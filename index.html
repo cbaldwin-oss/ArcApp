@@ -1,0 +1,649 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ArcApp — Commissioning Dashboard</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='16' fill='%23ffffff'/%3E%3Cpath d='M18 66 A34 34 0 0 1 82 66' fill='none' stroke='%234dbd50' stroke-width='9' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#f5f7f5;
+    --bg-alt:#eef2ee;
+    --surface:#ffffff;
+    --border:#e3e7e1;
+    --border-strong:#d2d9cf;
+    --text:#2b2b2b;
+    --text-muted:#6f766c;
+    --text-faint:#9aa098;
+    --green:#4dbd50;
+    --green-dark:#379a3b;
+    --green-deep:#256b28;
+    --green-tint:#eaf8ea;
+    --amber:#d98f26;
+    --amber-tint:#fbf1e0;
+    --red:#d9534a;
+    --red-tint:#fbeae9;
+    --font-display:'Poppins',sans-serif;
+    --font-body:'Inter',sans-serif;
+    --font-mono:'JetBrains Mono',monospace;
+    --radius:10px;
+    --radius-sm:6px;
+    --shadow-sm:0 1px 3px rgba(30,40,25,0.06);
+    --shadow-md:0 6px 20px rgba(30,40,25,0.09);
+  }
+
+  *{ box-sizing:border-box; }
+
+  @media (prefers-reduced-motion: reduce){
+    *{ animation:none !important; transition:none !important; }
+  }
+
+  html,body{
+    margin:0; padding:0; min-height:100%;
+    background:var(--bg);
+    color:var(--text);
+    font-family:var(--font-body);
+    -webkit-font-smoothing:antialiased;
+  }
+
+  ::selection{ background:var(--green-tint); color:var(--green-deep); }
+  a{ color:inherit; }
+
+  ::-webkit-scrollbar{ width:10px; height:10px; }
+  ::-webkit-scrollbar-track{ background:transparent; }
+  ::-webkit-scrollbar-thumb{ background:var(--border-strong); border-radius:10px; }
+
+  /* ---------- header ---------- */
+  .topbar{
+    position:sticky; top:0; z-index:40;
+    display:flex; align-items:center; justify-content:space-between;
+    padding:0 30px; height:72px;
+    background:var(--surface);
+    border-bottom:1px solid var(--border);
+  }
+  .brand{ display:flex; align-items:center; gap:12px; }
+  .brand-mark{ position:relative; width:38px; height:38px; flex:0 0 auto; }
+  .brand-text-wrap{ line-height:1.15; }
+  .brand-text{
+    font-family:var(--font-display); font-weight:600; font-size:20px;
+    letter-spacing:0.2px; color:var(--text);
+  }
+  .brand-text b{ color:var(--green-dark); font-weight:600; }
+  .brand-tagline{ font-size:10.5px; color:var(--text-faint); letter-spacing:0.3px; }
+
+  .nav{ display:flex; gap:4px; }
+  .nav a{
+    font-family:var(--font-display); font-size:13.5px; font-weight:500;
+    text-decoration:none; color:var(--text-muted);
+    padding:9px 15px; border-radius:var(--radius-sm);
+    transition:color .15s ease, background .15s ease;
+  }
+  .nav a:hover{ color:var(--text); background:var(--bg-alt); }
+  .nav a.active{ color:var(--green-dark); background:var(--green-tint); }
+
+  .topbar-right{ display:flex; align-items:center; gap:16px; }
+  .site-chip{
+    display:flex; align-items:center; gap:8px;
+    font-family:var(--font-body); font-size:12.5px; font-weight:500; color:var(--text-muted);
+    background:var(--bg-alt); border-radius:999px; padding:6px 14px 6px 10px;
+  }
+  .led{
+    width:7px; height:7px; border-radius:50%; background:var(--green);
+    animation:pulse 2.4s ease-in-out infinite;
+  }
+  @keyframes pulse{ 0%,100%{ opacity:1; } 50%{ opacity:.4; } }
+  .avatar{
+    width:34px; height:34px; border-radius:50%;
+    display:flex; align-items:center; justify-content:center;
+    font-family:var(--font-display); font-size:12.5px; font-weight:600; color:#fff;
+    background:linear-gradient(135deg,var(--green),var(--green-dark));
+  }
+
+  /* ---------- context strip ---------- */
+  .context-strip{
+    display:flex; align-items:center; gap:20px; flex-wrap:wrap;
+    padding:11px 30px; border-bottom:1px solid var(--border);
+    font-size:12.5px; color:var(--text-muted); background:var(--surface);
+  }
+  .context-strip span b{ color:var(--text); font-weight:600; }
+  .context-strip .divider{ color:var(--border-strong); }
+
+  /* ---------- page background arc ---------- */
+  .hero-arc{
+    position:relative; overflow:hidden;
+  }
+  .hero-arc svg{
+    position:absolute; top:-40px; left:50%; transform:translateX(-50%);
+    width:1100px; max-width:160%; opacity:0.55; pointer-events:none;
+  }
+
+  main{ max-width:1360px; margin:0 auto; padding:30px 30px 90px; position:relative; }
+
+  .page-heading{ margin:0 0 24px; position:relative; z-index:1; }
+  .page-heading h1{
+    font-family:var(--font-display); font-size:26px; font-weight:600;
+    margin:0 0 5px; color:var(--text);
+  }
+  .page-heading p{ margin:0; color:var(--text-muted); font-size:14px; }
+
+  /* ---------- KPI row ---------- */
+  .kpi-row{
+    display:grid; grid-template-columns:repeat(4,1fr); gap:16px; margin-bottom:24px;
+    position:relative; z-index:1;
+  }
+  .kpi{
+    background:var(--surface); border:1px solid var(--border); border-radius:var(--radius);
+    padding:18px 20px; box-shadow:var(--shadow-sm);
+  }
+  .kpi .kpi-label{
+    font-size:12px; font-weight:500; color:var(--text-muted); margin-bottom:12px;
+  }
+  .kpi .kpi-value{
+    font-family:var(--font-display); font-size:29px; font-weight:600; color:var(--text);
+    display:flex; align-items:baseline; gap:6px;
+  }
+  .kpi .kpi-value small{ font-size:14px; color:var(--text-faint); font-weight:500; font-family:var(--font-body); }
+  .kpi .kpi-sub{ margin-top:8px; font-size:12.5px; color:var(--text-faint); display:flex; align-items:center; gap:6px; }
+  .kpi .kpi-sub::before{ content:''; width:6px; height:6px; border-radius:50%; background:var(--border-strong); flex:0 0 auto; }
+  .kpi .kpi-sub.warn::before{ background:var(--amber); }
+  .kpi .kpi-sub.bad::before{ background:var(--red); }
+  .kpi .kpi-sub.good::before{ background:var(--green); }
+
+  /* ---------- panels ---------- */
+  .panel{
+    background:var(--surface); border:1px solid var(--border); border-radius:var(--radius);
+    margin-bottom:18px; box-shadow:var(--shadow-sm);
+  }
+  .panel-header{
+    display:flex; align-items:center; justify-content:space-between;
+    padding:16px 20px; border-bottom:1px solid var(--border);
+  }
+  .panel-header-left{ display:flex; align-items:center; gap:10px; }
+  .panel-title{
+    font-family:var(--font-display); font-size:15px; font-weight:600; margin:0; color:var(--text);
+  }
+  .panel-count{
+    font-size:11.5px; font-weight:500; color:var(--text-muted);
+    background:var(--bg-alt); border-radius:999px; padding:2px 10px;
+  }
+  .expand-btn{
+    background:var(--bg-alt); border:none; border-radius:var(--radius-sm); color:var(--text-muted);
+    width:30px; height:30px; display:flex; align-items:center; justify-content:center;
+    cursor:pointer; transition:background .15s ease, color .15s ease;
+  }
+  .expand-btn:hover{ background:var(--green-tint); color:var(--green-dark); }
+  .expand-btn svg{ width:14px; height:14px; }
+
+  .panel-body{ padding:8px 20px 16px; }
+  .panel-body.no-pad{ padding:0; }
+
+  /* ---------- dashboard grid ---------- */
+  .dash-grid{ display:grid; grid-template-columns:1.1fr 1fr; gap:18px; align-items:start; position:relative; z-index:1; }
+  @media (max-width:980px){ .dash-grid{ grid-template-columns:1fr; } .kpi-row{ grid-template-columns:repeat(2,1fr); } }
+
+  /* ---------- to-do list ---------- */
+  .todo-item{
+    display:flex; gap:13px; align-items:flex-start; padding:13px 0;
+    border-bottom:1px solid var(--border);
+  }
+  .todo-item:last-child{ border-bottom:none; }
+  .todo-check{
+    flex:0 0 auto; width:19px; height:19px; margin-top:2px; border-radius:5px;
+    border:1.5px solid var(--border-strong); background:var(--surface);
+    cursor:pointer; position:relative; transition:border-color .15s ease, background .15s ease;
+  }
+  .todo-check:hover{ border-color:var(--green); }
+  .todo-check.checked{ background:var(--green); border-color:var(--green); }
+  .todo-check.checked::after{
+    content:''; position:absolute; left:5px; top:2px; width:5px; height:9px;
+    border:solid #fff; border-width:0 2px 2px 0; transform:rotate(40deg);
+  }
+  .todo-main{ flex:1; min-width:0; }
+  .todo-text{ font-size:14px; color:var(--text); margin:0 0 6px; line-height:1.45; }
+  .todo-item.done .todo-text{ color:var(--text-faint); text-decoration:line-through; }
+  .todo-meta{ display:flex; align-items:center; gap:9px; flex-wrap:wrap; }
+  .tag{
+    font-size:11px; font-weight:600; letter-spacing:0.2px;
+    padding:2px 9px; border-radius:999px;
+  }
+  .tag.crit{ color:var(--red); background:var(--red-tint); }
+  .tag.high{ color:var(--amber); background:var(--amber-tint); }
+  .tag.norm{ color:var(--text-muted); background:var(--bg-alt); }
+  .todo-due{ font-family:var(--font-mono); font-size:11.5px; color:var(--text-faint); }
+  .todo-due.today{ color:var(--amber); font-weight:600; }
+  .todo-sys{ font-family:var(--font-mono); font-size:11.5px; color:var(--text-faint); }
+
+  /* ---------- milestones ---------- */
+  .milestone-item{
+    display:flex; align-items:center; gap:16px; padding:15px 0;
+    border-bottom:1px solid var(--border);
+  }
+  .milestone-item:last-child{ border-bottom:none; }
+  .arc-wrap{ flex:0 0 auto; width:54px; height:54px; position:relative; }
+  .arc-wrap svg{ width:54px; height:54px; transform:rotate(-90deg); }
+  .arc-bg{ fill:none; stroke:var(--bg-alt); stroke-width:5; }
+  .arc-fg{ fill:none; stroke-width:5; stroke-linecap:round; transition:stroke-dashoffset .4s ease; }
+  .arc-pct{
+    position:absolute; inset:0; display:flex; align-items:center; justify-content:center;
+    font-family:var(--font-display); font-size:12px; font-weight:600; color:var(--text);
+  }
+  .milestone-main{ flex:1; min-width:0; }
+  .milestone-name{ font-size:14px; font-weight:500; margin:0 0 6px; color:var(--text); }
+  .milestone-meta{ display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
+  .status-chip{
+    font-size:11px; font-weight:600; letter-spacing:0.2px; padding:2px 9px; border-radius:999px;
+  }
+  .status-chip.ontrack{ color:var(--green-dark); background:var(--green-tint); }
+  .status-chip.atrisk{ color:var(--amber); background:var(--amber-tint); }
+  .status-chip.behind{ color:var(--red); background:var(--red-tint); }
+  .status-chip.complete{ color:#fff; background:var(--green); }
+  .milestone-date{ font-family:var(--font-mono); font-size:11.5px; color:var(--text-faint); }
+
+  /* ---------- table ---------- */
+  table.sched{ width:100%; border-collapse:collapse; font-size:13px; }
+  table.sched th{
+    text-align:left; font-size:11.5px; font-weight:600; color:var(--text-muted);
+    padding:11px 14px; border-bottom:1px solid var(--border); background:var(--bg-alt);
+    white-space:nowrap;
+  }
+  table.sched th:first-child{ border-top-left-radius:0; }
+  table.sched td{
+    padding:12px 14px; border-bottom:1px solid var(--border); color:var(--text);
+    white-space:nowrap;
+  }
+  table.sched tbody tr:hover{ background:var(--green-tint); }
+  .tag-cell{ font-family:var(--font-mono); font-weight:600; color:var(--green-deep); }
+  .discipline-cell{ color:var(--text-muted); }
+  .mini-bar{ width:70px; height:6px; background:var(--bg-alt); border-radius:999px; position:relative; display:inline-block; vertical-align:middle; margin-right:8px; overflow:hidden; }
+  .mini-bar span{ position:absolute; left:0; top:0; bottom:0; background:var(--green); border-radius:999px; }
+  .pct-cell{ font-family:var(--font-mono); font-size:12px; }
+  .loto-yes{ color:var(--red); font-weight:600; font-size:12px; }
+  .loto-no{ color:var(--text-faint); font-size:12px; }
+
+  /* ---------- fullscreen overlay ---------- */
+  .fs-overlay{
+    position:fixed; inset:0; z-index:100; background:rgba(30,35,28,0.45);
+    display:none; align-items:flex-start; justify-content:center; padding:26px;
+  }
+  .fs-overlay.open{ display:flex; }
+  .fs-panel{
+    background:var(--surface); border-radius:var(--radius); width:100%; max-width:1400px;
+    max-height:calc(100vh - 52px); display:flex; flex-direction:column; overflow:hidden;
+    box-shadow:var(--shadow-md);
+  }
+  .fs-header{
+    display:flex; align-items:center; justify-content:space-between;
+    padding:18px 26px; border-bottom:1px solid var(--border);
+  }
+  .fs-header h2{ font-family:var(--font-display); font-size:17px; font-weight:600; margin:0; color:var(--text); }
+  .fs-close{
+    background:var(--bg-alt); border:none; border-radius:var(--radius-sm); color:var(--text-muted);
+    width:32px; height:32px; cursor:pointer; font-size:17px;
+    display:flex; align-items:center; justify-content:center;
+    transition:background .15s ease, color .15s ease;
+  }
+  .fs-close:hover{ background:var(--red-tint); color:var(--red); }
+  .fs-body{ flex:1; overflow:auto; padding:22px 26px; }
+  .fs-body .panel-body{ padding:0; }
+  .fs-body table.sched{ font-size:14px; }
+  .fs-body table.sched th, .fs-body table.sched td{ padding:14px 16px; }
+
+  .fs-toolbar{ display:flex; gap:10px; margin-bottom:16px; }
+  .fs-toolbar input{
+    background:var(--bg-alt); border:1px solid var(--border); border-radius:var(--radius-sm);
+    color:var(--text); font-size:13px; padding:9px 13px; flex:1; max-width:320px;
+  }
+  .fs-toolbar input::placeholder{ color:var(--text-faint); }
+
+  footer{
+    text-align:center; padding:34px; color:var(--text-faint); font-size:12px;
+    border-top:1px solid var(--border); background:var(--surface);
+  }
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="brand">
+    <div class="brand-mark">
+      <svg viewBox="0 0 100 100" width="38" height="38">
+        <path d="M14 66 A36 36 0 0 1 86 66" fill="none" stroke="url(#arcGrad)" stroke-width="8" stroke-linecap="round"/>
+        <defs>
+          <linearGradient id="arcGrad" x1="0" y1="0" x2="1" y2="0">
+            <stop offset="0%" stop-color="#9adf9c"/>
+            <stop offset="100%" stop-color="#3a9a3d"/>
+          </linearGradient>
+        </defs>
+      </svg>
+    </div>
+    <div class="brand-text-wrap">
+      <div class="brand-text">Arc<b>App</b></div>
+      <div class="brand-tagline">Commissioning. Confidence.</div>
+    </div>
+  </div>
+  <nav class="nav">
+    <a href="#dashboard" class="active">Dashboard</a>
+    <a href="#todo">To-Do</a>
+    <a href="#milestones">Milestones</a>
+    <a href="#schedule">Schedule</a>
+  </nav>
+  <div class="topbar-right">
+    <div class="site-chip"><span class="led"></span> PHX-3 · Phase 2</div>
+    <div class="avatar">JT</div>
+  </div>
+</div>
+
+<div class="context-strip">
+  <span>Project <b>Phoenix Data Center 3</b></span>
+  <span class="divider">/</span>
+  <span>Role <b>Commissioning Lead</b></span>
+  <span class="divider">/</span>
+  <span>Today <b>Fri, Aug 28 2026</b></span>
+  <span class="divider">/</span>
+  <span>Open systems <b>9</b></span>
+</div>
+
+<div class="hero-arc">
+  <svg viewBox="0 0 1100 200" xmlns="http://www.w3.org/2000/svg">
+    <path d="M60 180 A490 490 0 0 1 1040 180" fill="none" stroke="url(#heroGrad)" stroke-width="3"/>
+    <defs>
+      <linearGradient id="heroGrad" x1="0" y1="0" x2="1" y2="0">
+        <stop offset="0%" stop-color="#4dbd50" stop-opacity="0"/>
+        <stop offset="50%" stop-color="#4dbd50" stop-opacity="0.5"/>
+        <stop offset="100%" stop-color="#4dbd50" stop-opacity="0"/>
+      </linearGradient>
+    </defs>
+  </svg>
+
+<main>
+  <div class="page-heading" id="dashboard">
+    <h1>Commissioning Dashboard</h1>
+    <p>Your milestones, punch items, and system status for Phoenix Data Center 3 — updated live.</p>
+  </div>
+
+  <div class="kpi-row">
+    <div class="kpi">
+      <div class="kpi-label">Milestones on track</div>
+      <div class="kpi-value">4 <small>/ 6</small></div>
+      <div class="kpi-sub good">2 need attention this week</div>
+    </div>
+    <div class="kpi">
+      <div class="kpi-label">Open to-dos</div>
+      <div class="kpi-value">7</div>
+      <div class="kpi-sub warn">2 due today</div>
+    </div>
+    <div class="kpi">
+      <div class="kpi-label">Systems in commissioning</div>
+      <div class="kpi-value">9</div>
+      <div class="kpi-sub">3 disciplines active</div>
+    </div>
+    <div class="kpi">
+      <div class="kpi-label">Next milestone due</div>
+      <div class="kpi-value">2 <small>days</small></div>
+      <div class="kpi-sub bad">Domestic Water Booster — Turnover</div>
+    </div>
+  </div>
+
+  <div class="dash-grid">
+
+    <!-- TO-DO PANEL -->
+    <section class="panel" id="todo">
+      <div class="panel-header">
+        <div class="panel-header-left">
+          <h2 class="panel-title">Your to-dos</h2>
+          <span class="panel-count">7 open</span>
+        </div>
+        <button class="expand-btn" data-target="todo-body" data-title="Your to-dos" title="Expand">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 3H3v6M15 3h6v6M9 21H3v-6M15 21h6v-6"/></svg>
+        </button>
+      </div>
+      <div class="panel-body" id="todo-body">
+        <div class="todo-list"></div>
+      </div>
+    </section>
+
+    <!-- MILESTONES PANEL -->
+    <section class="panel" id="milestones">
+      <div class="panel-header">
+        <div class="panel-header-left">
+          <h2 class="panel-title">Milestones</h2>
+          <span class="panel-count">6 tracked</span>
+        </div>
+        <button class="expand-btn" data-target="milestones-body" data-title="Milestones" title="Expand">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 3H3v6M15 3h6v6M9 21H3v-6M15 21h6v-6"/></svg>
+        </button>
+      </div>
+      <div class="panel-body" id="milestones-body">
+        <div class="milestone-list"></div>
+      </div>
+    </section>
+  </div>
+
+  <!-- SCHEDULE / SYSTEM STATUS PANEL -->
+  <section class="panel" id="schedule">
+    <div class="panel-header">
+      <div class="panel-header-left">
+        <h2 class="panel-title">System status</h2>
+        <span class="panel-count">12 systems</span>
+      </div>
+      <button class="expand-btn" data-target="schedule-body" data-title="System status" title="Expand">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 3H3v6M15 3h6v6M9 21H3v-6M15 21h6v-6"/></svg>
+      </button>
+    </div>
+    <div class="panel-body no-pad" id="schedule-body">
+      <div style="overflow-x:auto;">
+        <table class="sched" id="sched-table">
+          <thead>
+            <tr>
+              <th>Tag / System</th>
+              <th>Discipline</th>
+              <th>Activity</th>
+              <th>Status</th>
+              <th>LOTO</th>
+              <th>Complete</th>
+              <th>Target date</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <footer>ArcApp Commissioning · Phoenix Data Center 3 · Sample data for design review only</footer>
+</main>
+</div>
+
+<!-- FULLSCREEN OVERLAY (shared) -->
+<div class="fs-overlay" id="fs-overlay">
+  <div class="fs-panel">
+    <div class="fs-header">
+      <h2 id="fs-title">Panel</h2>
+      <button class="fs-close" id="fs-close">&times;</button>
+    </div>
+    <div class="fs-body" id="fs-body"></div>
+  </div>
+</div>
+
+<script>
+/* ============ FAKE DATA ============ */
+
+const todos = [
+  { id:1, text:'Approve turnover package — Chiller Plant Room 1', tag:'crit', tagLabel:'Critical', sys:'CHW-01', due:'Due today', today:true, done:false },
+  { id:2, text:'Review LOTO permit request — MC-204 Switchgear', tag:'high', tagLabel:'High', sys:'MC-204', due:'Due today', today:true, done:false },
+  { id:3, text:'Walk punch list — Electrical Room 3', tag:'norm', tagLabel:'Normal', sys:'ER-03', due:'Due tomorrow', today:false, done:false },
+  { id:4, text:'Sign off functional test — Fire Alarm Panel FP-2', tag:'high', tagLabel:'High', sys:'FP-2', due:'Due Aug 29', today:false, done:false },
+  { id:5, text:'Update RFSU tracker — BAS Integration', tag:'norm', tagLabel:'Normal', sys:'BAS-01', due:'Due Sep 1', today:false, done:false },
+  { id:6, text:'Coordinate vendor start-up — Generator Load Bank Test', tag:'crit', tagLabel:'Critical', sys:'GEN-02', due:'Due Sep 2', today:false, done:false },
+  { id:7, text:'Close out punch items — Domestic Water Booster', tag:'norm', tagLabel:'Normal', sys:'DWB-01', due:'Due Aug 30', today:false, done:false },
+  { id:8, text:'File inspection request — Emergency Lighting circuit EL-14', tag:'norm', tagLabel:'Normal', sys:'EL-14', due:'Completed Aug 26', today:false, done:true },
+];
+
+const milestones = [
+  { name:'Electrical Room 3 — Energization', pct:82, due:'Sep 5, 2026', status:'ontrack', label:'On Track' },
+  { name:'Chiller Plant — Functional Testing', pct:45, due:'Sep 18, 2026', status:'atrisk', label:'At Risk' },
+  { name:'Fire Alarm System — RFSU', pct:100, due:'Completed Aug 20', status:'complete', label:'Complete' },
+  { name:'Emergency Generator — Load Bank Test', pct:20, due:'Oct 2, 2026', status:'ontrack', label:'On Track' },
+  { name:'Building Automation — System Integration', pct:60, due:'Sep 25, 2026', status:'behind', label:'Behind' },
+  { name:'Domestic Water Booster — Turnover', pct:95, due:'Aug 30, 2026', status:'ontrack', label:'On Track' },
+];
+
+const schedule = [
+  { tag:'CHW-01', discipline:'Mechanical', activity:'Functional Performance Test', status:'In Progress', loto:true, pct:45, date:'Sep 18, 2026' },
+  { tag:'MC-204', discipline:'Electrical', activity:'Switchgear Energization', status:'Ready', loto:true, pct:78, date:'Sep 3, 2026' },
+  { tag:'ER-03', discipline:'Electrical', activity:'Panel Termination Punch', status:'In Progress', loto:false, pct:82, date:'Sep 5, 2026' },
+  { tag:'FP-2', discipline:'Fire Protection', activity:'Device Point-to-Point', status:'In Progress', loto:false, pct:88, date:'Aug 29, 2026' },
+  { tag:'BAS-01', discipline:'Controls', activity:'Sequence of Operations Test', status:'Not Started', loto:false, pct:60, date:'Sep 25, 2026' },
+  { tag:'GEN-02', discipline:'Electrical', activity:'Load Bank Test', status:'Scheduled', loto:true, pct:20, date:'Oct 2, 2026' },
+  { tag:'DWB-01', discipline:'Plumbing', activity:'Turnover Package', status:'In Progress', loto:false, pct:95, date:'Aug 30, 2026' },
+  { tag:'EL-14', discipline:'Electrical', activity:'Emergency Lighting Test', status:'Complete', loto:false, pct:100, date:'Aug 26, 2026' },
+  { tag:'AHU-06', discipline:'Mechanical', activity:'Air Balance / TAB', status:'In Progress', loto:false, pct:55, date:'Sep 12, 2026' },
+  { tag:'UPS-01', discipline:'Electrical', activity:'Battery String Test', status:'Not Started', loto:true, pct:10, date:'Oct 8, 2026' },
+  { tag:'FP-6', discipline:'Fire Protection', activity:'Sprinkler Flow Test', status:'Ready', loto:false, pct:70, date:'Sep 9, 2026' },
+  { tag:'BAS-02', discipline:'Controls', activity:'Graphics & Alarm Verification', status:'Not Started', loto:false, pct:15, date:'Oct 1, 2026' },
+];
+
+/* ============ RENDER: TO-DO ============ */
+function renderTodos(container){
+  container.innerHTML = '';
+  todos.forEach(t => {
+    const row = document.createElement('div');
+    row.className = 'todo-item' + (t.done ? ' done' : '');
+    row.innerHTML = `
+      <div class="todo-check ${t.done ? 'checked' : ''}" data-id="${t.id}"></div>
+      <div class="todo-main">
+        <p class="todo-text">${t.text}</p>
+        <div class="todo-meta">
+          <span class="tag ${t.tag}">${t.tagLabel}</span>
+          <span class="todo-sys">${t.sys}</span>
+          <span class="todo-due ${t.today ? 'today' : ''}">${t.due}</span>
+        </div>
+      </div>`;
+    container.appendChild(row);
+  });
+  container.querySelectorAll('.todo-check').forEach(cb => {
+    cb.addEventListener('click', () => {
+      const id = Number(cb.dataset.id);
+      const item = todos.find(x => x.id === id);
+      item.done = !item.done;
+      renderTodos(document.querySelector('#todo-body .todo-list'));
+      const fsList = document.querySelector('#fs-body .todo-list');
+      if (fsList) renderTodos(fsList);
+    });
+  });
+}
+
+/* ============ RENDER: MILESTONES ============ */
+function statusColor(status){
+  return { ontrack:'#4dbd50', atrisk:'#d98f26', behind:'#d9534a', complete:'#379a3b' }[status];
+}
+function renderMilestones(container){
+  container.innerHTML = '';
+  const R = 24, C = 2 * Math.PI * R;
+  milestones.forEach(m => {
+    const offset = C - (m.pct / 100) * C;
+    const row = document.createElement('div');
+    row.className = 'milestone-item';
+    row.innerHTML = `
+      <div class="arc-wrap">
+        <svg viewBox="0 0 56 56">
+          <circle class="arc-bg" cx="28" cy="28" r="${R}"></circle>
+          <circle class="arc-fg" cx="28" cy="28" r="${R}" stroke="${statusColor(m.status)}"
+            stroke-dasharray="${C}" stroke-dashoffset="${offset}"></circle>
+        </svg>
+        <div class="arc-pct">${m.pct}%</div>
+      </div>
+      <div class="milestone-main">
+        <p class="milestone-name">${m.name}</p>
+        <div class="milestone-meta">
+          <span class="status-chip ${m.status}">${m.label}</span>
+          <span class="milestone-date">${m.due}</span>
+        </div>
+      </div>`;
+    container.appendChild(row);
+  });
+}
+
+/* ============ RENDER: SCHEDULE TABLE ============ */
+function statusChipClass(status){
+  if (status === 'Complete') return 'complete';
+  if (status === 'In Progress' || status === 'Ready' || status === 'Scheduled') return 'ontrack';
+  return 'atrisk';
+}
+function renderSchedule(tbody, filter=''){
+  tbody.innerHTML = '';
+  const f = filter.trim().toLowerCase();
+  schedule
+    .filter(r => !f || (r.tag + r.discipline + r.activity + r.status).toLowerCase().includes(f))
+    .forEach(r => {
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td class="tag-cell">${r.tag}</td>
+        <td class="discipline-cell">${r.discipline}</td>
+        <td>${r.activity}</td>
+        <td><span class="status-chip ${statusChipClass(r.status)}">${r.status}</span></td>
+        <td>${r.loto ? '<span class="loto-yes">YES</span>' : '<span class="loto-no">NO</span>'}</td>
+        <td class="pct-cell"><span class="mini-bar"><span style="width:${r.pct}%"></span></span>${r.pct}%</td>
+        <td class="discipline-cell">${r.date}</td>`;
+      tbody.appendChild(tr);
+    });
+}
+
+/* ============ INITIAL RENDER ============ */
+renderTodos(document.querySelector('#todo-body .todo-list'));
+renderMilestones(document.querySelector('#milestones-body .milestone-list'));
+renderSchedule(document.querySelector('#sched-table tbody'));
+
+/* ============ FULLSCREEN EXPAND ============ */
+const overlay = document.getElementById('fs-overlay');
+const fsBody = document.getElementById('fs-body');
+const fsTitle = document.getElementById('fs-title');
+let movedNode = null, originalParent = null, originalNext = null;
+
+document.querySelectorAll('.expand-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const targetId = btn.dataset.target;
+    const node = document.getElementById(targetId);
+    originalParent = node.parentNode;
+    originalNext = node.nextSibling;
+    movedNode = node;
+
+    fsTitle.textContent = btn.dataset.title;
+    fsBody.innerHTML = '';
+
+    if (targetId === 'schedule-body') {
+      const toolbar = document.createElement('div');
+      toolbar.className = 'fs-toolbar';
+      toolbar.innerHTML = `<input type="text" id="fs-filter" placeholder="Filter by tag, discipline, activity, status...">`;
+      fsBody.appendChild(toolbar);
+      toolbar.querySelector('input').addEventListener('input', (e) => {
+        renderSchedule(document.querySelector('#sched-table tbody'), e.target.value);
+      });
+    }
+
+    fsBody.appendChild(node);
+    overlay.classList.add('open');
+    document.body.style.overflow = 'hidden';
+  });
+});
+
+function closeFullscreen(){
+  if (movedNode && originalParent) {
+    originalParent.insertBefore(movedNode, originalNext);
+  }
+  overlay.classList.remove('open');
+  document.body.style.overflow = '';
+  movedNode = null;
+}
+document.getElementById('fs-close').addEventListener('click', closeFullscreen);
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape' && overlay.classList.contains('open')) closeFullscreen();
+});
+overlay.addEventListener('click', (e) => {
+  if (e.target === overlay) closeFullscreen();
+});
+</script>
+</body>
+</html>
