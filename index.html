@@ -3,35 +3,37 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>ArcApp — Commissioning Dashboard</title>
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='16' fill='%23ffffff'/%3E%3Cpath d='M18 66 A34 34 0 0 1 82 66' fill='none' stroke='%234dbd50' stroke-width='9' stroke-linecap='round'/%3E%3C/svg%3E">
+<title>ArcApp — Mission Dashboard</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='16' fill='%23060915'/%3E%3Cpath d='M18 66 A34 34 0 0 1 82 66' fill='none' stroke='%2340e37f' stroke-width='9' stroke-linecap='round'/%3E%3C/svg%3E">
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;600;700;800&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
   :root{
-    --bg:#f5f7f5;
-    --bg-alt:#eef2ee;
-    --surface:#ffffff;
-    --border:#e3e7e1;
-    --border-strong:#d2d9cf;
-    --text:#2b2b2b;
-    --text-muted:#6f766c;
-    --text-faint:#9aa098;
-    --green:#4dbd50;
-    --green-dark:#379a3b;
-    --green-deep:#256b28;
-    --green-tint:#eaf8ea;
-    --amber:#d98f26;
-    --amber-tint:#fbf1e0;
-    --red:#d9534a;
-    --red-tint:#fbeae9;
-    --font-display:'Poppins',sans-serif;
+    --bg:#05070d;
+    --bg-elev:#0b0f1c;
+    --bg-elev-2:#111629;
+    --border:#1d2440;
+    --border-strong:#2c3560;
+    --text:#eef1f8;
+    --text-muted:#8991b5;
+    --text-faint:#565f84;
+    --green:#3fe382;
+    --green-soft:#8ff2ae;
+    --green-dim:#1c8a4c;
+    --green-deep:#0d3d24;
+    --green-tint:rgba(63,227,130,0.12);
+    --amber:#f0a840;
+    --amber-tint:rgba(240,168,64,0.14);
+    --red:#ff5c56;
+    --red-tint:rgba(255,92,86,0.14);
+    --font-display:'Orbitron',sans-serif;
     --font-body:'Inter',sans-serif;
     --font-mono:'JetBrains Mono',monospace;
     --radius:10px;
     --radius-sm:6px;
-    --shadow-sm:0 1px 3px rgba(30,40,25,0.06);
-    --shadow-md:0 6px 20px rgba(30,40,25,0.09);
+    --shadow-sm:0 1px 2px rgba(0,0,0,0.35);
+    --shadow-md:0 12px 34px rgba(0,0,0,0.5);
   }
 
   *{ box-sizing:border-box; }
@@ -48,7 +50,29 @@
     -webkit-font-smoothing:antialiased;
   }
 
-  ::selection{ background:var(--green-tint); color:var(--green-deep); }
+  /* ---------- starfield ---------- */
+  .starfield{
+    position:fixed; inset:0; z-index:0; pointer-events:none;
+    background:
+      radial-gradient(1.5px 1.5px at 8% 12%, #ffffff 100%, transparent),
+      radial-gradient(1px 1px at 22% 68%, #ffffff 100%, transparent),
+      radial-gradient(1.5px 1.5px at 38% 24%, #cfe9ff 100%, transparent),
+      radial-gradient(1px 1px at 54% 82%, #ffffff 100%, transparent),
+      radial-gradient(1.5px 1.5px at 67% 14%, #ffffff 100%, transparent),
+      radial-gradient(1px 1px at 78% 55%, #cfe9ff 100%, transparent),
+      radial-gradient(1.5px 1.5px at 91% 30%, #ffffff 100%, transparent),
+      radial-gradient(1px 1px at 12% 90%, #ffffff 100%, transparent),
+      radial-gradient(1px 1px at 46% 46%, #ffffff 100%, transparent),
+      radial-gradient(1.5px 1.5px at 85% 78%, #cfe9ff 100%, transparent);
+    background-repeat:no-repeat;
+    opacity:0.5;
+  }
+  .starfield::after{
+    content:''; position:absolute; inset:0;
+    background:radial-gradient(ellipse 900px 500px at 50% -10%, rgba(63,227,130,0.10), transparent 60%);
+  }
+
+  ::selection{ background:var(--green-deep); color:var(--green-soft); }
   a{ color:inherit; }
 
   ::-webkit-scrollbar{ width:10px; height:10px; }
@@ -60,312 +84,294 @@
     position:sticky; top:0; z-index:40;
     display:flex; align-items:center; justify-content:space-between;
     padding:0 30px; height:72px;
-    background:var(--surface);
+    background:rgba(11,15,28,0.9);
+    backdrop-filter:blur(8px);
     border-bottom:1px solid var(--border);
   }
   .brand{ display:flex; align-items:center; gap:12px; }
   .brand-mark{ position:relative; width:38px; height:38px; flex:0 0 auto; }
   .brand-text-wrap{ line-height:1.15; }
   .brand-text{
-    font-family:var(--font-display); font-weight:600; font-size:20px;
-    letter-spacing:0.2px; color:var(--text);
+    font-family:var(--font-display); font-weight:700; font-size:19px;
+    letter-spacing:0.5px; color:var(--text);
   }
-  .brand-text b{ color:var(--green-dark); font-weight:600; }
-  .brand-tagline{ font-size:10.5px; color:var(--text-faint); letter-spacing:0.3px; }
+  .brand-text b{ color:var(--green); font-weight:700; }
+  .brand-tagline{ font-family:var(--font-mono); font-size:10px; color:var(--text-faint); letter-spacing:0.6px; text-transform:uppercase; }
 
   .nav{ display:flex; gap:4px; }
   .nav a{
-    font-family:var(--font-display); font-size:13.5px; font-weight:500;
+    font-family:var(--font-display); font-size:12.5px; font-weight:600;
+    letter-spacing:0.6px; text-transform:uppercase;
     text-decoration:none; color:var(--text-muted);
     padding:9px 15px; border-radius:var(--radius-sm);
     transition:color .15s ease, background .15s ease;
   }
-  .nav a:hover{ color:var(--text); background:var(--bg-alt); }
-  .nav a.active{ color:var(--green-dark); background:var(--green-tint); }
+  .nav a:hover{ color:var(--text); background:var(--bg-elev-2); }
+  .nav a.active{ color:var(--green); background:var(--green-tint); }
 
   .topbar-right{ display:flex; align-items:center; gap:16px; }
   .site-chip{
     display:flex; align-items:center; gap:8px;
-    font-family:var(--font-body); font-size:12.5px; font-weight:500; color:var(--text-muted);
-    background:var(--bg-alt); border-radius:999px; padding:6px 14px 6px 10px;
+    font-family:var(--font-mono); font-size:11.5px; font-weight:500; color:var(--text-muted);
+    background:var(--bg-elev-2); border:1px solid var(--border); border-radius:999px; padding:6px 14px 6px 10px;
+    letter-spacing:0.4px;
   }
-  .led{
-    width:7px; height:7px; border-radius:50%; background:var(--green);
-    animation:pulse 2.4s ease-in-out infinite;
-  }
-  @keyframes pulse{ 0%,100%{ opacity:1; } 50%{ opacity:.4; } }
+  .led{ width:7px; height:7px; border-radius:50%; background:var(--green); animation:pulse 2.4s ease-in-out infinite; }
+  .led.amber{ background:var(--amber); }
+  .led.red{ background:var(--red); }
+  @keyframes pulse{ 0%,100%{ opacity:1; } 50%{ opacity:.35; } }
   .avatar{
     width:34px; height:34px; border-radius:50%;
     display:flex; align-items:center; justify-content:center;
-    font-family:var(--font-display); font-size:12.5px; font-weight:600; color:#fff;
-    background:linear-gradient(135deg,var(--green),var(--green-dark));
+    font-family:var(--font-display); font-size:12px; font-weight:700; color:#04170d;
+    background:linear-gradient(135deg,var(--green-soft),var(--green));
   }
 
   /* ---------- context strip ---------- */
   .context-strip{
     display:flex; align-items:center; gap:20px; flex-wrap:wrap;
     padding:11px 30px; border-bottom:1px solid var(--border);
-    font-size:12.5px; color:var(--text-muted); background:var(--surface);
+    font-family:var(--font-mono); font-size:11.5px; color:var(--text-muted);
+    background:rgba(11,15,28,0.6);
   }
   .context-strip span b{ color:var(--text); font-weight:600; }
   .context-strip .divider{ color:var(--border-strong); }
 
-  /* ---------- page background arc ---------- */
-  .hero-arc{
-    position:relative; overflow:hidden;
-  }
-  .hero-arc svg{
-    position:absolute; top:-40px; left:50%; transform:translateX(-50%);
-    width:1100px; max-width:160%; opacity:0.55; pointer-events:none;
-  }
+  main{ max-width:1360px; margin:0 auto; padding:30px 30px 90px; position:relative; z-index:1; }
 
-  main{ max-width:1360px; margin:0 auto; padding:30px 30px 90px; position:relative; }
-
-  .page-heading{ margin:0 0 24px; position:relative; z-index:1; }
+  .page-heading{ margin:0 0 24px; }
   .page-heading h1{
-    font-family:var(--font-display); font-size:26px; font-weight:600;
-    margin:0 0 5px; color:var(--text);
+    font-family:var(--font-display); font-size:23px; font-weight:700;
+    margin:0 0 6px; color:var(--text); letter-spacing:0.4px;
   }
   .page-heading p{ margin:0; color:var(--text-muted); font-size:14px; }
 
   /* ---------- KPI row ---------- */
-  .kpi-row{
-    display:grid; grid-template-columns:repeat(4,1fr); gap:16px; margin-bottom:24px;
-    position:relative; z-index:1;
-  }
+  .kpi-row{ display:grid; grid-template-columns:repeat(4,1fr); gap:16px; margin-bottom:24px; }
   .kpi{
-    background:var(--surface); border:1px solid var(--border); border-radius:var(--radius);
+    background:var(--bg-elev); border:1px solid var(--border); border-radius:var(--radius);
     padding:18px 20px; box-shadow:var(--shadow-sm);
   }
   .kpi .kpi-label{
-    font-size:12px; font-weight:500; color:var(--text-muted); margin-bottom:12px;
+    font-family:var(--font-mono); font-size:10.5px; font-weight:600; letter-spacing:0.8px;
+    text-transform:uppercase; color:var(--text-muted); margin-bottom:12px;
   }
   .kpi .kpi-value{
-    font-family:var(--font-display); font-size:29px; font-weight:600; color:var(--text);
+    font-family:var(--font-display); font-size:28px; font-weight:700; color:var(--text);
     display:flex; align-items:baseline; gap:6px;
   }
-  .kpi .kpi-value small{ font-size:14px; color:var(--text-faint); font-weight:500; font-family:var(--font-body); }
-  .kpi .kpi-sub{ margin-top:8px; font-size:12.5px; color:var(--text-faint); display:flex; align-items:center; gap:6px; }
+  .kpi .kpi-value small{ font-size:13px; color:var(--text-faint); font-weight:500; font-family:var(--font-mono); }
+  .kpi .kpi-sub{ margin-top:9px; font-size:12px; color:var(--text-faint); display:flex; align-items:center; gap:6px; }
   .kpi .kpi-sub::before{ content:''; width:6px; height:6px; border-radius:50%; background:var(--border-strong); flex:0 0 auto; }
   .kpi .kpi-sub.warn::before{ background:var(--amber); }
   .kpi .kpi-sub.bad::before{ background:var(--red); }
   .kpi .kpi-sub.good::before{ background:var(--green); }
+  .kpi.clock .kpi-value{ font-size:30px; letter-spacing:1px; }
+  .kpi.clock .kpi-value .unit{ color:var(--green); }
 
   /* ---------- panels ---------- */
   .panel{
-    background:var(--surface); border:1px solid var(--border); border-radius:var(--radius);
+    background:var(--bg-elev); border:1px solid var(--border); border-radius:var(--radius);
     margin-bottom:18px; box-shadow:var(--shadow-sm);
   }
   .panel-header{
-    display:flex; align-items:center; justify-content:space-between;
+    display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap;
     padding:16px 20px; border-bottom:1px solid var(--border);
   }
-  .panel-header-left{ display:flex; align-items:center; gap:10px; }
+  .panel-header-left{ display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
   .panel-title{
-    font-family:var(--font-display); font-size:15px; font-weight:600; margin:0; color:var(--text);
+    font-family:var(--font-display); font-size:14px; font-weight:700; letter-spacing:0.5px;
+    text-transform:uppercase; margin:0; color:var(--text);
   }
   .panel-count{
-    font-size:11.5px; font-weight:500; color:var(--text-muted);
-    background:var(--bg-alt); border-radius:999px; padding:2px 10px;
+    font-family:var(--font-mono); font-size:11px; font-weight:500; color:var(--text-muted);
+    background:var(--bg-elev-2); border:1px solid var(--border); border-radius:999px; padding:2px 10px;
   }
-  .expand-btn{
-    background:var(--bg-alt); border:none; border-radius:var(--radius-sm); color:var(--text-muted);
+  .conn-pill{
+    display:flex; align-items:center; gap:6px;
+    font-family:var(--font-mono); font-size:10.5px; font-weight:600; letter-spacing:0.4px; text-transform:uppercase;
+    border-radius:999px; padding:3px 10px 3px 8px;
+  }
+  .conn-pill.ready{ color:var(--green); background:var(--green-tint); }
+  .conn-pill.loading{ color:var(--text-muted); background:var(--bg-elev-2); }
+  .conn-pill.error{ color:var(--red); background:var(--red-tint); }
+  .panel-header-right{ display:flex; align-items:center; gap:8px; }
+  .icon-btn{
+    background:var(--bg-elev-2); border:1px solid var(--border); border-radius:var(--radius-sm); color:var(--text-muted);
     width:30px; height:30px; display:flex; align-items:center; justify-content:center;
-    cursor:pointer; transition:background .15s ease, color .15s ease;
+    cursor:pointer; transition:border-color .15s ease, color .15s ease;
   }
-  .expand-btn:hover{ background:var(--green-tint); color:var(--green-dark); }
-  .expand-btn svg{ width:14px; height:14px; }
+  .icon-btn:hover{ border-color:var(--green); color:var(--green); }
+  .icon-btn svg{ width:14px; height:14px; }
+  .icon-btn.spin svg{ animation:spin 0.9s linear infinite; }
+  @keyframes spin{ to{ transform:rotate(360deg); } }
 
   .panel-body{ padding:8px 20px 16px; }
   .panel-body.no-pad{ padding:0; }
+  .sync-note{ font-family:var(--font-mono); font-size:10.5px; color:var(--text-faint); padding:0 20px 12px; margin-top:-6px; }
 
   /* ---------- dashboard grid ---------- */
-  .dash-grid{ display:grid; grid-template-columns:1.1fr 1fr; gap:18px; align-items:start; position:relative; z-index:1; }
+  .dash-grid{ display:grid; grid-template-columns:1.1fr 1fr; gap:18px; align-items:start; }
   @media (max-width:980px){ .dash-grid{ grid-template-columns:1fr; } .kpi-row{ grid-template-columns:repeat(2,1fr); } }
 
   /* ---------- to-do list ---------- */
-  .todo-item{
-    display:flex; gap:13px; align-items:flex-start; padding:13px 0;
-    border-bottom:1px solid var(--border);
-  }
+  .todo-item{ display:flex; gap:13px; align-items:flex-start; padding:13px 0; border-bottom:1px solid var(--border); }
   .todo-item:last-child{ border-bottom:none; }
   .todo-check{
     flex:0 0 auto; width:19px; height:19px; margin-top:2px; border-radius:5px;
-    border:1.5px solid var(--border-strong); background:var(--surface);
+    border:1.5px solid var(--border-strong); background:var(--bg-elev-2);
     cursor:pointer; position:relative; transition:border-color .15s ease, background .15s ease;
   }
   .todo-check:hover{ border-color:var(--green); }
   .todo-check.checked{ background:var(--green); border-color:var(--green); }
   .todo-check.checked::after{
     content:''; position:absolute; left:5px; top:2px; width:5px; height:9px;
-    border:solid #fff; border-width:0 2px 2px 0; transform:rotate(40deg);
+    border:solid #04170d; border-width:0 2px 2px 0; transform:rotate(40deg);
   }
   .todo-main{ flex:1; min-width:0; }
   .todo-text{ font-size:14px; color:var(--text); margin:0 0 6px; line-height:1.45; }
   .todo-item.done .todo-text{ color:var(--text-faint); text-decoration:line-through; }
   .todo-meta{ display:flex; align-items:center; gap:9px; flex-wrap:wrap; }
-  .tag{
-    font-size:11px; font-weight:600; letter-spacing:0.2px;
-    padding:2px 9px; border-radius:999px;
-  }
+  .tag{ font-family:var(--font-mono); font-size:10.5px; font-weight:600; letter-spacing:0.3px; padding:2px 9px; border-radius:999px; }
   .tag.crit{ color:var(--red); background:var(--red-tint); }
   .tag.high{ color:var(--amber); background:var(--amber-tint); }
-  .tag.norm{ color:var(--text-muted); background:var(--bg-alt); }
-  .todo-due{ font-family:var(--font-mono); font-size:11.5px; color:var(--text-faint); }
+  .tag.norm{ color:var(--text-muted); background:var(--bg-elev-2); }
+  .todo-due{ font-family:var(--font-mono); font-size:11px; color:var(--text-faint); }
   .todo-due.today{ color:var(--amber); font-weight:600; }
-  .todo-sys{ font-family:var(--font-mono); font-size:11.5px; color:var(--text-faint); }
+  .todo-sys{ font-family:var(--font-mono); font-size:11px; color:var(--text-faint); }
 
-  /* ---------- milestones ---------- */
-  .milestone-item{
-    display:flex; align-items:center; gap:16px; padding:15px 0;
-    border-bottom:1px solid var(--border);
-  }
+  /* ---------- milestones (orbit rings) ---------- */
+  .milestone-item{ display:flex; align-items:center; gap:16px; padding:15px 0; border-bottom:1px solid var(--border); }
   .milestone-item:last-child{ border-bottom:none; }
-  .arc-wrap{ flex:0 0 auto; width:54px; height:54px; position:relative; }
-  .arc-wrap svg{ width:54px; height:54px; transform:rotate(-90deg); }
-  .arc-bg{ fill:none; stroke:var(--bg-alt); stroke-width:5; }
-  .arc-fg{ fill:none; stroke-width:5; stroke-linecap:round; transition:stroke-dashoffset .4s ease; }
+  .arc-wrap{ flex:0 0 auto; width:56px; height:56px; position:relative; }
+  .arc-wrap svg{ width:56px; height:56px; transform:rotate(-90deg); }
+  .arc-bg{ fill:none; stroke:var(--bg-elev-2); stroke-width:2; stroke-dasharray:2 4; }
+  .arc-fg{ fill:none; stroke-width:4; stroke-linecap:round; transition:stroke-dashoffset .4s ease; }
   .arc-pct{
     position:absolute; inset:0; display:flex; align-items:center; justify-content:center;
-    font-family:var(--font-display); font-size:12px; font-weight:600; color:var(--text);
+    font-family:var(--font-mono); font-size:11.5px; font-weight:700; color:var(--text);
   }
   .milestone-main{ flex:1; min-width:0; }
   .milestone-name{ font-size:14px; font-weight:500; margin:0 0 6px; color:var(--text); }
   .milestone-meta{ display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
   .status-chip{
-    font-size:11px; font-weight:600; letter-spacing:0.2px; padding:2px 9px; border-radius:999px;
+    font-family:var(--font-mono); font-size:10.5px; font-weight:700; letter-spacing:0.5px;
+    padding:2px 9px; border-radius:999px;
   }
-  .status-chip.ontrack{ color:var(--green-dark); background:var(--green-tint); }
-  .status-chip.atrisk{ color:var(--amber); background:var(--amber-tint); }
-  .status-chip.behind{ color:var(--red); background:var(--red-tint); }
-  .status-chip.complete{ color:#fff; background:var(--green); }
-  .milestone-date{ font-family:var(--font-mono); font-size:11.5px; color:var(--text-faint); }
+  .status-chip.go{ color:var(--green); background:var(--green-tint); }
+  .status-chip.caution{ color:var(--amber); background:var(--amber-tint); }
+  .status-chip.hold{ color:var(--red); background:var(--red-tint); }
+  .status-chip.complete{ color:#04170d; background:var(--green); }
+  .status-chip.muted{ color:var(--text-muted); background:var(--bg-elev-2); }
+  .milestone-date{ font-family:var(--font-mono); font-size:11px; color:var(--text-faint); }
 
   /* ---------- table ---------- */
-  table.sched{ width:100%; border-collapse:collapse; font-size:13px; }
+  table.sched{ width:100%; border-collapse:collapse; font-size:12.5px; }
   table.sched th{
-    text-align:left; font-size:11.5px; font-weight:600; color:var(--text-muted);
-    padding:11px 14px; border-bottom:1px solid var(--border); background:var(--bg-alt);
-    white-space:nowrap;
+    text-align:left; font-family:var(--font-mono); font-size:10.5px; font-weight:600; letter-spacing:0.5px;
+    text-transform:uppercase; color:var(--text-muted); padding:11px 14px; border-bottom:1px solid var(--border-strong);
+    background:var(--bg-elev-2); white-space:nowrap;
   }
-  table.sched th:first-child{ border-top-left-radius:0; }
-  table.sched td{
-    padding:12px 14px; border-bottom:1px solid var(--border); color:var(--text);
-    white-space:nowrap;
-  }
+  table.sched td{ padding:12px 14px; border-bottom:1px solid var(--border); color:var(--text); white-space:nowrap; }
   table.sched tbody tr:hover{ background:var(--green-tint); }
-  .tag-cell{ font-family:var(--font-mono); font-weight:600; color:var(--green-deep); }
+  .tag-cell{ font-family:var(--font-mono); font-weight:600; color:var(--green-soft); }
   .discipline-cell{ color:var(--text-muted); }
-  .mini-bar{ width:70px; height:6px; background:var(--bg-alt); border-radius:999px; position:relative; display:inline-block; vertical-align:middle; margin-right:8px; overflow:hidden; }
-  .mini-bar span{ position:absolute; left:0; top:0; bottom:0; background:var(--green); border-radius:999px; }
-  .pct-cell{ font-family:var(--font-mono); font-size:12px; }
-  .loto-yes{ color:var(--red); font-weight:600; font-size:12px; }
-  .loto-no{ color:var(--text-faint); font-size:12px; }
+  .loto-yes{ color:var(--red); font-family:var(--font-mono); font-weight:700; font-size:11px; }
+  .loto-no{ color:var(--text-faint); font-family:var(--font-mono); font-size:11px; }
+  .table-empty, .table-error{ padding:34px 14px; text-align:center; color:var(--text-muted); font-size:13px; }
+  .table-error{ color:var(--red); }
+  .retry-btn{
+    margin-top:10px; background:var(--bg-elev-2); border:1px solid var(--border-strong); color:var(--text);
+    padding:7px 16px; border-radius:var(--radius-sm); font-family:var(--font-mono); font-size:12px; cursor:pointer;
+  }
+  .retry-btn:hover{ border-color:var(--green); color:var(--green); }
+  .skeleton-row td{ padding:12px 14px; }
+  .skeleton-bar{ height:12px; border-radius:4px; background:linear-gradient(90deg, var(--bg-elev-2) 25%, var(--border) 50%, var(--bg-elev-2) 75%); background-size:200% 100%; animation:shimmer 1.4s infinite; }
+  @keyframes shimmer{ 0%{ background-position:200% 0; } 100%{ background-position:-200% 0; } }
 
   /* ---------- fullscreen overlay ---------- */
-  .fs-overlay{
-    position:fixed; inset:0; z-index:100; background:rgba(30,35,28,0.45);
-    display:none; align-items:flex-start; justify-content:center; padding:26px;
-  }
+  .fs-overlay{ position:fixed; inset:0; z-index:100; background:rgba(2,4,10,0.75); backdrop-filter:blur(2px); display:none; align-items:flex-start; justify-content:center; padding:26px; }
   .fs-overlay.open{ display:flex; }
   .fs-panel{
-    background:var(--surface); border-radius:var(--radius); width:100%; max-width:1400px;
-    max-height:calc(100vh - 52px); display:flex; flex-direction:column; overflow:hidden;
-    box-shadow:var(--shadow-md);
+    background:var(--bg-elev); border:1px solid var(--border); border-radius:var(--radius); width:100%; max-width:1400px;
+    max-height:calc(100vh - 52px); display:flex; flex-direction:column; overflow:hidden; box-shadow:var(--shadow-md);
   }
-  .fs-header{
-    display:flex; align-items:center; justify-content:space-between;
-    padding:18px 26px; border-bottom:1px solid var(--border);
-  }
-  .fs-header h2{ font-family:var(--font-display); font-size:17px; font-weight:600; margin:0; color:var(--text); }
+  .fs-header{ display:flex; align-items:center; justify-content:space-between; padding:18px 26px; border-bottom:1px solid var(--border); }
+  .fs-header h2{ font-family:var(--font-display); font-size:16px; font-weight:700; letter-spacing:0.5px; text-transform:uppercase; margin:0; color:var(--text); }
   .fs-close{
-    background:var(--bg-alt); border:none; border-radius:var(--radius-sm); color:var(--text-muted);
-    width:32px; height:32px; cursor:pointer; font-size:17px;
-    display:flex; align-items:center; justify-content:center;
-    transition:background .15s ease, color .15s ease;
+    background:var(--bg-elev-2); border:1px solid var(--border); border-radius:var(--radius-sm); color:var(--text-muted);
+    width:32px; height:32px; cursor:pointer; font-size:17px; display:flex; align-items:center; justify-content:center;
+    transition:border-color .15s ease, color .15s ease;
   }
-  .fs-close:hover{ background:var(--red-tint); color:var(--red); }
+  .fs-close:hover{ border-color:var(--red); color:var(--red); }
   .fs-body{ flex:1; overflow:auto; padding:22px 26px; }
   .fs-body .panel-body{ padding:0; }
-  .fs-body table.sched{ font-size:14px; }
+  .fs-body table.sched{ font-size:13.5px; }
   .fs-body table.sched th, .fs-body table.sched td{ padding:14px 16px; }
 
   .fs-toolbar{ display:flex; gap:10px; margin-bottom:16px; }
   .fs-toolbar input{
-    background:var(--bg-alt); border:1px solid var(--border); border-radius:var(--radius-sm);
-    color:var(--text); font-size:13px; padding:9px 13px; flex:1; max-width:320px;
+    background:var(--bg-elev-2); border:1px solid var(--border); border-radius:var(--radius-sm);
+    color:var(--text); font-family:var(--font-mono); font-size:12.5px; padding:9px 13px; flex:1; max-width:320px;
   }
   .fs-toolbar input::placeholder{ color:var(--text-faint); }
 
-  footer{
-    text-align:center; padding:34px; color:var(--text-faint); font-size:12px;
-    border-top:1px solid var(--border); background:var(--surface);
-  }
+  footer{ text-align:center; padding:34px; color:var(--text-faint); font-family:var(--font-mono); font-size:11px; border-top:1px solid var(--border); }
 </style>
 </head>
 <body>
+<div class="starfield"></div>
 
 <div class="topbar">
   <div class="brand">
     <div class="brand-mark">
       <svg viewBox="0 0 100 100" width="38" height="38">
         <path d="M14 66 A36 36 0 0 1 86 66" fill="none" stroke="url(#arcGrad)" stroke-width="8" stroke-linecap="round"/>
+        <circle cx="50" cy="30" r="3.4" fill="#8ff2ae"/>
         <defs>
           <linearGradient id="arcGrad" x1="0" y1="0" x2="1" y2="0">
-            <stop offset="0%" stop-color="#9adf9c"/>
-            <stop offset="100%" stop-color="#3a9a3d"/>
+            <stop offset="0%" stop-color="#8ff2ae"/>
+            <stop offset="100%" stop-color="#1c8a4c"/>
           </linearGradient>
         </defs>
       </svg>
     </div>
     <div class="brand-text-wrap">
       <div class="brand-text">Arc<b>App</b></div>
-      <div class="brand-tagline">Commissioning. Confidence.</div>
+      <div class="brand-tagline">Mission Control for Commissioning</div>
     </div>
   </div>
   <nav class="nav">
     <a href="#dashboard" class="active">Dashboard</a>
     <a href="#todo">To-Do</a>
     <a href="#milestones">Milestones</a>
-    <a href="#schedule">Schedule</a>
+    <a href="#schedule">Activities</a>
   </nav>
   <div class="topbar-right">
-    <div class="site-chip"><span class="led"></span> PHX-3 · Phase 2</div>
+    <div class="site-chip"><span class="led"></span> PHX-3 · PHASE 2</div>
     <div class="avatar">JT</div>
   </div>
 </div>
 
 <div class="context-strip">
-  <span>Project <b>Phoenix Data Center 3</b></span>
+  <span>PROJECT <b>Phoenix Data Center 3</b></span>
   <span class="divider">/</span>
-  <span>Role <b>Commissioning Lead</b></span>
+  <span>ROLE <b>Commissioning Lead</b></span>
   <span class="divider">/</span>
-  <span>Today <b>Fri, Aug 28 2026</b></span>
+  <span>MISSION DAY <b>T+118</b></span>
   <span class="divider">/</span>
-  <span>Open systems <b>9</b></span>
+  <span>OPEN SYSTEMS <b>9</b></span>
 </div>
-
-<div class="hero-arc">
-  <svg viewBox="0 0 1100 200" xmlns="http://www.w3.org/2000/svg">
-    <path d="M60 180 A490 490 0 0 1 1040 180" fill="none" stroke="url(#heroGrad)" stroke-width="3"/>
-    <defs>
-      <linearGradient id="heroGrad" x1="0" y1="0" x2="1" y2="0">
-        <stop offset="0%" stop-color="#4dbd50" stop-opacity="0"/>
-        <stop offset="50%" stop-color="#4dbd50" stop-opacity="0.5"/>
-        <stop offset="100%" stop-color="#4dbd50" stop-opacity="0"/>
-      </linearGradient>
-    </defs>
-  </svg>
 
 <main>
   <div class="page-heading" id="dashboard">
-    <h1>Commissioning Dashboard</h1>
-    <p>Your milestones, punch items, and system status for Phoenix Data Center 3 — updated live.</p>
+    <h1>Mission Dashboard</h1>
+    <p>Your checklist, milestones, and live activity feed for Phoenix Data Center 3.</p>
   </div>
 
   <div class="kpi-row">
     <div class="kpi">
-      <div class="kpi-label">Milestones on track</div>
+      <div class="kpi-label">Milestones GO</div>
       <div class="kpi-value">4 <small>/ 6</small></div>
       <div class="kpi-sub good">2 need attention this week</div>
     </div>
@@ -379,9 +385,9 @@
       <div class="kpi-value">9</div>
       <div class="kpi-sub">3 disciplines active</div>
     </div>
-    <div class="kpi">
-      <div class="kpi-label">Next milestone due</div>
-      <div class="kpi-value">2 <small>days</small></div>
+    <div class="kpi clock">
+      <div class="kpi-label">Next milestone</div>
+      <div class="kpi-value">T&#8722;<span class="unit">02D</span></div>
       <div class="kpi-sub bad">Domestic Water Booster — Turnover</div>
     </div>
   </div>
@@ -392,12 +398,14 @@
     <section class="panel" id="todo">
       <div class="panel-header">
         <div class="panel-header-left">
-          <h2 class="panel-title">Your to-dos</h2>
+          <h2 class="panel-title">Your To-Dos</h2>
           <span class="panel-count">7 open</span>
         </div>
-        <button class="expand-btn" data-target="todo-body" data-title="Your to-dos" title="Expand">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 3H3v6M15 3h6v6M9 21H3v-6M15 21h6v-6"/></svg>
-        </button>
+        <div class="panel-header-right">
+          <button class="icon-btn" data-target="todo-body" data-title="Your To-Dos" title="Expand">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 3H3v6M15 3h6v6M9 21H3v-6M15 21h6v-6"/></svg>
+          </button>
+        </div>
       </div>
       <div class="panel-body" id="todo-body">
         <div class="todo-list"></div>
@@ -411,9 +419,11 @@
           <h2 class="panel-title">Milestones</h2>
           <span class="panel-count">6 tracked</span>
         </div>
-        <button class="expand-btn" data-target="milestones-body" data-title="Milestones" title="Expand">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 3H3v6M15 3h6v6M9 21H3v-6M15 21h6v-6"/></svg>
-        </button>
+        <div class="panel-header-right">
+          <button class="icon-btn" data-target="milestones-body" data-title="Milestones" title="Expand">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 3H3v6M15 3h6v6M9 21H3v-6M15 21h6v-6"/></svg>
+          </button>
+        </div>
       </div>
       <div class="panel-body" id="milestones-body">
         <div class="milestone-list"></div>
@@ -421,29 +431,38 @@
     </section>
   </div>
 
-  <!-- SCHEDULE / SYSTEM STATUS PANEL -->
+  <!-- SCHEDULED ACTIVITIES PANEL (live Supabase) -->
   <section class="panel" id="schedule">
     <div class="panel-header">
       <div class="panel-header-left">
-        <h2 class="panel-title">System status</h2>
-        <span class="panel-count">12 systems</span>
+        <h2 class="panel-title">Scheduled Activities</h2>
+        <span class="panel-count" id="sched-count">— rows</span>
+        <span class="conn-pill loading" id="conn-pill"><span class="led" id="conn-led"></span> Connecting</span>
       </div>
-      <button class="expand-btn" data-target="schedule-body" data-title="System status" title="Expand">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 3H3v6M15 3h6v6M9 21H3v-6M15 21h6v-6"/></svg>
-      </button>
+      <div class="panel-header-right">
+        <button class="icon-btn" id="refresh-btn" title="Refresh from Supabase">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 4v6h-6M1 20v-6h6"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+        </button>
+        <button class="icon-btn" data-target="schedule-body" data-title="Scheduled Activities" title="Expand">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 3H3v6M15 3h6v6M9 21H3v-6M15 21h6v-6"/></svg>
+        </button>
+      </div>
     </div>
+    <div class="sync-note" id="sync-note">Source: <b style="color:var(--text-muted)">RNO04BackEndData</b> · not yet synced</div>
     <div class="panel-body no-pad" id="schedule-body">
       <div style="overflow-x:auto;">
         <table class="sched" id="sched-table">
           <thead>
             <tr>
-              <th>Tag / System</th>
-              <th>Discipline</th>
+              <th>Date</th>
+              <th>Time</th>
+              <th>Place</th>
               <th>Activity</th>
+              <th>Asset</th>
+              <th>Trade Partners</th>
               <th>Status</th>
               <th>LOTO</th>
-              <th>Complete</th>
-              <th>Target date</th>
+              <th>Result</th>
             </tr>
           </thead>
           <tbody></tbody>
@@ -452,9 +471,8 @@
     </div>
   </section>
 
-  <footer>ArcApp Commissioning · Phoenix Data Center 3 · Sample data for design review only</footer>
+  <footer>ArcApp Commissioning · Phoenix Data Center 3 · To-dos &amp; milestones are sample data — Scheduled Activities reads live from Supabase</footer>
 </main>
-</div>
 
 <!-- FULLSCREEN OVERLAY (shared) -->
 <div class="fs-overlay" id="fs-overlay">
@@ -468,7 +486,198 @@
 </div>
 
 <script>
-/* ============ FAKE DATA ============ */
+/* =====================================================================
+   SUPABASE CONNECTION — Scheduled Activities
+   =====================================================================
+   This reads live from the same Supabase project as the LaunchPad
+   Schedule app, scoped to the RNO04 project's activity table.
+
+   RNO04's table_prefix (set in launchpad_projects) is assumed to be
+   exactly "RNO04", making the schedule table "RNO04BackEndData". If
+   that project's actual table_prefix differs, update the constant below
+   to match — everything else keys off it automatically.
+   ===================================================================== */
+const SUPABASE_URL = 'https://rcnxetcomdrlxvlarqoc.supabase.co';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJjbnhldGNvbWRybHh2bGFycW9jIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY0NDIyMjksImV4cCI6MjA5MjAxODIyOX0.gP37sT5OrCOVRZXekMrBZHm5mtfnr6JrC2YGflWsDQU';
+const PROJECT_TABLE_PREFIX = 'RNO04';
+const SCHEDULE_TABLE = `${PROJECT_TABLE_PREFIX}BackEndData`;
+
+let sb = null;
+try {
+  const { createClient } = supabase;
+  sb = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+} catch (e) {
+  console.error('Supabase client failed to initialize:', e);
+}
+
+let scheduleRows = [];
+let scheduleState = 'loading'; // loading | ready | error
+let scheduleErrorMsg = '';
+
+function stripHtml(str){ return (str || '').toString().replace(/<[^>]+>/g, '').trim(); }
+
+function addDaysIso(iso, n){
+  const d = new Date(iso + 'T00:00:00');
+  d.setDate(d.getDate() + n);
+  return d.toISOString().slice(0, 10);
+}
+
+function fmtDate(iso){
+  if (!iso) return '—';
+  const d = new Date(iso + 'T00:00:00');
+  if (isNaN(d)) return iso;
+  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+}
+
+function scheduleStatusClass(text){
+  const t = (text || '').toLowerCase();
+  if (!t || t === 'na') return 'muted';
+  if (t.includes('complete') || t.includes('pass')) return 'complete';
+  if (t.includes('hold') || t.includes('fail') || t.includes('issue')) return 'hold';
+  if (t.includes('caution') || t.includes('risk') || t.includes('delay')) return 'caution';
+  return 'go';
+}
+
+async function loadSchedule(){
+  scheduleState = 'loading';
+  renderConnPill();
+  renderSchedule(document.querySelector('#sched-table tbody'));
+
+  if (!sb) {
+    scheduleState = 'error';
+    scheduleErrorMsg = 'Supabase client did not initialize.';
+    renderConnPill();
+    renderSchedule(document.querySelector('#sched-table tbody'));
+    return;
+  }
+
+  const today = new Date().toISOString().slice(0, 10);
+  const windowStart = addDaysIso(today, -3);
+  const windowEnd = addDaysIso(today, 14);
+
+  try {
+    const { data, error } = await sb
+      .from(SCHEDULE_TABLE)
+      .select('id, day_label, time, place, activity, asset, status, trade_partners, result, loto')
+      .gte('day_label', windowStart)
+      .lte('day_label', windowEnd)
+      .order('day_label', { ascending: true })
+      .order('time', { ascending: true })
+      .limit(500);
+
+    if (error) throw error;
+
+    scheduleRows = (data || []).map(r => ({
+      date: r.day_label,
+      time: r.time || '—',
+      place: r.place || '—',
+      activity: r.activity || '—',
+      asset: r.asset || '—',
+      trade: r.trade_partners || '—',
+      status: stripHtml(r.status) || 'NA',
+      loto: (r.loto || '').toString().trim().toLowerCase() === 'yes',
+      result: stripHtml(r.result) || '—',
+    }));
+    scheduleState = 'ready';
+  } catch (err) {
+    console.error('Failed to load Scheduled Activities from Supabase:', err);
+    scheduleState = 'error';
+    scheduleErrorMsg = (err && err.message) ? err.message : 'Unknown error contacting Supabase.';
+  }
+
+  renderConnPill();
+  renderSchedule(document.querySelector('#sched-table tbody'));
+  const fsBody = document.querySelector('#fs-body #sched-table tbody');
+  if (fsBody) renderSchedule(fsBody, document.getElementById('fs-filter')?.value || '');
+}
+
+function renderConnPill(){
+  const pill = document.getElementById('conn-pill');
+  const led = document.getElementById('conn-led');
+  const note = document.getElementById('sync-note');
+  const count = document.getElementById('sched-count');
+  if (!pill) return;
+
+  pill.classList.remove('ready', 'loading', 'error');
+  led.classList.remove('amber', 'red');
+
+  if (scheduleState === 'loading') {
+    pill.classList.add('loading');
+    pill.innerHTML = `<span class="led" id="conn-led"></span> Syncing`;
+    note.innerHTML = `Source: <b style="color:var(--text-muted)">${SCHEDULE_TABLE}</b> · syncing with Supabase…`;
+  } else if (scheduleState === 'ready') {
+    pill.classList.add('ready');
+    pill.innerHTML = `<span class="led" id="conn-led"></span> Live`;
+    const now = new Date();
+    note.innerHTML = `Source: <b style="color:var(--text-muted)">${SCHEDULE_TABLE}</b> · last synced ${now.toLocaleTimeString()}`;
+    count.textContent = `${scheduleRows.length} row${scheduleRows.length === 1 ? '' : 's'}`;
+  } else {
+    pill.classList.add('error');
+    pill.innerHTML = `<span class="led red" id="conn-led"></span> Offline`;
+    note.innerHTML = `Source: <b style="color:var(--text-muted)">${SCHEDULE_TABLE}</b> · connection failed`;
+  }
+}
+
+/* ============ RENDER: SCHEDULE TABLE ============ */
+function renderSchedule(tbody, filter = ''){
+  if (!tbody) return;
+  tbody.innerHTML = '';
+
+  if (scheduleState === 'loading') {
+    for (let i = 0; i < 5; i++) {
+      const tr = document.createElement('tr');
+      tr.className = 'skeleton-row';
+      tr.innerHTML = Array(9).fill('<td><div class="skeleton-bar" style="width:80%"></div></td>').join('');
+      tbody.appendChild(tr);
+    }
+    return;
+  }
+
+  if (scheduleState === 'error') {
+    const tr = document.createElement('tr');
+    const td = document.createElement('td');
+    td.colSpan = 9;
+    td.className = 'table-error';
+    td.innerHTML = `Couldn't reach Supabase (${scheduleErrorMsg}).<br><button class="retry-btn" id="retry-btn">Retry connection</button>`;
+    tr.appendChild(td);
+    tbody.appendChild(tr);
+    document.getElementById('retry-btn')?.addEventListener('click', loadSchedule);
+    return;
+  }
+
+  const f = filter.trim().toLowerCase();
+  const rows = scheduleRows.filter(r =>
+    !f || (r.date + r.time + r.place + r.activity + r.asset + r.trade + r.status + r.result).toLowerCase().includes(f)
+  );
+
+  if (rows.length === 0) {
+    const tr = document.createElement('tr');
+    const td = document.createElement('td');
+    td.colSpan = 9;
+    td.className = 'table-empty';
+    td.textContent = 'No scheduled activities in the current window.';
+    tr.appendChild(td);
+    tbody.appendChild(tr);
+    return;
+  }
+
+  rows.forEach(r => {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td class="discipline-cell">${fmtDate(r.date)}</td>
+      <td>${r.time}</td>
+      <td class="tag-cell">${r.place}</td>
+      <td>${r.activity}</td>
+      <td class="discipline-cell">${r.asset}</td>
+      <td class="discipline-cell">${r.trade}</td>
+      <td><span class="status-chip ${scheduleStatusClass(r.status)}">${r.status}</span></td>
+      <td>${r.loto ? '<span class="loto-yes">YES</span>' : '<span class="loto-no">NO</span>'}</td>
+      <td class="discipline-cell">${r.result}</td>`;
+    tbody.appendChild(tr);
+  });
+}
+
+/* ============ FAKE DATA — To-Dos & Milestones ============ */
 
 const todos = [
   { id:1, text:'Approve turnover package — Chiller Plant Room 1', tag:'crit', tagLabel:'Critical', sys:'CHW-01', due:'Due today', today:true, done:false },
@@ -482,27 +691,12 @@ const todos = [
 ];
 
 const milestones = [
-  { name:'Electrical Room 3 — Energization', pct:82, due:'Sep 5, 2026', status:'ontrack', label:'On Track' },
-  { name:'Chiller Plant — Functional Testing', pct:45, due:'Sep 18, 2026', status:'atrisk', label:'At Risk' },
-  { name:'Fire Alarm System — RFSU', pct:100, due:'Completed Aug 20', status:'complete', label:'Complete' },
-  { name:'Emergency Generator — Load Bank Test', pct:20, due:'Oct 2, 2026', status:'ontrack', label:'On Track' },
-  { name:'Building Automation — System Integration', pct:60, due:'Sep 25, 2026', status:'behind', label:'Behind' },
-  { name:'Domestic Water Booster — Turnover', pct:95, due:'Aug 30, 2026', status:'ontrack', label:'On Track' },
-];
-
-const schedule = [
-  { tag:'CHW-01', discipline:'Mechanical', activity:'Functional Performance Test', status:'In Progress', loto:true, pct:45, date:'Sep 18, 2026' },
-  { tag:'MC-204', discipline:'Electrical', activity:'Switchgear Energization', status:'Ready', loto:true, pct:78, date:'Sep 3, 2026' },
-  { tag:'ER-03', discipline:'Electrical', activity:'Panel Termination Punch', status:'In Progress', loto:false, pct:82, date:'Sep 5, 2026' },
-  { tag:'FP-2', discipline:'Fire Protection', activity:'Device Point-to-Point', status:'In Progress', loto:false, pct:88, date:'Aug 29, 2026' },
-  { tag:'BAS-01', discipline:'Controls', activity:'Sequence of Operations Test', status:'Not Started', loto:false, pct:60, date:'Sep 25, 2026' },
-  { tag:'GEN-02', discipline:'Electrical', activity:'Load Bank Test', status:'Scheduled', loto:true, pct:20, date:'Oct 2, 2026' },
-  { tag:'DWB-01', discipline:'Plumbing', activity:'Turnover Package', status:'In Progress', loto:false, pct:95, date:'Aug 30, 2026' },
-  { tag:'EL-14', discipline:'Electrical', activity:'Emergency Lighting Test', status:'Complete', loto:false, pct:100, date:'Aug 26, 2026' },
-  { tag:'AHU-06', discipline:'Mechanical', activity:'Air Balance / TAB', status:'In Progress', loto:false, pct:55, date:'Sep 12, 2026' },
-  { tag:'UPS-01', discipline:'Electrical', activity:'Battery String Test', status:'Not Started', loto:true, pct:10, date:'Oct 8, 2026' },
-  { tag:'FP-6', discipline:'Fire Protection', activity:'Sprinkler Flow Test', status:'Ready', loto:false, pct:70, date:'Sep 9, 2026' },
-  { tag:'BAS-02', discipline:'Controls', activity:'Graphics & Alarm Verification', status:'Not Started', loto:false, pct:15, date:'Oct 1, 2026' },
+  { name:'Electrical Room 3 — Energization', pct:82, due:'Sep 5, 2026', status:'go', label:'GO' },
+  { name:'Chiller Plant — Functional Testing', pct:45, due:'Sep 18, 2026', status:'caution', label:'CAUTION' },
+  { name:'Fire Alarm System — RFSU', pct:100, due:'Completed Aug 20', status:'complete', label:'COMPLETE' },
+  { name:'Emergency Generator — Load Bank Test', pct:20, due:'Oct 2, 2026', status:'go', label:'GO' },
+  { name:'Building Automation — System Integration', pct:60, due:'Sep 25, 2026', status:'hold', label:'HOLD' },
+  { name:'Domestic Water Booster — Turnover', pct:95, due:'Aug 30, 2026', status:'go', label:'GO' },
 ];
 
 /* ============ RENDER: TO-DO ============ */
@@ -537,7 +731,7 @@ function renderTodos(container){
 
 /* ============ RENDER: MILESTONES ============ */
 function statusColor(status){
-  return { ontrack:'#4dbd50', atrisk:'#d98f26', behind:'#d9534a', complete:'#379a3b' }[status];
+  return { go:'#3fe382', caution:'#f0a840', hold:'#ff5c56', complete:'#3fe382' }[status];
 }
 function renderMilestones(container){
   container.innerHTML = '';
@@ -566,35 +760,15 @@ function renderMilestones(container){
   });
 }
 
-/* ============ RENDER: SCHEDULE TABLE ============ */
-function statusChipClass(status){
-  if (status === 'Complete') return 'complete';
-  if (status === 'In Progress' || status === 'Ready' || status === 'Scheduled') return 'ontrack';
-  return 'atrisk';
-}
-function renderSchedule(tbody, filter=''){
-  tbody.innerHTML = '';
-  const f = filter.trim().toLowerCase();
-  schedule
-    .filter(r => !f || (r.tag + r.discipline + r.activity + r.status).toLowerCase().includes(f))
-    .forEach(r => {
-      const tr = document.createElement('tr');
-      tr.innerHTML = `
-        <td class="tag-cell">${r.tag}</td>
-        <td class="discipline-cell">${r.discipline}</td>
-        <td>${r.activity}</td>
-        <td><span class="status-chip ${statusChipClass(r.status)}">${r.status}</span></td>
-        <td>${r.loto ? '<span class="loto-yes">YES</span>' : '<span class="loto-no">NO</span>'}</td>
-        <td class="pct-cell"><span class="mini-bar"><span style="width:${r.pct}%"></span></span>${r.pct}%</td>
-        <td class="discipline-cell">${r.date}</td>`;
-      tbody.appendChild(tr);
-    });
-}
-
 /* ============ INITIAL RENDER ============ */
 renderTodos(document.querySelector('#todo-body .todo-list'));
 renderMilestones(document.querySelector('#milestones-body .milestone-list'));
-renderSchedule(document.querySelector('#sched-table tbody'));
+loadSchedule();
+
+document.getElementById('refresh-btn').addEventListener('click', (e) => {
+  e.currentTarget.classList.add('spin');
+  loadSchedule().finally(() => setTimeout(() => e.currentTarget.classList.remove('spin'), 400));
+});
 
 /* ============ FULLSCREEN EXPAND ============ */
 const overlay = document.getElementById('fs-overlay');
@@ -602,7 +776,7 @@ const fsBody = document.getElementById('fs-body');
 const fsTitle = document.getElementById('fs-title');
 let movedNode = null, originalParent = null, originalNext = null;
 
-document.querySelectorAll('.expand-btn').forEach(btn => {
+document.querySelectorAll('.icon-btn[data-target]').forEach(btn => {
   btn.addEventListener('click', () => {
     const targetId = btn.dataset.target;
     const node = document.getElementById(targetId);
@@ -616,7 +790,7 @@ document.querySelectorAll('.expand-btn').forEach(btn => {
     if (targetId === 'schedule-body') {
       const toolbar = document.createElement('div');
       toolbar.className = 'fs-toolbar';
-      toolbar.innerHTML = `<input type="text" id="fs-filter" placeholder="Filter by tag, discipline, activity, status...">`;
+      toolbar.innerHTML = `<input type="text" id="fs-filter" placeholder="Filter by place, activity, asset, status...">`;
       fsBody.appendChild(toolbar);
       toolbar.querySelector('input').addEventListener('input', (e) => {
         renderSchedule(document.querySelector('#sched-table tbody'), e.target.value);
