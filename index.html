@@ -369,6 +369,16 @@
   }
   .step-input::-webkit-outer-spin-button, .step-input::-webkit-inner-spin-button{ -webkit-appearance:none; margin:0; }
   .step-input:focus{ outline:none; background:var(--green-tint); }
+
+  .photo-log-btn{
+    display:flex; align-items:center; justify-content:center; gap:9px; width:100%;
+    background:var(--green-tint); border:1px solid var(--green-dim); color:var(--green-soft);
+    font-family:var(--font-display); font-size:12.5px; font-weight:600; letter-spacing:0.5px; text-transform:uppercase;
+    padding:12px 14px; border-radius:var(--radius-sm); cursor:pointer;
+    transition:background .15s ease, border-color .15s ease;
+  }
+  .photo-log-btn:hover{ background:var(--green-deep); border-color:var(--green); color:var(--green-soft); }
+  .photo-log-btn svg{ width:16px; height:16px; flex:0 0 auto; }
 </style>
 </head>
 <body>
@@ -562,9 +572,18 @@
       <label class="q-label" for="ca-input">How many CA team members at inspection?</label>
       <div class="stepper">
         <button class="step-btn" id="ca-dec" type="button">&minus;</button>
-        <input type="number" step="1" class="step-input" id="ca-input" value="0">
+        <input type="number" step="1" min="1" class="step-input" id="ca-input" value="1">
         <button class="step-btn" id="ca-inc" type="button">+</button>
       </div>
+    </div>
+
+    <div class="q-block">
+      <label class="q-label">Equipment photos</label>
+      <button class="photo-log-btn" id="photo-log-btn" type="button">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+        Log Photos to Drive
+      </button>
+      <div class="q-hint">Opens a camera page in a new tab, filed under this activity → asset → date in Drive.</div>
     </div>
   </div>
 </aside>
@@ -777,7 +796,7 @@ function fmtOffset(v){
 
 function openActivityDrawer(row){
   selectedRowId = row.id;
-  const ans = activityAnswers[row.id] || { offsetHrs: 0, caCount: 0 };
+  const ans = activityAnswers[row.id] || { offsetHrs: 0, caCount: 1 };
 
   document.getElementById('drawer-title').textContent = row.activity;
   document.getElementById('drawer-sub').textContent =
@@ -815,7 +834,7 @@ function saveActivityAnswer(){
   const caVal = parseInt(document.getElementById('ca-input').value, 10);
   activityAnswers[selectedRowId] = {
     offsetHrs: isNaN(offsetVal) ? 0 : offsetVal,
-    caCount: isNaN(caVal) ? 0 : Math.max(0, caVal),
+    caCount: isNaN(caVal) ? 1 : Math.max(1, caVal),
   };
   // refresh the answered-dot indicator in whichever table is currently visible
   const activeFilter = document.getElementById('fs-filter')?.value || '';
@@ -860,16 +879,31 @@ offsetInput.addEventListener('input', () => {
 
 const caInput = document.getElementById('ca-input');
 document.getElementById('ca-inc').addEventListener('click', () => {
-  stepInput(caInput, 1, 1, 0);
+  stepInput(caInput, 1, 1, 1);
   saveActivityAnswer();
 });
 document.getElementById('ca-dec').addEventListener('click', () => {
-  stepInput(caInput, -1, 1, 0);
+  stepInput(caInput, -1, 1, 1);
   saveActivityAnswer();
 });
 caInput.addEventListener('input', () => {
-  if (parseInt(caInput.value, 10) < 0) caInput.value = 0;
+  if (parseInt(caInput.value, 10) < 1 || isNaN(parseInt(caInput.value, 10))) caInput.value = 1;
   saveActivityAnswer();
+});
+
+document.getElementById('photo-log-btn').addEventListener('click', () => {
+  if (selectedRowId == null) return;
+  const row = scheduleRows.find(r => String(r.id) === String(selectedRowId));
+  if (!row) return;
+  const params = new URLSearchParams({
+    activity: row.activity || 'Unspecified Activity',
+    asset: row.asset || 'Unspecified Asset',
+    date: row.date || new Date().toISOString().slice(0, 10),
+  });
+  // Opens the camera/upload tool in its own tab/file — keeps the OAuth + Drive
+  // upload code (and the Google Identity Services script it loads) out of the
+  // main dashboard entirely, so the dashboard itself stays light and fast.
+  window.open(`photo-logger.html?${params.toString()}`, '_blank');
 });
 
 // Delegated row click — works for both the docked table and the fullscreen-expanded copy,
