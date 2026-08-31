@@ -388,30 +388,55 @@
 
   footer{ text-align:center; padding:34px; color:var(--text-faint); font-family:var(--font-mono); font-size:11px; border-top:1px solid var(--border); }
 
-  /* ---------- activity drawer ---------- */
-  .drawer-backdrop{ position:fixed; inset:0; background:rgba(2,4,10,0.55); z-index:190; display:none; }
-  .drawer-backdrop.open{ display:block; }
+  /* ---------- activity modal ---------- */
+  .drawer-backdrop{ position:fixed; inset:0; background:rgba(2,4,10,0.7); z-index:190; display:none; align-items:center; justify-content:center; padding:24px; }
+  .drawer-backdrop.open{ display:flex; }
 
   .activity-drawer{
-    position:fixed; top:0; right:0; bottom:0; width:400px; max-width:92vw;
-    background:var(--bg-elev); border-left:1px solid var(--border);
-    z-index:200; transform:translateX(100%); transition:transform .25s ease;
-    display:flex; flex-direction:column; box-shadow:var(--shadow-md);
+    position:relative; width:94vw; max-width:1360px; height:90vh; max-height:920px;
+    background:var(--bg-elev); border:1px solid var(--border); border-radius:var(--radius);
+    transform:scale(0.96); opacity:0; transition:transform .2s ease, opacity .2s ease;
+    display:flex; flex-direction:column; box-shadow:var(--shadow-md); overflow:hidden;
   }
-  .activity-drawer.open{ transform:translateX(0); }
+  .activity-drawer.open{ transform:scale(1); opacity:1; }
 
   .drawer-header{
-    padding:20px 22px; border-bottom:1px solid var(--border);
-    display:flex; justify-content:space-between; align-items:flex-start; gap:12px;
+    padding:18px 24px; border-bottom:1px solid var(--border);
+    display:flex; justify-content:space-between; align-items:flex-start; gap:12px; flex:0 0 auto;
   }
   .drawer-eyebrow{
     font-family:var(--font-mono); font-size:10.5px; letter-spacing:0.8px; text-transform:uppercase;
     color:var(--green); margin-bottom:8px;
   }
-  .drawer-title{ font-family:var(--font-display); font-size:16px; font-weight:700; margin:0 0 7px; color:var(--text); letter-spacing:0.2px; }
+  .drawer-title{ font-family:var(--font-display); font-size:17px; font-weight:700; margin:0 0 7px; color:var(--text); letter-spacing:0.2px; }
   .drawer-sub{ font-family:var(--font-mono); font-size:11.5px; color:var(--text-muted); line-height:1.5; }
 
-  .drawer-body{ padding:24px 22px; overflow-y:auto; flex:1; }
+  .drawer-columns{ flex:1; display:grid; grid-template-columns:1fr 1fr; overflow:hidden; min-height:0; }
+  @media (max-width:900px){ .drawer-columns{ grid-template-columns:1fr; overflow-y:auto; } }
+
+  .drawer-reference{ padding:26px 28px; overflow-y:auto; border-right:1px solid var(--border); min-height:0; }
+  @media (max-width:900px){ .drawer-reference{ border-right:none; border-bottom:1px solid var(--border); overflow-y:visible; } }
+  .drawer-questions{ padding:26px 28px; overflow-y:auto; min-height:0; }
+
+  .ref-heading{ font-family:var(--font-display); font-size:14px; font-weight:700; color:var(--text); margin:0 0 10px; letter-spacing:0.3px; }
+  .ref-heading.second{ margin-top:26px; }
+  .ref-overview{ font-size:13.5px; color:var(--text-muted); line-height:1.65; margin:0 0 4px; }
+  .ref-overview b{ color:var(--text); font-weight:600; }
+  .ref-list{ margin:0; padding-left:0; list-style:none; }
+  .ref-list li{
+    display:flex; gap:10px; align-items:flex-start; font-size:13px; color:var(--text-muted);
+    line-height:1.5; padding:9px 0; border-bottom:1px solid var(--border);
+  }
+  .ref-list li:last-child{ border-bottom:none; }
+  .ref-list li::before{
+    content:''; flex:0 0 auto; width:6px; height:6px; border-radius:50%; background:var(--green);
+    margin-top:6px;
+  }
+  .ref-sample-tag{
+    display:inline-block; font-family:var(--font-mono); font-size:10px; letter-spacing:0.5px; text-transform:uppercase;
+    color:var(--text-faint); border:1px solid var(--border-strong); border-radius:999px; padding:2px 9px; margin-bottom:16px;
+  }
+
   .q-block{ margin-bottom:28px; }
   .q-block.hidden{ display:none; }
   .q-label{ display:block; font-size:13.5px; color:var(--text); margin-bottom:13px; line-height:1.4; font-weight:500; }
@@ -454,6 +479,39 @@
   .result-input:disabled{ opacity:0.5; cursor:not-allowed; }
   .q-hint.err{ color:var(--red); }
   .q-hint.ok{ color:var(--green-soft); }
+
+  /* ---------- tamper seal log ---------- */
+  .seal-field{ margin-bottom:12px; }
+  .seal-field label{ display:block; font-family:var(--font-mono); font-size:10.5px; letter-spacing:0.5px; text-transform:uppercase; color:var(--text-muted); margin-bottom:6px; }
+  .seal-field input, .seal-field select, .seal-field textarea{
+    width:100%; background:var(--bg-elev-2); border:1px solid var(--border-strong); border-radius:var(--radius-sm);
+    color:var(--text); font-family:var(--font-body); font-size:13.5px; padding:9px 11px;
+  }
+  .seal-field textarea{ resize:vertical; min-height:56px; font-family:var(--font-body); }
+  .seal-field input:focus, .seal-field select:focus, .seal-field textarea:focus{ outline:none; border-color:var(--green); }
+  .seal-field input:disabled, .seal-field select:disabled, .seal-field textarea:disabled{ opacity:0.5; cursor:not-allowed; }
+  .seal-row2{ display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+  .seal-broken-fields{ border-top:1px dashed var(--border); margin-top:6px; padding-top:14px; }
+  .seal-broken-fields.hidden{ display:none; }
+  .seal-submit-btn{
+    width:100%; background:var(--green); color:#04170d; border:none; border-radius:var(--radius-sm);
+    font-family:var(--font-display); font-size:12px; font-weight:700; letter-spacing:0.5px; text-transform:uppercase;
+    padding:11px; cursor:pointer; margin-top:6px;
+  }
+  .seal-submit-btn:hover{ background:var(--green-soft); }
+  .seal-submit-btn:disabled{ opacity:0.5; cursor:not-allowed; }
+  .seal-log-list{ margin-top:16px; }
+  .seal-log-item{
+    display:flex; justify-content:space-between; align-items:center; gap:10px;
+    padding:9px 11px; background:var(--bg-elev-2); border:1px solid var(--border); border-radius:var(--radius-sm);
+    font-size:12.5px; margin-bottom:6px;
+  }
+  .seal-log-item .num{ font-family:var(--font-mono); color:var(--text); font-weight:600; }
+  .seal-log-item .stat{ font-family:var(--font-mono); font-size:10.5px; letter-spacing:0.4px; text-transform:uppercase; }
+  .seal-log-item .stat.intact{ color:var(--green-soft); }
+  .seal-log-item .stat.broken{ color:var(--red); }
+  .seal-log-item .stat.removed{ color:var(--amber); }
+  .seal-log-item .time{ font-family:var(--font-mono); font-size:10.5px; color:var(--text-faint); }
 </style>
 </head>
 <body>
@@ -637,8 +695,8 @@
   </div>
 </div>
 
-<!-- ACTIVITY DETAIL DRAWER -->
-<div class="drawer-backdrop" id="drawer-backdrop"></div>
+<!-- ACTIVITY DETAIL MODAL -->
+<div class="drawer-backdrop" id="drawer-backdrop">
 <aside class="activity-drawer" id="activity-drawer">
   <div class="drawer-header">
     <div>
@@ -648,43 +706,103 @@
     </div>
     <button class="fs-close" id="drawer-close">&times;</button>
   </div>
-  <div class="drawer-body">
-    <div class="q-block" id="offset-block">
-      <label class="q-label" for="offset-input">Time between scheduled and actual start (hrs)</label>
-      <div class="stepper">
-        <button class="step-btn" id="offset-dec" type="button">&minus;</button>
-        <input type="number" step="0.25" class="step-input" id="offset-input" value="0">
-        <button class="step-btn" id="offset-inc" type="button">+</button>
-      </div>
-      <div class="q-hint">Negative = started early · Positive = started late</div>
-    </div>
-    <div class="q-block hidden" id="ca-block">
-      <label class="q-label" for="ca-input">How many CA team members at inspection?</label>
-      <div class="stepper">
-        <button class="step-btn" id="ca-dec" type="button">&minus;</button>
-        <input type="number" step="1" min="1" class="step-input" id="ca-input" value="1">
-        <button class="step-btn" id="ca-inc" type="button">+</button>
-      </div>
+
+  <div class="drawer-columns">
+    <!-- LEFT: reference / what to look for -->
+    <div class="drawer-reference" id="drawer-reference">
+      <span class="ref-sample-tag">Sample reference — for design review</span>
+      <h4 class="ref-heading">What You're Inspecting</h4>
+      <p class="ref-overview" id="ref-overview">Overview goes here.</p>
+
+      <h4 class="ref-heading second">Common Things to Look For</h4>
+      <ul class="ref-list" id="ref-checklist"></ul>
     </div>
 
-    <div class="q-block">
-      <label class="q-label">Equipment photos</label>
-      <button class="photo-log-btn" id="photo-log-btn" type="button">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
-        Log Photos to Drive
-      </button>
-      <div class="q-hint" id="photo-log-hint">Desktop opens the Drive folder directly. On iPad/phone, choose to take a new photo or pick an existing one.</div>
-    </div>
+    <!-- RIGHT: questions -->
+    <div class="drawer-questions">
+      <div class="q-block" id="offset-block">
+        <label class="q-label" for="offset-input">Time between scheduled and actual start (hrs)</label>
+        <div class="stepper">
+          <button class="step-btn" id="offset-dec" type="button">&minus;</button>
+          <input type="number" step="0.25" class="step-input" id="offset-input" value="0">
+          <button class="step-btn" id="offset-inc" type="button">+</button>
+        </div>
+        <div class="q-hint">Negative = started early · Positive = started late</div>
+      </div>
+      <div class="q-block hidden" id="ca-block">
+        <label class="q-label" for="ca-input">How many CA team members at inspection?</label>
+        <div class="stepper">
+          <button class="step-btn" id="ca-dec" type="button">&minus;</button>
+          <input type="number" step="1" min="1" class="step-input" id="ca-input" value="1">
+          <button class="step-btn" id="ca-inc" type="button">+</button>
+        </div>
+      </div>
 
-    <div class="q-block">
-      <label class="q-label" for="result-input">Activity result</label>
-      <select class="result-input" id="result-input" disabled>
-        <option value="">— No result yet —</option>
-      </select>
-      <div class="q-hint" id="result-status">Sign in to edit the result.</div>
+      <div class="q-block">
+        <label class="q-label">Equipment photos</label>
+        <button class="photo-log-btn" id="photo-log-btn" type="button">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+          Log Photos to Drive
+        </button>
+        <div class="q-hint" id="photo-log-hint">Desktop opens the Drive folder directly. On iPad/phone, choose to take a new photo or pick an existing one.</div>
+      </div>
+
+      <div class="q-block">
+        <label class="q-label" for="result-input">Activity result</label>
+        <select class="result-input" id="result-input" disabled>
+          <option value="">— No result yet —</option>
+        </select>
+        <div class="q-hint" id="result-status">Sign in to edit the result.</div>
+      </div>
+
+      <div class="q-block">
+        <label class="q-label">Tamper seal log</label>
+        <div class="seal-field">
+          <label for="seal-number">Seal number</label>
+          <input type="text" id="seal-number" placeholder="e.g. 048213" disabled>
+        </div>
+        <div class="seal-row2">
+          <div class="seal-field">
+            <label for="seal-status">Status</label>
+            <select id="seal-status" disabled>
+              <option value="Intact">Intact</option>
+              <option value="Broken">Broken</option>
+              <option value="Removed">Removed</option>
+            </select>
+          </div>
+          <div class="seal-field">
+            <label for="seal-sub-area">Sub area (optional)</label>
+            <input type="text" id="seal-sub-area" placeholder="e.g. North panel" disabled>
+          </div>
+        </div>
+        <div class="seal-field">
+          <label for="seal-notes">Inspection notes</label>
+          <textarea id="seal-notes" placeholder="Anything worth noting" disabled></textarea>
+        </div>
+
+        <div class="seal-broken-fields hidden" id="seal-broken-fields">
+          <div class="seal-field">
+            <label for="seal-break-date">Break / removal date</label>
+            <input type="date" id="seal-break-date" disabled>
+          </div>
+          <div class="seal-field">
+            <label for="seal-responsible">Responsible party</label>
+            <input type="text" id="seal-responsible" placeholder="Who broke/removed it, if known" disabled>
+          </div>
+          <div class="seal-field">
+            <label for="seal-break-reason">Reason</label>
+            <input type="text" id="seal-break-reason" placeholder="e.g. Scheduled maintenance access" disabled>
+          </div>
+        </div>
+
+        <button class="seal-submit-btn" id="seal-submit-btn" type="button" disabled>Log Seal</button>
+        <div class="q-hint" id="seal-status-msg">Sign in to log tamper seals.</div>
+        <div class="seal-log-list" id="seal-log-list"></div>
+      </div>
     </div>
   </div>
 </aside>
+</div>
 
 <!-- SIGN-IN MODAL -->
 <div class="login-backdrop" id="login-backdrop">
@@ -732,6 +850,8 @@ const SUPABASE_URL = 'https://rcnxetcomdrlxvlarqoc.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJjbnhldGNvbWRybHh2bGFycW9jIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY0NDIyMjksImV4cCI6MjA5MjAxODIyOX0.gP37sT5OrCOVRZXekMrBZHm5mtfnr6JrC2YGflWsDQU';
 const PROJECT_TABLE_PREFIX = 'RNO04';
 const SCHEDULE_TABLE = `${PROJECT_TABLE_PREFIX}BackEndData`;
+// Same "Assets" table LaunchPad's tamper-seal log page reads/writes.
+const TAMPER_SEAL_TABLE = `${PROJECT_TABLE_PREFIX}Assets`;
 
 let sb = null;
 try {
@@ -973,6 +1093,10 @@ function openActivityDrawer(row){
   document.getElementById('photo-log-hint').textContent =
     'Desktop opens the Drive folder directly. On iPad/phone, choose to take a new photo or pick an existing one.';
 
+  renderReferenceContent(row);
+  resetSealForm();
+  refreshSealAccess();
+
   document.getElementById('activity-drawer').classList.add('open');
   document.getElementById('drawer-backdrop').classList.add('open');
   refreshRowSelection();
@@ -1020,7 +1144,9 @@ function stepInput(inputEl, delta, step, min){
 }
 
 document.getElementById('drawer-close').addEventListener('click', closeActivityDrawer);
-document.getElementById('drawer-backdrop').addEventListener('click', closeActivityDrawer);
+document.getElementById('drawer-backdrop').addEventListener('click', (e) => {
+  if (e.target.id === 'drawer-backdrop') closeActivityDrawer();
+});
 document.addEventListener('keydown', (e) => {
   if (e.key === 'Escape' && document.getElementById('activity-drawer').classList.contains('open')) {
     closeActivityDrawer();
@@ -1127,6 +1253,7 @@ function updateAuthUI(){
     pill.title = 'Sign in to edit data';
   }
   refreshResultAccess();
+  refreshSealAccess();
 }
 
 async function restoreSession(){
@@ -1393,6 +1520,207 @@ document.getElementById('result-input').addEventListener('change', saveResult);
 
 restoreSession();
 loadResultOptions();
+
+/* =====================================================================
+   REFERENCE PANEL — sample "what to look for" content
+   =====================================================================
+   Placeholder/sample content for the left-hand reference column, picked
+   by keyword match against the activity/asset/place text. Swap this for
+   real per-asset reference content (or a Supabase-backed table) later.
+   ===================================================================== */
+const SAMPLE_CHECKLISTS = {
+  electrical: {
+    overview: (row) => `This activity covers <b>${escapeHtml(row.activity)}</b> on <b>${escapeHtml(row.asset)}</b> at ${escapeHtml(row.place)}. Confirm the equipment is de-energized and properly locked out before opening any enclosure, and verify nameplate data matches the one-line diagram.`,
+    items: [
+      'Verify LOTO is applied and tested (zero-energy check) before opening any panel',
+      'Check torque marks / paint pens on lug and breaker connections for signs of movement',
+      'Inspect for discoloration, a burning smell, or heat-damaged insulation',
+      'Confirm labeling (panel schedule, arc-flash warning, equipment ID) is present and legible',
+      'Look for loose, missing, or corroded hardware on covers and grounding connections',
+      'Check for tamper seals — note seal numbers and condition before breaking any',
+    ],
+  },
+  mechanical: {
+    overview: (row) => `This activity covers <b>${escapeHtml(row.activity)}</b> on <b>${escapeHtml(row.asset)}</b> at ${escapeHtml(row.place)}. Confirm isolation valves and breakers are set per the test procedure before starting.`,
+    items: [
+      'Check for refrigerant, water, or oil leaks at fittings and gasket lines',
+      'Verify belts, couplings, and fan blades are free of visible wear or misalignment',
+      'Confirm vibration and noise levels are within expected range at startup',
+      'Check gauge readings (pressure/temperature) against design setpoints',
+      'Inspect insulation and lagging for damage or moisture intrusion',
+      'Note any tamper seals on access panels — record seal numbers before breaking',
+    ],
+  },
+  fire: {
+    overview: (row) => `This activity covers <b>${escapeHtml(row.activity)}</b> on <b>${escapeHtml(row.asset)}</b> at ${escapeHtml(row.place)}. Coordinate with the monitoring company before testing to avoid a false dispatch.`,
+    items: [
+      'Confirm the monitoring company has been notified before testing',
+      'Verify device address/zone matches the fire alarm matrix',
+      'Check for physical damage, paint overspray, or obstruction on detectors/sprinkler heads',
+      'Confirm audible/visual notification appliances activate as expected',
+      'Inspect valve tamper switches and seals — record any broken or missing seals',
+      'Restore the system to normal and confirm the monitoring company clears the test',
+    ],
+  },
+  controls: {
+    overview: (row) => `This activity covers <b>${escapeHtml(row.activity)}</b> on <b>${escapeHtml(row.asset)}</b> at ${escapeHtml(row.place)}. Compare live point values against the sequence of operations before signing off.`,
+    items: [
+      'Confirm point-to-point checkout matches the controls schedule',
+      'Verify setpoints and alarm limits match the sequence of operations',
+      'Check that graphics reflect real-time equipment status accurately',
+      'Test manual override / hand-off-auto behavior at the panel',
+      'Confirm network/communication status shows no dropped points',
+    ],
+  },
+  plumbing: {
+    overview: (row) => `This activity covers <b>${escapeHtml(row.activity)}</b> on <b>${escapeHtml(row.asset)}</b> at ${escapeHtml(row.place)}. Confirm the system is depressurized/isolated as required before inspection.`,
+    items: [
+      'Check for leaks at joints, valves, and fittings',
+      'Verify pressure gauge readings are within design range',
+      'Confirm backflow preventer and isolation valves are tagged correctly',
+      'Inspect pipe supports and hangers for proper alignment',
+      'Note any tamper seals on valves — record seal numbers before breaking',
+    ],
+  },
+  default: {
+    overview: (row) => `This activity covers <b>${escapeHtml(row.activity)}</b> on <b>${escapeHtml(row.asset)}</b> at ${escapeHtml(row.place)}. Review the commissioning procedure for this system before beginning.`,
+    items: [
+      'Confirm the equipment matches the tag/asset ID on the schedule',
+      'Check for visible damage, corrosion, or missing hardware',
+      'Verify labeling and documentation are present and legible',
+      'Note the condition of any tamper seals before breaking them',
+      'Take photos of anything unexpected for the record',
+    ],
+  },
+};
+
+function pickChecklistCategory(row){
+  const text = `${row.activity} ${row.asset} ${row.place}`.toLowerCase();
+  if (/switchgear|breaker|panel|generator|electrical|transformer|\bups\b|battery/.test(text)) return 'electrical';
+  if (/chiller|\bahu\b|pump|ductwork|mechanical|cooling|boiler/.test(text)) return 'mechanical';
+  if (/fire|sprinkler|alarm|smoke|suppression/.test(text)) return 'fire';
+  if (/\bbas\b|controls|sequence|graphics|automation/.test(text)) return 'controls';
+  if (/water|plumbing|booster|backflow|domestic/.test(text)) return 'plumbing';
+  return 'default';
+}
+
+function renderReferenceContent(row){
+  const def = SAMPLE_CHECKLISTS[pickChecklistCategory(row)];
+  document.getElementById('ref-overview').innerHTML = def.overview(row);
+  document.getElementById('ref-checklist').innerHTML = def.items.map(i => `<li>${escapeHtml(i)}</li>`).join('');
+}
+
+/* =====================================================================
+   TAMPER SEAL LOG — matches the schema/columns of LaunchPad's own
+   Asset Tamper Seal Log tool (same RNO04Assets table).
+   ===================================================================== */
+let sessionSealLog = [];
+
+function toggleSealBrokenFields(status){
+  document.getElementById('seal-broken-fields').classList.toggle('hidden', status === 'Intact');
+}
+
+function resetSealForm(){
+  document.getElementById('seal-number').value = '';
+  document.getElementById('seal-status').value = 'Intact';
+  document.getElementById('seal-sub-area').value = '';
+  document.getElementById('seal-notes').value = '';
+  document.getElementById('seal-break-date').value = selectedDate;
+  document.getElementById('seal-responsible').value = '';
+  document.getElementById('seal-break-reason').value = '';
+  toggleSealBrokenFields('Intact');
+  sessionSealLog = [];
+  renderSealLogList();
+  document.getElementById('seal-status-msg').className = 'q-hint';
+}
+
+function renderSealLogList(){
+  const list = document.getElementById('seal-log-list');
+  if (sessionSealLog.length === 0) { list.innerHTML = ''; return; }
+  list.innerHTML = '<div class="q-hint" style="margin-bottom:8px;">Logged this session:</div>' +
+    sessionSealLog.map(s => `
+      <div class="seal-log-item">
+        <span class="num">Seal #${escapeHtml(s.sealNumber)}</span>
+        <span class="stat ${s.status.toLowerCase()}">${escapeHtml(s.status)}</span>
+        <span class="time">${s.time}</span>
+      </div>`).join('');
+}
+
+function refreshSealAccess(){
+  const disabled = !authUser;
+  ['seal-number', 'seal-status', 'seal-sub-area', 'seal-notes', 'seal-break-date', 'seal-responsible', 'seal-break-reason', 'seal-submit-btn']
+    .forEach(id => { document.getElementById(id).disabled = disabled; });
+
+  const msg = document.getElementById('seal-status-msg');
+  if (disabled) {
+    msg.textContent = 'Sign in to log tamper seals.';
+    msg.className = 'q-hint';
+  } else if (msg.className !== 'q-hint ok' && msg.className !== 'q-hint err') {
+    msg.textContent = `Signed in as ${authUser}.`;
+    msg.className = 'q-hint';
+  }
+}
+
+document.getElementById('seal-status').addEventListener('change', (e) => toggleSealBrokenFields(e.target.value));
+
+async function saveTamperSeal(){
+  if (!authUser || selectedRowId == null || !sb) return;
+  const row = scheduleRows.find(r => String(r.id) === String(selectedRowId));
+  if (!row) return;
+
+  const msg = document.getElementById('seal-status-msg');
+  const sealNumber = document.getElementById('seal-number').value.trim();
+  const status = document.getElementById('seal-status').value;
+  const subArea = document.getElementById('seal-sub-area').value.trim();
+  const notes = document.getElementById('seal-notes').value.trim();
+
+  if (!sealNumber) {
+    msg.className = 'q-hint err';
+    msg.textContent = 'Enter a seal number first.';
+    return;
+  }
+
+  const payload = {
+    asset_name: row.asset,
+    location: row.place,
+    sub_area: subArea,
+    seal_number: sealNumber,
+    inspection_date: selectedDate,
+    inspection_notes: notes,
+    signoff: authUser,
+    status: status,
+  };
+  if (status !== 'Intact') {
+    payload.break_date = document.getElementById('seal-break-date').value || selectedDate;
+    payload.responsible_party = document.getElementById('seal-responsible').value.trim();
+    payload.break_reason = document.getElementById('seal-break-reason').value.trim();
+  }
+
+  const btn = document.getElementById('seal-submit-btn');
+  btn.disabled = true;
+  msg.className = 'q-hint';
+  msg.textContent = 'Logging seal…';
+
+  try {
+    const { error } = await sb.from(TAMPER_SEAL_TABLE).insert(payload);
+    if (error) throw error;
+
+    sessionSealLog.unshift({ sealNumber, status, time: new Date().toLocaleTimeString() });
+    renderSealLogList();
+
+    msg.className = 'q-hint ok';
+    msg.textContent = `Seal #${sealNumber} logged to RNO04Assets.`;
+    document.getElementById('seal-number').value = '';
+    document.getElementById('seal-notes').value = '';
+  } catch (err) {
+    msg.className = 'q-hint err';
+    msg.textContent = 'Failed to log seal: ' + err.message;
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+document.getElementById('seal-submit-btn').addEventListener('click', saveTamperSeal);
 
 // Delegated row click — works for both the docked table and the fullscreen-expanded copy,
 // since the <table> node itself is only ever moved, never re-created.
