@@ -125,7 +125,55 @@
     display:flex; align-items:center; justify-content:center;
     font-family:var(--font-display); font-size:12px; font-weight:700; color:#04170d;
     background:linear-gradient(135deg,var(--green-soft),var(--green));
+    cursor:pointer; border:none;
   }
+  .auth-pill{
+    display:flex; align-items:center; gap:8px;
+    background:var(--bg-elev-2); border:1px solid var(--border-strong); border-radius:999px;
+    padding:5px 14px 5px 6px; cursor:pointer; font-family:var(--font-display); font-size:11.5px;
+    font-weight:600; letter-spacing:0.4px; text-transform:uppercase; color:var(--text-muted);
+    transition:border-color .15s ease, color .15s ease;
+  }
+  .auth-pill:hover{ border-color:var(--green); color:var(--green); }
+  .auth-pill.signed-in{ color:var(--text); }
+  .auth-pill .avatar{ width:24px; height:24px; font-size:10.5px; }
+
+  /* ---------- sign-in modal ---------- */
+  .login-backdrop{ position:fixed; inset:0; z-index:250; background:rgba(2,4,10,0.72); display:none; align-items:center; justify-content:center; padding:20px; }
+  .login-backdrop.open{ display:flex; }
+  .login-card{
+    background:var(--bg-elev); border:1px solid var(--border); border-radius:var(--radius);
+    width:100%; max-width:380px; box-shadow:var(--shadow-md); overflow:hidden;
+  }
+  .login-head{ display:flex; justify-content:space-between; align-items:flex-start; padding:20px 22px 0; }
+  .login-head h3{ font-family:var(--font-display); font-size:16px; font-weight:700; margin:0 0 6px; color:var(--text); }
+  .login-head p{ margin:0; font-size:12.5px; color:var(--text-muted); line-height:1.5; }
+  .login-body{ padding:18px 22px 22px; }
+  .login-field{ margin-bottom:14px; }
+  .login-field label{ display:block; font-family:var(--font-mono); font-size:10.5px; letter-spacing:0.5px; text-transform:uppercase; color:var(--text-muted); margin-bottom:7px; }
+  .login-field input{
+    width:100%; background:var(--bg-elev-2); border:1px solid var(--border-strong); border-radius:var(--radius-sm);
+    color:var(--text); font-family:var(--font-body); font-size:14px; padding:10px 12px;
+  }
+  .login-field input:focus{ outline:none; border-color:var(--green); }
+  .login-submit{
+    width:100%; background:var(--green); color:#04170d; border:none; border-radius:var(--radius-sm);
+    font-family:var(--font-display); font-size:12.5px; font-weight:700; letter-spacing:0.5px; text-transform:uppercase;
+    padding:12px; cursor:pointer; margin-top:4px;
+  }
+  .login-submit:hover{ background:var(--green-soft); }
+  .login-submit:disabled{ opacity:0.5; cursor:not-allowed; }
+  .login-links{ display:flex; justify-content:space-between; margin-top:14px; font-size:12px; }
+  .login-links a{ color:var(--green-soft); text-decoration:none; cursor:pointer; }
+  .login-links a:hover{ text-decoration:underline; }
+  .login-msg{ margin-top:14px; font-size:12.5px; display:none; line-height:1.5; }
+  .login-msg.error{ color:var(--red); }
+  .login-msg.success{ color:var(--green-soft); }
+  .login-close{
+    background:var(--bg-elev-2); border:1px solid var(--border); border-radius:var(--radius-sm); color:var(--text-muted);
+    width:28px; height:28px; cursor:pointer; font-size:15px; flex:0 0 auto;
+  }
+  .login-close:hover{ border-color:var(--red); color:var(--red); }
 
   /* ---------- context strip ---------- */
   .context-strip{
@@ -398,21 +446,12 @@
   .photo-log-btn:hover{ background:var(--green-deep); border-color:var(--green); color:var(--green-soft); }
   .photo-log-btn svg{ width:16px; height:16px; flex:0 0 auto; }
 
-  .result-row{ display:flex; gap:8px; }
   .result-input{
-    flex:1; min-width:0; background:var(--bg-elev-2); border:1px solid var(--border-strong); border-radius:var(--radius-sm);
+    width:100%; background:var(--bg-elev-2); border:1px solid var(--border-strong); border-radius:var(--radius-sm);
     color:var(--text); font-family:var(--font-mono); font-size:13px; padding:10px 12px;
   }
   .result-input:focus{ outline:none; border-color:var(--green); }
-  .result-input::placeholder{ color:var(--text-faint); }
-  .result-save-btn{
-    background:var(--green-tint); border:1px solid var(--green-dim); color:var(--green-soft);
-    font-family:var(--font-display); font-size:11.5px; font-weight:600; letter-spacing:0.4px; text-transform:uppercase;
-    border-radius:var(--radius-sm); padding:0 16px; cursor:pointer; white-space:nowrap;
-    transition:background .15s ease, border-color .15s ease;
-  }
-  .result-save-btn:hover{ background:var(--green-deep); border-color:var(--green); }
-  .result-save-btn:disabled{ opacity:0.5; cursor:not-allowed; }
+  .result-input:disabled{ opacity:0.5; cursor:not-allowed; }
   .q-hint.err{ color:var(--red); }
   .q-hint.ok{ color:var(--green-soft); }
 </style>
@@ -447,7 +486,10 @@
   </nav>
   <div class="topbar-right">
     <div class="site-chip"><span class="led"></span> PHX-3 · PHASE 2</div>
-    <div class="avatar">JT</div>
+    <div class="auth-pill" id="auth-pill" title="Sign in to edit data">
+      <div class="avatar" id="auth-avatar">?</div>
+      <span id="auth-pill-label">Sign In</span>
+    </div>
   </div>
 </div>
 
@@ -636,14 +678,43 @@
 
     <div class="q-block">
       <label class="q-label" for="result-input">Activity result</label>
-      <div class="result-row">
-        <input type="text" class="result-input" id="result-input" placeholder="e.g. Pass, Fail, Incomplete">
-        <button class="result-save-btn" id="result-save-btn" type="button">Save</button>
-      </div>
-      <div class="q-hint" id="result-status">Writes back to the live RNO04BackEndData row in Supabase.</div>
+      <select class="result-input" id="result-input" disabled>
+        <option value="">— No result yet —</option>
+      </select>
+      <div class="q-hint" id="result-status">Sign in to edit the result.</div>
     </div>
   </div>
 </aside>
+
+<!-- SIGN-IN MODAL -->
+<div class="login-backdrop" id="login-backdrop">
+  <div class="login-card">
+    <div class="login-head">
+      <div>
+        <h3 id="login-title">Sign In to ArcApp</h3>
+        <p id="login-subtitle">Enter your email and PIN to edit activity data.</p>
+      </div>
+      <button class="login-close" id="login-close">&times;</button>
+    </div>
+    <div class="login-body">
+      <div class="login-field" id="login-email-field">
+        <label for="login-email">Email</label>
+        <input type="email" id="login-email" autocomplete="username">
+      </div>
+      <div class="login-field">
+        <label for="login-pin" id="login-pin-label">PIN (6+ characters)</label>
+        <input type="password" id="login-pin" autocomplete="current-password" minlength="6">
+      </div>
+      <button class="login-submit" id="login-submit-btn">Sign In</button>
+      <div class="login-links" id="login-links">
+        <a id="login-toggle-link">First time? Create your PIN</a>
+        <a id="login-forgot-link">Forgot PIN?</a>
+      </div>
+      <div class="login-msg" id="login-error"></div>
+      <div class="login-msg" id="login-success"></div>
+    </div>
+  </div>
+</div>
 
 <script>
 /* =====================================================================
@@ -894,11 +965,10 @@ function openActivityDrawer(row){
   document.getElementById('ca-input').value = ans.caCount;
   toggleCaBlock(ans.offsetHrs);
 
-  const resultInput = document.getElementById('result-input');
-  resultInput.value = (row.result && row.result !== '—') ? row.result : '';
-  const resultStatus = document.getElementById('result-status');
-  resultStatus.textContent = 'Writes back to the live RNO04BackEndData row in Supabase.';
-  resultStatus.className = 'q-hint';
+  const currentResult = (row.result && row.result !== '—') ? row.result : '';
+  populateResultSelect(currentResult);
+  document.getElementById('result-status').className = 'q-hint'; // clear any stale status from a previous row
+  refreshResultAccess();
 
   document.getElementById('photo-log-hint').textContent =
     'Desktop opens the Drive folder directly. On iPad/phone, choose to take a new photo or pick an existing one.';
@@ -1015,13 +1085,286 @@ document.getElementById('photo-log-btn').addEventListener('click', () => {
   }
 });
 
-async function saveResult(){
-  if (selectedRowId == null || !sb) return;
-  const btn = document.getElementById('result-save-btn');
-  const statusEl = document.getElementById('result-status');
-  const val = document.getElementById('result-input').value.trim();
+/* =====================================================================
+   AUTHENTICATION — mirrors LaunchPad's email + PIN sign-in
+   =====================================================================
+   Same Supabase project as the schedule read above. A user must be a row
+   in RNO04authorized_editors (checked by email) AND successfully sign in
+   with Supabase Auth (email + PIN-as-password) before they can edit the
+   Result field. Viewing the dashboard itself never requires signing in.
+   ===================================================================== */
+let authUser = null;   // signed-in + authorized email, or null
+let authRole = null;
+let authCompany = null;
+let isSignUpMode = false;
+let isRecoveryMode = false;
+
+async function verifyPermission(email){
+  if (!sb) return { isAuthorized: false, role: null, company: null };
+  const { data, error } = await sb
+    .from(`${PROJECT_TABLE_PREFIX}authorized_editors`)
+    .select('is_admin, company, role')
+    .eq('email', email.toLowerCase())
+    .single();
+  if (error || !data) return { isAuthorized: false, role: null, company: null };
+  const role = data.role || (data.is_admin ? 'admin' : 'editor');
+  return { isAuthorized: true, role, company: data.company };
+}
+
+function updateAuthUI(){
+  const avatar = document.getElementById('auth-avatar');
+  const label = document.getElementById('auth-pill-label');
+  const pill = document.getElementById('auth-pill');
+  if (authUser) {
+    avatar.textContent = authUser.slice(0, 2).toUpperCase();
+    label.textContent = authUser.split('@')[0];
+    pill.classList.add('signed-in');
+    pill.title = `Signed in as ${authUser} (${authRole || 'editor'}) — click to sign out`;
+  } else {
+    avatar.textContent = '?';
+    label.textContent = 'Sign In';
+    pill.classList.remove('signed-in');
+    pill.title = 'Sign in to edit data';
+  }
+  refreshResultAccess();
+}
+
+async function restoreSession(){
+  if (!sb) return;
+  try {
+    const { data: { user } } = await sb.auth.getUser();
+    if (user && user.email) {
+      const perm = await verifyPermission(user.email);
+      if (perm.isAuthorized) {
+        authUser = user.email; authRole = perm.role; authCompany = perm.company;
+      }
+    }
+  } catch (e) { /* no active session — stay signed out */ }
+  updateAuthUI();
+}
+
+sb?.auth?.onAuthStateChange((event) => {
+  if (event === 'PASSWORD_RECOVERY') {
+    isRecoveryMode = true;
+    openLoginModal();
+    renderLoginModalMode();
+  }
+});
+
+document.getElementById('auth-pill').addEventListener('click', async () => {
+  if (authUser) {
+    await sb.auth.signOut();
+    authUser = null; authRole = null; authCompany = null;
+    updateAuthUI();
+  } else {
+    openLoginModal();
+  }
+});
+
+function openLoginModal(){
+  document.getElementById('login-backdrop').classList.add('open');
+  document.getElementById('login-error').style.display = 'none';
+  document.getElementById('login-success').style.display = 'none';
+  renderLoginModalMode();
+}
+function closeLoginModal(){
+  document.getElementById('login-backdrop').classList.remove('open');
+}
+function renderLoginModalMode(){
+  const title = document.getElementById('login-title');
+  const subtitle = document.getElementById('login-subtitle');
+  const btn = document.getElementById('login-submit-btn');
+  const toggleLink = document.getElementById('login-toggle-link');
+  const emailField = document.getElementById('login-email-field');
+  const pinLabel = document.getElementById('login-pin-label');
+  const links = document.getElementById('login-links');
+
+  if (isRecoveryMode) {
+    title.textContent = 'Set a New PIN';
+    subtitle.textContent = 'Enter a new 6+ character PIN for your account.';
+    btn.textContent = 'Set New PIN';
+    emailField.style.display = 'none';
+    pinLabel.textContent = 'New PIN (6+ characters)';
+    links.style.display = 'none';
+  } else {
+    emailField.style.display = 'block';
+    pinLabel.textContent = 'PIN (6+ characters)';
+    links.style.display = 'flex';
+    if (isSignUpMode) {
+      title.textContent = 'Create Your PIN';
+      subtitle.textContent = 'Sign up with your email and a 6+ character PIN — you\'ll need to be on the RNO04 authorized editors list to edit data.';
+      btn.textContent = 'Create PIN';
+      toggleLink.textContent = 'Already have a PIN? Sign in';
+    } else {
+      title.textContent = 'Sign In to ArcApp';
+      subtitle.textContent = 'Enter your email and PIN to edit activity data.';
+      btn.textContent = 'Sign In';
+      toggleLink.textContent = "First time? Create your PIN";
+    }
+  }
+}
+
+function showLoginError(msg){
+  const el = document.getElementById('login-error');
+  el.textContent = msg;
+  el.className = 'login-msg error';
+  el.style.display = 'block';
+  document.getElementById('login-success').style.display = 'none';
+}
+function showLoginSuccess(msg){
+  const el = document.getElementById('login-success');
+  el.textContent = msg;
+  el.className = 'login-msg success';
+  el.style.display = 'block';
+  document.getElementById('login-error').style.display = 'none';
+}
+
+document.getElementById('login-close').addEventListener('click', closeLoginModal);
+document.getElementById('login-backdrop').addEventListener('click', (e) => {
+  if (e.target.id === 'login-backdrop') closeLoginModal();
+});
+document.getElementById('login-toggle-link').addEventListener('click', () => {
+  isSignUpMode = !isSignUpMode;
+  renderLoginModalMode();
+});
+document.getElementById('login-forgot-link').addEventListener('click', async () => {
+  const email = document.getElementById('login-email').value.trim().toLowerCase();
+  if (!email) { showLoginError('Enter your email first, then click "Forgot PIN?".'); return; }
+  try {
+    const { error } = await sb.auth.resetPasswordForEmail(email, {
+      redirectTo: window.location.origin + window.location.pathname,
+    });
+    if (error) throw error;
+    showLoginSuccess('Password reset email sent — check your inbox.');
+  } catch (err) {
+    showLoginError(err.message);
+  }
+});
+
+document.getElementById('login-submit-btn').addEventListener('click', async () => {
+  const btn = document.getElementById('login-submit-btn');
+  const email = document.getElementById('login-email').value.trim().toLowerCase();
+  const pin = document.getElementById('login-pin').value.trim();
+
+  document.getElementById('login-error').style.display = 'none';
+  document.getElementById('login-success').style.display = 'none';
+
+  if (!pin || pin.length < 6) { showLoginError('PIN must be at least 6 characters.'); return; }
+  if (!isRecoveryMode && !email) { showLoginError('Enter your email.'); return; }
 
   btn.disabled = true;
+  try {
+    if (isRecoveryMode) {
+      const { error } = await sb.auth.updateUser({ password: pin });
+      if (error) throw error;
+      const { data: { user } } = await sb.auth.getUser();
+      if (user && user.email) {
+        const perm = await verifyPermission(user.email);
+        if (perm.isAuthorized) { authUser = user.email; authRole = perm.role; authCompany = perm.company; }
+      }
+      isRecoveryMode = false;
+      updateAuthUI();
+      showLoginSuccess('PIN updated — you\'re signed in.');
+      setTimeout(closeLoginModal, 1200);
+    } else if (isSignUpMode) {
+      const { data, error } = await sb.auth.signUp({ email, password: pin });
+      if (error) throw error;
+      const alreadyHasAccount = data && data.user &&
+        Array.isArray(data.user.identities) && data.user.identities.length === 0;
+      if (alreadyHasAccount) {
+        showLoginError('You already have an account with this email — sign in instead, or use "Forgot PIN?".');
+      } else {
+        showLoginSuccess('Check your email to verify your account, then sign in here.');
+      }
+    } else {
+      const perm = await verifyPermission(email);
+      const { error: loginError } = await sb.auth.signInWithPassword({ email, password: pin });
+      if (loginError || !perm.isAuthorized) {
+        const reasons = [];
+        if (!perm.isAuthorized) reasons.push('this email is not on the RNO04 authorized editors list');
+        if (loginError) {
+          const msg = (loginError.message || '').toLowerCase();
+          reasons.push(msg.includes('invalid') ? 'the PIN is incorrect, or not created yet — use "First time?" below' : loginError.message);
+        }
+        showLoginError('Sign in failed: ' + reasons.join(', and ') + '.');
+      } else {
+        authUser = email; authRole = perm.role; authCompany = perm.company;
+        updateAuthUI();
+        closeLoginModal();
+      }
+    }
+  } catch (err) {
+    showLoginError(err.message);
+  } finally {
+    btn.disabled = false;
+  }
+});
+
+/* =====================================================================
+   RESULT DROPDOWN — sourced from RNO04dropdownoptions.Results
+   ===================================================================== */
+let resultOptions = [];
+
+async function loadResultOptions(){
+  if (!sb) return;
+  const table = `${PROJECT_TABLE_PREFIX}dropdownoptions`;
+  const values = new Set();
+  let page = 0;
+  const pageSize = 1000;
+  try {
+    while (true) {
+      const { data, error } = await sb.from(table).select('Results').range(page * pageSize, (page + 1) * pageSize - 1);
+      if (error) throw error;
+      if (!data || data.length === 0) break;
+      data.forEach(r => { const v = (r.Results || '').toString().trim(); if (v) values.add(v); });
+      if (data.length < pageSize) break;
+      page++;
+    }
+    resultOptions = Array.from(values).sort();
+  } catch (err) {
+    console.error('Failed to load Result options from Supabase:', err);
+    resultOptions = [];
+  }
+  // If the drawer's already open, refresh it with the freshly-loaded list.
+  if (selectedRowId != null) {
+    const row = scheduleRows.find(r => String(r.id) === String(selectedRowId));
+    if (row) populateResultSelect((row.result && row.result !== '—') ? row.result : '');
+  }
+}
+
+function escapeHtml(str){
+  return String(str).replace(/[&<>"']/g, c => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c]));
+}
+
+function populateResultSelect(currentVal){
+  const sel = document.getElementById('result-input');
+  const values = new Set(resultOptions);
+  if (currentVal) values.add(currentVal);
+  const sorted = Array.from(values).sort();
+  sel.innerHTML = '<option value="">— No result yet —</option>' +
+    sorted.map(v => `<option value="${escapeHtml(v)}" ${v === currentVal ? 'selected' : ''}>${escapeHtml(v)}</option>`).join('');
+}
+
+function refreshResultAccess(){
+  const sel = document.getElementById('result-input');
+  const hint = document.getElementById('result-status');
+  sel.disabled = !authUser;
+  if (!authUser) {
+    hint.textContent = 'Sign in to edit the result.';
+    hint.className = 'q-hint';
+  } else if (hint.className !== 'q-hint ok' && hint.className !== 'q-hint err') {
+    hint.textContent = `Signed in as ${authUser} — changes save to Supabase immediately.`;
+    hint.className = 'q-hint';
+  }
+}
+
+async function saveResult(){
+  if (!authUser || selectedRowId == null || !sb) return;
+  const sel = document.getElementById('result-input');
+  const statusEl = document.getElementById('result-status');
+  const val = sel.value;
+
+  sel.disabled = true;
   statusEl.className = 'q-hint';
   statusEl.textContent = 'Saving…';
 
@@ -1042,14 +1385,14 @@ async function saveResult(){
     statusEl.className = 'q-hint err';
     statusEl.textContent = 'Failed to save: ' + err.message;
   } finally {
-    btn.disabled = false;
+    sel.disabled = false;
   }
 }
 
-document.getElementById('result-save-btn').addEventListener('click', saveResult);
-document.getElementById('result-input').addEventListener('keydown', (e) => {
-  if (e.key === 'Enter') { e.preventDefault(); saveResult(); }
-});
+document.getElementById('result-input').addEventListener('change', saveResult);
+
+restoreSession();
+loadResultOptions();
 
 // Delegated row click — works for both the docked table and the fullscreen-expanded copy,
 // since the <table> node itself is only ever moved, never re-created.
