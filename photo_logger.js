@@ -31,6 +31,13 @@
   let accessToken = null;
   let folderChainCache = {}; // key: "activity|asset|date" -> folder id promise
 
+  function localIsoDate(d = new Date()) {
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, "0");
+    const day = String(d.getDate()).padStart(2, "0");
+    return `${y}-${m}-${day}`;
+  }
+
   /* ---------- Device detection ---------- */
   function isTouchTablet() {
     const ua = navigator.userAgent;
@@ -238,14 +245,39 @@
 
   /* ---------- Desktop path: resolve + open Drive folder directly ---------- */
   async function openOnDesktop(ctx) {
+    // Open the tab synchronously, in direct response to the click — if we
+    // wait until after the OAuth/folder-lookup awaits below to call
+    // window.open(), most browsers (Safari especially) no longer treat it as
+    // user-initiated and either block it or reuse the current tab instead of
+    // opening a new one. Opening a blank tab now and redirecting it once we
+    // know the real URL keeps it a genuine separate tab either way.
+    const newTab = window.open("", "_blank", "noopener");
+    if (newTab) {
+      try {
+        newTab.document.write(
+          '<title>Opening Drive…</title><body style="margin:0;height:100vh;display:flex;align-items:center;justify-content:center;background:#05070d;color:#8991b5;font-family:sans-serif;font-size:14px;">Connecting to Google Drive…</body>'
+        );
+      } catch (e) { /* cross-origin write can fail in some browsers; harmless */ }
+    }
+
     showToast("Connecting to Google Drive…", 0);
     try {
       await ensureConnected();
       showToast("Finding the Drive folder…", 0);
       const folderId = await resolveFolderChain(ctx, (msg) => showToast(msg, 0));
-      window.open(`https://drive.google.com/drive/folders/${folderId}`, "_blank", "noopener");
+      const url = `https://drive.google.com/drive/folders/${folderId}`;
+      if (newTab && !newTab.closed) {
+        newTab.location = url;
+      } else {
+        window.open(url, "_blank", "noopener"); // fallback if the pre-opened tab got closed/blocked
+      }
       showToast(`Opened Drive: ${ROOT_FOLDER_NAME} / ${ctx.activity} / ${ctx.asset} / ${ctx.date}`, 4500);
     } catch (err) {
+      if (newTab && !newTab.closed) {
+        try {
+          newTab.document.body.textContent = "Couldn't open Drive folder: " + err.message;
+        } catch (e) { /* ignore */ }
+      }
       showToast("Couldn't open Drive folder: " + err.message, 6000);
     }
   }
@@ -460,7 +492,7 @@
       const context = {
         activity: ctx.activity || "Unspecified Activity",
         asset: ctx.asset || "Unspecified Asset",
-        date: ctx.date || new Date().toISOString().slice(0, 10),
+        date: ctx.date || localIsoDate(),
       };
       if (isDesktopDevice()) {
         openOnDesktop(context);

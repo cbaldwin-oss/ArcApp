@@ -210,6 +210,24 @@
   .panel-body.no-pad{ padding:0; }
   .sync-note{ font-family:var(--font-mono); font-size:10.5px; color:var(--text-faint); padding:0 20px 12px; margin-top:-6px; }
 
+  .day-nav{
+    display:flex; align-items:center; justify-content:center; gap:14px;
+    padding:14px 20px; border-bottom:1px solid var(--border); position:relative;
+  }
+  .day-nav-center{ display:flex; flex-direction:column; align-items:center; gap:2px; min-width:180px; }
+  .day-nav-label{ font-family:var(--font-display); font-size:14px; font-weight:600; letter-spacing:0.3px; color:var(--text); }
+  .day-today-btn{
+    background:none; border:none; color:var(--green); font-family:var(--font-mono); font-size:10.5px;
+    letter-spacing:0.4px; text-transform:uppercase; cursor:pointer; padding:0;
+  }
+  .day-today-btn:hover{ color:var(--green-soft); text-decoration:underline; }
+  .day-picker{
+    position:absolute; right:20px; top:50%; transform:translateY(-50%);
+    background:var(--bg-elev-2); border:1px solid var(--border-strong); border-radius:var(--radius-sm);
+    color:var(--text); font-family:var(--font-mono); font-size:12px; padding:6px 8px; color-scheme:dark;
+  }
+  @media (max-width:560px){ .day-picker{ display:none; } }
+
   /* ---------- dashboard grid ---------- */
   .dash-grid{ display:grid; grid-template-columns:1.1fr 1fr; gap:18px; align-items:start; }
   @media (max-width:980px){ .dash-grid{ grid-template-columns:1fr; } .kpi-row{ grid-template-columns:repeat(2,1fr); } }
@@ -510,13 +528,25 @@
         </button>
       </div>
     </div>
+    <div class="day-nav">
+      <button class="icon-btn" id="day-prev" title="Previous day">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 18l-6-6 6-6"/></svg>
+      </button>
+      <div class="day-nav-center">
+        <div class="day-nav-label" id="day-nav-label">Fri, Aug 28 2026</div>
+        <button class="day-today-btn" id="day-today-btn">Today</button>
+      </div>
+      <button class="icon-btn" id="day-next" title="Next day">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18l6-6-6-6"/></svg>
+      </button>
+      <input type="date" id="day-picker" class="day-picker">
+    </div>
     <div class="sync-note" id="sync-note">Source: <b style="color:var(--text-muted)">RNO04BackEndData</b> · not yet synced</div>
     <div class="panel-body no-pad" id="schedule-body">
       <div style="overflow-x:auto;">
         <table class="sched" id="sched-table">
           <thead>
             <tr>
-              <th>Date</th>
               <th>Time</th>
               <th>Place</th>
               <th>Activity</th>
@@ -583,7 +613,7 @@
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
         Log Photos to Drive
       </button>
-      <div class="q-hint">Opens a camera page in a new tab, filed under this activity → asset → date in Drive.</div>
+      <div class="q-hint">Desktop opens the Drive folder directly. On iPad/phone, choose to take a new photo or pick an existing one.</div>
     </div>
   </div>
 </aside>
@@ -617,12 +647,25 @@ let scheduleRows = [];
 let scheduleState = 'loading'; // loading | ready | error
 let scheduleErrorMsg = '';
 
+// Local calendar date as YYYY-MM-DD — deliberately NOT toISOString(), which
+// converts to UTC and rolls to the next day in the evening for any US
+// timezone (e.g. after ~5pm in Phoenix). day_label in Supabase is a plain
+// local calendar date, so "today" needs to match using local date parts.
+function localIsoDate(d = new Date()){
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+
+let selectedDate = localIsoDate(); // day currently shown
+
 function stripHtml(str){ return (str || '').toString().replace(/<[^>]+>/g, '').trim(); }
 
 function addDaysIso(iso, n){
   const d = new Date(iso + 'T00:00:00');
   d.setDate(d.getDate() + n);
-  return d.toISOString().slice(0, 10);
+  return localIsoDate(d);
 }
 
 function fmtDate(iso){
@@ -630,6 +673,13 @@ function fmtDate(iso){
   const d = new Date(iso + 'T00:00:00');
   if (isNaN(d)) return iso;
   return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+}
+
+function fmtDateLong(iso){
+  if (!iso) return '—';
+  const d = new Date(iso + 'T00:00:00');
+  if (isNaN(d)) return iso;
+  return d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' });
 }
 
 function scheduleStatusClass(text){
@@ -640,6 +690,24 @@ function scheduleStatusClass(text){
   if (t.includes('caution') || t.includes('risk') || t.includes('delay')) return 'caution';
   return 'go';
 }
+
+function renderDayNav(){
+  document.getElementById('day-nav-label').textContent = fmtDateLong(selectedDate);
+  document.getElementById('day-picker').value = selectedDate;
+  document.getElementById('day-today-btn').style.visibility =
+    (selectedDate === localIsoDate()) ? 'hidden' : 'visible';
+}
+
+function goToDate(iso){
+  selectedDate = iso;
+  renderDayNav();
+  loadSchedule();
+}
+
+document.getElementById('day-prev').addEventListener('click', () => goToDate(addDaysIso(selectedDate, -1)));
+document.getElementById('day-next').addEventListener('click', () => goToDate(addDaysIso(selectedDate, 1)));
+document.getElementById('day-today-btn').addEventListener('click', () => goToDate(localIsoDate()));
+document.getElementById('day-picker').addEventListener('change', (e) => { if (e.target.value) goToDate(e.target.value); });
 
 async function loadSchedule(){
   scheduleState = 'loading';
@@ -654,19 +722,13 @@ async function loadSchedule(){
     return;
   }
 
-  const today = new Date().toISOString().slice(0, 10);
-  const windowStart = addDaysIso(today, -3);
-  const windowEnd = addDaysIso(today, 14);
-
   try {
     const { data, error } = await sb
       .from(SCHEDULE_TABLE)
       .select('id, day_label, time, place, activity, asset, status, trade_partners, result, loto')
-      .gte('day_label', windowStart)
-      .lte('day_label', windowEnd)
-      .order('day_label', { ascending: true })
+      .eq('day_label', selectedDate)
       .order('time', { ascending: true })
-      .limit(500);
+      .limit(200);
 
     if (error) throw error;
 
@@ -731,7 +793,7 @@ function renderSchedule(tbody, filter = ''){
     for (let i = 0; i < 5; i++) {
       const tr = document.createElement('tr');
       tr.className = 'skeleton-row';
-      tr.innerHTML = Array(9).fill('<td><div class="skeleton-bar" style="width:80%"></div></td>').join('');
+      tr.innerHTML = Array(8).fill('<td><div class="skeleton-bar" style="width:80%"></div></td>').join('');
       tbody.appendChild(tr);
     }
     return;
@@ -740,7 +802,7 @@ function renderSchedule(tbody, filter = ''){
   if (scheduleState === 'error') {
     const tr = document.createElement('tr');
     const td = document.createElement('td');
-    td.colSpan = 9;
+    td.colSpan = 8;
     td.className = 'table-error';
     td.innerHTML = `Couldn't reach Supabase (${scheduleErrorMsg}).<br><button class="retry-btn" id="retry-btn">Retry connection</button>`;
     tr.appendChild(td);
@@ -751,15 +813,15 @@ function renderSchedule(tbody, filter = ''){
 
   const f = filter.trim().toLowerCase();
   const rows = scheduleRows.filter(r =>
-    !f || (r.date + r.time + r.place + r.activity + r.asset + r.trade + r.status + r.result).toLowerCase().includes(f)
+    !f || (r.time + r.place + r.activity + r.asset + r.trade + r.status + r.result).toLowerCase().includes(f)
   );
 
   if (rows.length === 0) {
     const tr = document.createElement('tr');
     const td = document.createElement('td');
-    td.colSpan = 9;
+    td.colSpan = 8;
     td.className = 'table-empty';
-    td.textContent = 'No scheduled activities in the current window.';
+    td.textContent = `No scheduled activities on ${fmtDate(selectedDate)}.`;
     tr.appendChild(td);
     tbody.appendChild(tr);
     return;
@@ -771,7 +833,6 @@ function renderSchedule(tbody, filter = ''){
     if (String(r.id) === String(selectedRowId)) tr.classList.add('row-selected');
     const answered = activityAnswers[r.id] ? '<span class="answered-dot" title="Notes recorded"></span>' : '';
     tr.innerHTML = `
-      <td class="discipline-cell">${fmtDate(r.date)}</td>
       <td>${r.time}</td>
       <td class="tag-cell">${r.place}</td>
       <td>${answered}${r.activity}</td>
@@ -895,15 +956,14 @@ document.getElementById('photo-log-btn').addEventListener('click', () => {
   if (selectedRowId == null) return;
   const row = scheduleRows.find(r => String(r.id) === String(selectedRowId));
   if (!row) return;
-  const params = new URLSearchParams({
-    activity: row.activity || 'Unspecified Activity',
-    asset: row.asset || 'Unspecified Asset',
-    date: row.date || new Date().toISOString().slice(0, 10),
+  // photo-logger.js decides desktop vs. touch behavior; the dashboard just
+  // hands over context. See that file for the Drive OAuth/upload logic —
+  // kept separate so it only loads its Google sign-in script when actually used.
+  window.ArcAppPhotoLogger.open({
+    activity: row.activity,
+    asset: row.asset,
+    date: row.date,
   });
-  // Opens the camera/upload tool in its own tab/file — keeps the OAuth + Drive
-  // upload code (and the Google Identity Services script it loads) out of the
-  // main dashboard entirely, so the dashboard itself stays light and fast.
-  window.open(`photo-logger.html?${params.toString()}`, '_blank');
 });
 
 // Delegated row click — works for both the docked table and the fullscreen-expanded copy,
@@ -1001,6 +1061,7 @@ function renderMilestones(container){
 /* ============ INITIAL RENDER ============ */
 renderTodos(document.querySelector('#todo-body .todo-list'));
 renderMilestones(document.querySelector('#milestones-body .milestone-list'));
+renderDayNav();
 loadSchedule();
 
 document.getElementById('refresh-btn').addEventListener('click', (e) => {
@@ -1057,5 +1118,6 @@ overlay.addEventListener('click', (e) => {
   if (e.target === overlay) closeFullscreen();
 });
 </script>
+<script src="photo-logger.js" defer></script>
 </body>
 </html>
