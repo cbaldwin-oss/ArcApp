@@ -487,16 +487,41 @@
     width:100%; background:var(--bg-elev-2); border:1px solid var(--border-strong); border-radius:var(--radius-sm);
     color:var(--text); font-family:var(--font-body); font-size:13.5px; padding:9px 11px;
   }
-  .seal-field textarea{ resize:vertical; min-height:56px; font-family:var(--font-body); }
+  .seal-field textarea{ resize:vertical; min-height:48px; font-family:var(--font-body); }
   .seal-field input:focus, .seal-field select:focus, .seal-field textarea:focus{ outline:none; border-color:var(--green); }
   .seal-field input:disabled, .seal-field select:disabled, .seal-field textarea:disabled{ opacity:0.5; cursor:not-allowed; }
-  .seal-row2{ display:grid; grid-template-columns:1fr 1fr; gap:10px; }
-  .seal-broken-fields{ border-top:1px dashed var(--border); margin-top:6px; padding-top:14px; }
-  .seal-broken-fields.hidden{ display:none; }
+
+  .seal-instance{
+    border:1px solid var(--border-strong); border-radius:var(--radius-sm); background:var(--bg-elev-2);
+    padding:14px 14px 4px; margin-bottom:14px;
+  }
+  .seal-instance-head{ display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; }
+  .seal-instance-title{ font-family:var(--font-mono); font-size:10.5px; letter-spacing:0.6px; text-transform:uppercase; color:var(--text-muted); }
+  .seal-remove-btn{
+    background:none; border:1px solid var(--border-strong); border-radius:50%; color:var(--text-muted);
+    width:22px; height:22px; font-size:13px; line-height:1; cursor:pointer; display:flex; align-items:center; justify-content:center;
+  }
+  .seal-remove-btn:hover{ border-color:var(--red); color:var(--red); }
+  .seal-remove-btn:disabled{ opacity:0.4; cursor:not-allowed; }
+  .seal-row3{ display:grid; grid-template-columns:1fr 1fr 1.3fr; gap:9px; }
+  @media (max-width:520px){ .seal-row3{ grid-template-columns:1fr; } }
+  .seal-preview{ font-family:var(--font-mono); font-size:11px; color:var(--text-faint); margin:-4px 0 12px; line-height:1.5; }
+  .seal-preview.ok{ color:var(--green-soft); }
+  .seal-preview.err{ color:var(--red); }
+
+  .seal-add-btn{
+    width:100%; background:transparent; border:1px dashed var(--border-strong); color:var(--text-muted);
+    font-family:var(--font-display); font-size:11.5px; font-weight:600; letter-spacing:0.4px; text-transform:uppercase;
+    border-radius:var(--radius-sm); padding:10px; cursor:pointer; margin-bottom:12px;
+    transition:border-color .15s ease, color .15s ease;
+  }
+  .seal-add-btn:hover{ border-color:var(--green); color:var(--green); }
+  .seal-add-btn:disabled{ opacity:0.4; cursor:not-allowed; }
+
   .seal-submit-btn{
     width:100%; background:var(--green); color:#04170d; border:none; border-radius:var(--radius-sm);
     font-family:var(--font-display); font-size:12px; font-weight:700; letter-spacing:0.5px; text-transform:uppercase;
-    padding:11px; cursor:pointer; margin-top:6px;
+    padding:11px; cursor:pointer; margin-top:2px;
   }
   .seal-submit-btn:hover{ background:var(--green-soft); }
   .seal-submit-btn:disabled{ opacity:0.5; cursor:not-allowed; }
@@ -507,10 +532,6 @@
     font-size:12.5px; margin-bottom:6px;
   }
   .seal-log-item .num{ font-family:var(--font-mono); color:var(--text); font-weight:600; }
-  .seal-log-item .stat{ font-family:var(--font-mono); font-size:10.5px; letter-spacing:0.4px; text-transform:uppercase; }
-  .seal-log-item .stat.intact{ color:var(--green-soft); }
-  .seal-log-item .stat.broken{ color:var(--red); }
-  .seal-log-item .stat.removed{ color:var(--amber); }
   .seal-log-item .time{ font-family:var(--font-mono); font-size:10.5px; color:var(--text-faint); }
 </style>
 </head>
@@ -757,45 +778,9 @@
 
       <div class="q-block">
         <label class="q-label">Tamper seal log</label>
-        <div class="seal-field">
-          <label for="seal-number">Seal number</label>
-          <input type="text" id="seal-number" placeholder="e.g. 048213" disabled>
-        </div>
-        <div class="seal-row2">
-          <div class="seal-field">
-            <label for="seal-status">Status</label>
-            <select id="seal-status" disabled>
-              <option value="Intact">Intact</option>
-              <option value="Broken">Broken</option>
-              <option value="Removed">Removed</option>
-            </select>
-          </div>
-          <div class="seal-field">
-            <label for="seal-sub-area">Sub area (optional)</label>
-            <input type="text" id="seal-sub-area" placeholder="e.g. North panel" disabled>
-          </div>
-        </div>
-        <div class="seal-field">
-          <label for="seal-notes">Inspection notes</label>
-          <textarea id="seal-notes" placeholder="Anything worth noting" disabled></textarea>
-        </div>
-
-        <div class="seal-broken-fields hidden" id="seal-broken-fields">
-          <div class="seal-field">
-            <label for="seal-break-date">Break / removal date</label>
-            <input type="date" id="seal-break-date" disabled>
-          </div>
-          <div class="seal-field">
-            <label for="seal-responsible">Responsible party</label>
-            <input type="text" id="seal-responsible" placeholder="Who broke/removed it, if known" disabled>
-          </div>
-          <div class="seal-field">
-            <label for="seal-break-reason">Reason</label>
-            <input type="text" id="seal-break-reason" placeholder="e.g. Scheduled maintenance access" disabled>
-          </div>
-        </div>
-
-        <button class="seal-submit-btn" id="seal-submit-btn" type="button" disabled>Log Seal</button>
+        <div id="seal-instances"></div>
+        <button class="seal-add-btn" id="seal-add-instance-btn" type="button" disabled>+ Add Another Range</button>
+        <button class="seal-submit-btn" id="seal-submit-btn" type="button" disabled>Log All Seals</button>
         <div class="q-hint" id="seal-status-msg">Sign in to log tamper seals.</div>
         <div class="seal-log-list" id="seal-log-list"></div>
       </div>
@@ -1611,24 +1596,104 @@ function renderReferenceContent(row){
 }
 
 /* =====================================================================
-   TAMPER SEAL LOG — matches the schema/columns of LaunchPad's own
-   Asset Tamper Seal Log tool (same RNO04Assets table).
+   TAMPER SEAL LOG — matches LaunchPad's own "Add Tamper Seals" flow:
+   a first/last seal number range with an optional comma-separated
+   omitted list, always logged as status "Intact" (matching that same
+   tool — reinspection of broken seals is a separate flow there and not
+   replicated here). Multiple ranges ("instances") can be queued and
+   submitted together in one insert.
    ===================================================================== */
 let sessionSealLog = [];
+let sealInstanceCounter = 0;
 
-function toggleSealBrokenFields(status){
-  document.getElementById('seal-broken-fields').classList.toggle('hidden', status === 'Intact');
+function buildSealInstanceHTML(instanceId){
+  return `
+    <div class="seal-instance" data-instance-id="${instanceId}">
+      <div class="seal-instance-head">
+        <span class="seal-instance-title">Seal Range</span>
+        <button class="seal-remove-btn" type="button" data-remove-instance title="Remove this range">&times;</button>
+      </div>
+      <div class="seal-row3">
+        <div class="seal-field">
+          <label>First seal #</label>
+          <input type="text" inputmode="numeric" class="seal-start" placeholder="e.g. 48201">
+        </div>
+        <div class="seal-field">
+          <label>Last seal #</label>
+          <input type="text" inputmode="numeric" class="seal-end" placeholder="e.g. 48215">
+        </div>
+        <div class="seal-field">
+          <label>Omitted (comma-sep)</label>
+          <input type="text" class="seal-omit" placeholder="e.g. 48205, 48210">
+        </div>
+      </div>
+      <div class="seal-field">
+        <label>Sub area (optional)</label>
+        <input type="text" class="seal-subarea" placeholder="e.g. North panel">
+      </div>
+      <div class="seal-field">
+        <label>Inspection notes (optional)</label>
+        <textarea class="seal-notes" placeholder="Anything worth noting"></textarea>
+      </div>
+      <div class="seal-preview" data-preview>Enter a first and last seal number.</div>
+    </div>`;
+}
+
+function parseOmitted(str){
+  return str.split(',').map(s => parseInt(s.trim(), 10)).filter(n => !isNaN(n));
+}
+
+function updateSealPreview(instanceEl){
+  const start = parseInt(instanceEl.querySelector('.seal-start').value, 10);
+  const end = parseInt(instanceEl.querySelector('.seal-end').value, 10);
+  const omitted = parseOmitted(instanceEl.querySelector('.seal-omit').value);
+  const previewEl = instanceEl.querySelector('[data-preview]');
+
+  if (isNaN(start) || isNaN(end)) {
+    previewEl.textContent = 'Enter a first and last seal number.';
+    previewEl.className = 'seal-preview';
+    return;
+  }
+  if (start > end) {
+    previewEl.textContent = 'First seal # must be less than or equal to the last.';
+    previewEl.className = 'seal-preview err';
+    return;
+  }
+  const omittedSet = new Set(omitted);
+  let count = 0;
+  for (let i = start; i <= end; i++) if (!omittedSet.has(i)) count++;
+  const omitText = omitted.length ? ` (excluding ${omitted.join(', ')})` : '';
+  previewEl.textContent = `${count} seal${count === 1 ? '' : 's'}: ${start}–${end}${omitText}`;
+  previewEl.className = 'seal-preview ok';
+}
+
+function addSealInstance(){
+  sealInstanceCounter++;
+  const container = document.getElementById('seal-instances');
+  const wrapper = document.createElement('div');
+  wrapper.innerHTML = buildSealInstanceHTML(sealInstanceCounter);
+  const instanceEl = wrapper.firstElementChild;
+  container.appendChild(instanceEl);
+
+  instanceEl.querySelectorAll('.seal-start, .seal-end, .seal-omit').forEach(el => {
+    el.addEventListener('input', () => updateSealPreview(instanceEl));
+  });
+  instanceEl.querySelector('[data-remove-instance]').addEventListener('click', () => {
+    instanceEl.remove();
+    if (container.children.length === 0) addSealInstance(); // never leave zero forms showing
+  });
+
+  refreshSealAccess(); // apply current sign-in gate to the fields we just added
+}
+
+function resetSealInstances(){
+  document.getElementById('seal-instances').innerHTML = '';
+  sealInstanceCounter = 0;
+  addSealInstance();
 }
 
 function resetSealForm(){
-  document.getElementById('seal-number').value = '';
-  document.getElementById('seal-status').value = 'Intact';
-  document.getElementById('seal-sub-area').value = '';
-  document.getElementById('seal-notes').value = '';
-  document.getElementById('seal-break-date').value = selectedDate;
-  document.getElementById('seal-responsible').value = '';
-  document.getElementById('seal-break-reason').value = '';
-  toggleSealBrokenFields('Intact');
+  resetSealInstances();
   sessionSealLog = [];
   renderSealLogList();
   document.getElementById('seal-status-msg').className = 'q-hint';
@@ -1640,16 +1705,16 @@ function renderSealLogList(){
   list.innerHTML = '<div class="q-hint" style="margin-bottom:8px;">Logged this session:</div>' +
     sessionSealLog.map(s => `
       <div class="seal-log-item">
-        <span class="num">Seal #${escapeHtml(s.sealNumber)}</span>
-        <span class="stat ${s.status.toLowerCase()}">${escapeHtml(s.status)}</span>
+        <span class="num">${escapeHtml(s.text)}</span>
         <span class="time">${s.time}</span>
       </div>`).join('');
 }
 
 function refreshSealAccess(){
   const disabled = !authUser;
-  ['seal-number', 'seal-status', 'seal-sub-area', 'seal-notes', 'seal-break-date', 'seal-responsible', 'seal-break-reason', 'seal-submit-btn']
-    .forEach(id => { document.getElementById(id).disabled = disabled; });
+  document.querySelectorAll('#seal-instances input, #seal-instances textarea, #seal-instances button').forEach(el => { el.disabled = disabled; });
+  document.getElementById('seal-add-instance-btn').disabled = disabled;
+  document.getElementById('seal-submit-btn').disabled = disabled;
 
   const msg = document.getElementById('seal-status-msg');
   if (disabled) {
@@ -1661,66 +1726,91 @@ function refreshSealAccess(){
   }
 }
 
-document.getElementById('seal-status').addEventListener('change', (e) => toggleSealBrokenFields(e.target.value));
+document.getElementById('seal-add-instance-btn').addEventListener('click', addSealInstance);
 
-async function saveTamperSeal(){
+async function saveTamperSeals(){
   if (!authUser || selectedRowId == null || !sb) return;
   const row = scheduleRows.find(r => String(r.id) === String(selectedRowId));
   if (!row) return;
 
   const msg = document.getElementById('seal-status-msg');
-  const sealNumber = document.getElementById('seal-number').value.trim();
-  const status = document.getElementById('seal-status').value;
-  const subArea = document.getElementById('seal-sub-area').value.trim();
-  const notes = document.getElementById('seal-notes').value.trim();
-
-  if (!sealNumber) {
+  const instances = Array.from(document.querySelectorAll('.seal-instance'));
+  if (instances.length === 0) {
     msg.className = 'q-hint err';
-    msg.textContent = 'Enter a seal number first.';
+    msg.textContent = 'Add at least one seal range first.';
     return;
   }
 
-  const payload = {
-    asset_name: row.asset,
-    location: row.place,
-    sub_area: subArea,
-    seal_number: sealNumber,
-    inspection_date: selectedDate,
-    inspection_notes: notes,
-    signoff: authUser,
-    status: status,
-  };
-  if (status !== 'Intact') {
-    payload.break_date = document.getElementById('seal-break-date').value || selectedDate;
-    payload.responsible_party = document.getElementById('seal-responsible').value.trim();
-    payload.break_reason = document.getElementById('seal-break-reason').value.trim();
+  const payloadRows = [];
+  const summaries = [];
+  for (const inst of instances) {
+    const start = parseInt(inst.querySelector('.seal-start').value, 10);
+    const end = parseInt(inst.querySelector('.seal-end').value, 10);
+    const omitted = parseOmitted(inst.querySelector('.seal-omit').value);
+    const subArea = inst.querySelector('.seal-subarea').value.trim();
+    const notes = inst.querySelector('.seal-notes').value.trim();
+
+    if (isNaN(start) || isNaN(end) || start > end) {
+      msg.className = 'q-hint err';
+      msg.textContent = 'Every range needs a valid first and last seal number (first ≤ last).';
+      return;
+    }
+
+    const omittedSet = new Set(omitted);
+    let rangeCount = 0;
+    for (let i = start; i <= end; i++) {
+      if (omittedSet.has(i)) continue;
+      payloadRows.push({
+        asset_name: row.asset,
+        location: row.place,
+        sub_area: subArea,
+        seal_number: i.toString(),
+        inspection_date: selectedDate,
+        inspection_notes: notes,
+        signoff: authUser,
+        status: 'Intact',
+      });
+      rangeCount++;
+    }
+    summaries.push({ start, end, omitted, count: rangeCount });
   }
 
-  const btn = document.getElementById('seal-submit-btn');
-  btn.disabled = true;
+  if (payloadRows.length === 0) {
+    msg.className = 'q-hint err';
+    msg.textContent = 'No seals to log — check your ranges and omitted numbers.';
+    return;
+  }
+
+  const submitBtn = document.getElementById('seal-submit-btn');
+  submitBtn.disabled = true;
   msg.className = 'q-hint';
-  msg.textContent = 'Logging seal…';
+  msg.textContent = `Logging ${payloadRows.length} seal${payloadRows.length === 1 ? '' : 's'}…`;
 
   try {
-    const { error } = await sb.from(TAMPER_SEAL_TABLE).insert(payload);
+    const { error } = await sb.from(TAMPER_SEAL_TABLE).insert(payloadRows);
     if (error) throw error;
 
-    sessionSealLog.unshift({ sealNumber, status, time: new Date().toLocaleTimeString() });
+    summaries.forEach(s => {
+      const omitText = s.omitted.length ? `, excl. ${s.omitted.join(', ')}` : '';
+      sessionSealLog.unshift({
+        text: `${s.count} seal${s.count === 1 ? '' : 's'}: ${s.start}–${s.end}${omitText}`,
+        time: new Date().toLocaleTimeString(),
+      });
+    });
     renderSealLogList();
 
     msg.className = 'q-hint ok';
-    msg.textContent = `Seal #${sealNumber} logged to RNO04Assets.`;
-    document.getElementById('seal-number').value = '';
-    document.getElementById('seal-notes').value = '';
+    msg.textContent = `Logged ${payloadRows.length} seal${payloadRows.length === 1 ? '' : 's'} to RNO04Assets.`;
+    resetSealInstances();
   } catch (err) {
     msg.className = 'q-hint err';
-    msg.textContent = 'Failed to log seal: ' + err.message;
+    msg.textContent = 'Failed to log seals: ' + err.message;
   } finally {
-    btn.disabled = false;
+    submitBtn.disabled = !authUser;
   }
 }
 
-document.getElementById('seal-submit-btn').addEventListener('click', saveTamperSeal);
+document.getElementById('seal-submit-btn').addEventListener('click', saveTamperSeals);
 
 // Delegated row click — works for both the docked table and the fullscreen-expanded copy,
 // since the <table> node itself is only ever moved, never re-created.
