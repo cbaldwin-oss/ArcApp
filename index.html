@@ -875,7 +875,7 @@
         <button class="seal-add-btn" id="rtft-test-conn-btn" type="button">Test Apps Script Connection</button>
         <button class="seal-submit-btn" id="rtft-submit-btn" type="button" disabled>Submit RTFT Entry</button>
         <div class="q-hint" id="rtft-status-msg">Sign in to submit an RTFT entry.</div>
-        <div class="q-hint">RTFT (Automated) is calculated by the sheet itself and isn't set from here.</div>
+        <div class="q-hint">Fills in the existing sheet row for this asset — RTFT (Automated) is calculated by the sheet itself and isn't set from here.</div>
       </div>
     </div>
   </div>
@@ -1934,8 +1934,9 @@ document.getElementById('seal-submit-btn').addEventListener('click', saveTamperS
 
    Date and Equipment come from the activity itself. "RTFT (Automated)"
    is never sent — that's a formula the sheet computes on its own.
-   "Where the data should fill in" (matching by Equipment/column B) is
-   handled entirely inside the Apps Script, not here — see
+   The Apps Script finds the EXISTING row whose Equipment cell (column B)
+   matches this asset and writes the other answers into that same row —
+   it does not insert a new row unless no matching row exists yet. See
    rtft-appscript.gs for that logic and deployment instructions.
    ===================================================================== */
 
@@ -2044,7 +2045,11 @@ async function submitRTFTEntry(){
     if (result && result.status === 'error') throw new Error(result.message || 'Apps Script reported an error.');
 
     msg.className = 'q-hint ok';
-    msg.textContent = `Logged to the sheet${result && result.row ? ' (row ' + result.row + ')' : ''}.`;
+    if (result && result.status === 'ok_appended') {
+      msg.textContent = `No existing row found for "${row.asset}" — appended a new row (row ${result.row}).`;
+    } else {
+      msg.textContent = `Updated the existing row for "${row.asset}" in the sheet${result && result.row ? ' (row ' + result.row + ')' : ''}.`;
+    }
     resetRTFTForm(row);
     document.getElementById('rtft-inspector').value = inspector; // keep inspector filled for the next entry
   } catch (err) {
