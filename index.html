@@ -481,15 +481,26 @@
   .q-hint.ok{ color:var(--green-soft); }
 
   /* ---------- tamper seal log ---------- */
-  .seal-field{ margin-bottom:12px; }
-  .seal-field label{ display:block; font-family:var(--font-mono); font-size:10.5px; letter-spacing:0.5px; text-transform:uppercase; color:var(--text-muted); margin-bottom:6px; }
-  .seal-field input, .seal-field select, .seal-field textarea{
+  .seal-field, .form-field{ margin-bottom:12px; }
+  .seal-field label, .form-field label{ display:block; font-family:var(--font-mono); font-size:10.5px; letter-spacing:0.5px; text-transform:uppercase; color:var(--text-muted); margin-bottom:6px; }
+  .seal-field input, .seal-field select, .seal-field textarea,
+  .form-field input, .form-field select, .form-field textarea{
     width:100%; background:var(--bg-elev-2); border:1px solid var(--border-strong); border-radius:var(--radius-sm);
     color:var(--text); font-family:var(--font-body); font-size:13.5px; padding:9px 11px;
   }
-  .seal-field textarea{ resize:vertical; min-height:48px; font-family:var(--font-body); }
-  .seal-field input:focus, .seal-field select:focus, .seal-field textarea:focus{ outline:none; border-color:var(--green); }
-  .seal-field input:disabled, .seal-field select:disabled, .seal-field textarea:disabled{ opacity:0.5; cursor:not-allowed; }
+  .seal-field textarea, .form-field textarea{ resize:vertical; min-height:48px; font-family:var(--font-body); }
+  .seal-field input:focus, .seal-field select:focus, .seal-field textarea:focus,
+  .form-field input:focus, .form-field select:focus, .form-field textarea:focus{ outline:none; border-color:var(--green); }
+  .seal-field input:disabled, .seal-field select:disabled, .seal-field textarea:disabled,
+  .form-field input:disabled, .form-field select:disabled, .form-field textarea:disabled{ opacity:0.5; cursor:not-allowed; }
+
+  .rtft-checkbox-label{
+    display:flex; align-items:center; gap:9px; font-size:13px; color:var(--text);
+    text-transform:none; margin-bottom:14px; cursor:pointer;
+  }
+  .rtft-checkbox-label input[type="checkbox"]{ width:16px; height:16px; accent-color:var(--green); flex:0 0 auto; }
+  .rtft-checkbox-label input[type="checkbox"]:disabled{ opacity:0.5; }
+  .hidden{ display:none !important; }
 
   .seal-instance{
     border:1px solid var(--border-strong); border-radius:var(--radius-sm); background:var(--bg-elev-2);
@@ -533,6 +544,16 @@
   }
   .seal-log-item .num{ font-family:var(--font-mono); color:var(--text); font-weight:600; }
   .seal-log-item .time{ font-family:var(--font-mono); font-size:10.5px; color:var(--text-faint); }
+
+  /* ---------- RTFT questionnaire ---------- */
+  .rtft-checkbox-row{ display:flex; align-items:center; gap:9px; margin-bottom:14px; }
+  .rtft-checkbox-row input[type=checkbox]{ width:17px; height:17px; accent-color:var(--green); flex:0 0 auto; }
+  .rtft-checkbox-row label{ font-size:13px; color:var(--text); margin:0; }
+  .rtft-row2{ display:grid; grid-template-columns:1fr 1fr; gap:9px; }
+  .rtft-row3{ display:grid; grid-template-columns:1fr 1fr 1fr; gap:9px; margin-bottom:12px; }
+  @media (max-width:520px){ .rtft-row2, .rtft-row3{ grid-template-columns:1fr; } }
+  .rtft-issue-fields{ border-left:2px solid var(--border-strong); padding-left:14px; margin:-2px 0 12px; }
+  .rtft-issue-fields.hidden{ display:none; }
 </style>
 </head>
 <body>
@@ -784,6 +805,78 @@
         <div class="q-hint" id="seal-status-msg">Sign in to log tamper seals.</div>
         <div class="seal-log-list" id="seal-log-list"></div>
       </div>
+
+      <div class="q-block">
+        <label class="q-label">Right the First Time (RTFT)</label>
+
+        <div class="form-field">
+          <label>Equipment (auto-filled from this activity)</label>
+          <input type="text" id="rtft-equipment" disabled>
+        </div>
+        <div class="seal-row3" style="grid-template-columns:1fr 1fr;">
+          <div class="form-field">
+            <label>Equipment type</label>
+            <input type="text" id="rtft-equipment-type" placeholder="e.g. AHU, Switchgear" disabled>
+          </div>
+          <div class="form-field">
+            <label>Inspector</label>
+            <input type="text" id="rtft-inspector" disabled>
+          </div>
+        </div>
+
+        <label class="rtft-checkbox-label">
+          <input type="checkbox" id="rtft-ofe" disabled> Owner-Furnished Equipment (OFE)?
+        </label>
+
+        <div class="seal-row3">
+          <div class="form-field">
+            <label>Ops team present</label>
+            <select id="rtft-ops-present" disabled><option value="">—</option><option>Yes</option><option>No</option></select>
+          </div>
+          <div class="form-field">
+            <label>CxA present</label>
+            <select id="rtft-cxa-present" disabled><option value="">—</option><option>Yes</option><option>No</option></select>
+          </div>
+          <div class="form-field">
+            <label>GC present</label>
+            <select id="rtft-gc-present" disabled><option value="">—</option><option>Yes</option><option>No</option></select>
+          </div>
+        </div>
+
+        <div class="form-field">
+          <label>Were issues found?</label>
+          <select id="rtft-issues-found" disabled><option value="">—</option><option>Yes</option><option>No</option></select>
+        </div>
+
+        <div class="hidden" id="rtft-issue-fields">
+          <div class="form-field">
+            <label>Were they corrected immediately?</label>
+            <select id="rtft-corrected" disabled><option value="">—</option><option>Yes</option><option>No</option></select>
+          </div>
+          <div class="form-field">
+            <label>Issue description</label>
+            <textarea id="rtft-issue-desc" disabled></textarea>
+          </div>
+          <div class="form-field">
+            <label>Were they entered into BIM?</label>
+            <select id="rtft-entered-bim" disabled><option value="">—</option><option>Yes</option><option>No</option></select>
+          </div>
+          <div class="form-field hidden" id="rtft-bim-number-field">
+            <label>BIM issue number</label>
+            <input type="text" id="rtft-bim-number" disabled>
+          </div>
+        </div>
+
+        <div class="form-field">
+          <label>L2 pass?</label>
+          <select id="rtft-l2-pass" disabled><option value="">—</option><option>Yes</option><option>No</option></select>
+        </div>
+
+        <button class="seal-add-btn" id="rtft-test-conn-btn" type="button">Test Apps Script Connection</button>
+        <button class="seal-submit-btn" id="rtft-submit-btn" type="button" disabled>Submit RTFT Entry</button>
+        <div class="q-hint" id="rtft-status-msg">Sign in to submit an RTFT entry.</div>
+        <div class="q-hint">RTFT (Automated) is calculated by the sheet itself and isn't set from here.</div>
+      </div>
     </div>
   </div>
 </aside>
@@ -837,6 +930,21 @@ const PROJECT_TABLE_PREFIX = 'RNO04';
 const SCHEDULE_TABLE = `${PROJECT_TABLE_PREFIX}BackEndData`;
 // Same "Assets" table LaunchPad's tamper-seal log page reads/writes.
 const TAMPER_SEAL_TABLE = `${PROJECT_TABLE_PREFIX}Assets`;
+
+/* =====================================================================
+   RTFT (Right the First Time) — Google Apps Script Web App, not OAuth
+   =====================================================================
+   Deliberately NOT using the Google Identity Services / Drive OAuth flow
+   used elsewhere in this file. Instead this POSTs to a Google Apps Script
+   Web App bound to the RTFT spreadsheet, deployed with "Execute as: Me"
+   and "Who has access: Anyone" — so no Google sign-in popup is needed
+   client-side at all. See the accompanying rtft-appscript.gs file for the
+   exact script to paste into that spreadsheet's Apps Script editor, and
+   README notes for how to deploy it and get this URL.
+   ===================================================================== */
+const RTFT_APPSCRIPT_URL = 'https://script.google.com/macros/s/AKfycbyiADixrulPhbsLOB2a3n2erOfEWFz0QjG60BLHdW3I7_xmPRetbhWneHRMJYzl12Q7/exec'; // ends in /exec
+const RTFT_SHARED_SECRET = 'change-me-shared-secret'; // must match SHARED_SECRET in rtft-appscript.gs
+
 
 let sb = null;
 try {
@@ -1081,6 +1189,8 @@ function openActivityDrawer(row){
   renderReferenceContent(row);
   resetSealForm();
   refreshSealAccess();
+  resetRTFTForm(row);
+  refreshRTFTAccess();
 
   document.getElementById('activity-drawer').classList.add('open');
   document.getElementById('drawer-backdrop').classList.add('open');
@@ -1239,6 +1349,7 @@ function updateAuthUI(){
   }
   refreshResultAccess();
   refreshSealAccess();
+  refreshRTFTAccess();
 }
 
 async function restoreSession(){
@@ -1811,6 +1922,176 @@ async function saveTamperSeals(){
 }
 
 document.getElementById('seal-submit-btn').addEventListener('click', saveTamperSeals);
+
+/* =====================================================================
+   RTFT (Right the First Time) — Google Apps Script Web App
+   =====================================================================
+   Columns match the shared spreadsheet: Date | Equipment | Equipment
+   Type | OFE? | Inspector | Ops Team Present | CxA Present | GC Present
+   | Were Issues Found | Were they Corrected Immediately | Issue
+   Description | Were they entered into BIM | L2 Pass | RTFT (Automated)
+   | BIM Issue Number.
+
+   Date and Equipment come from the activity itself. "RTFT (Automated)"
+   is never sent — that's a formula the sheet computes on its own.
+   "Where the data should fill in" (matching by Equipment/column B) is
+   handled entirely inside the Apps Script, not here — see
+   rtft-appscript.gs for that logic and deployment instructions.
+   ===================================================================== */
+
+function toggleRTFTIssueFields(val){
+  document.getElementById('rtft-issue-fields').classList.toggle('hidden', val !== 'Yes');
+  if (val !== 'Yes') toggleRTFTBimNumberField(''); // no issues → BIM sub-question doesn't apply either
+}
+function toggleRTFTBimNumberField(val){
+  document.getElementById('rtft-bim-number-field').classList.toggle('hidden', val !== 'Yes');
+}
+document.getElementById('rtft-issues-found').addEventListener('change', (e) => toggleRTFTIssueFields(e.target.value));
+document.getElementById('rtft-entered-bim').addEventListener('change', (e) => toggleRTFTBimNumberField(e.target.value));
+
+function resetRTFTForm(row){
+  document.getElementById('rtft-equipment').value = row.asset || '';
+  document.getElementById('rtft-equipment-type').value = '';
+  document.getElementById('rtft-ofe').checked = false;
+  document.getElementById('rtft-inspector').value = authUser || '';
+  document.getElementById('rtft-ops-present').value = '';
+  document.getElementById('rtft-cxa-present').value = '';
+  document.getElementById('rtft-gc-present').value = '';
+  document.getElementById('rtft-issues-found').value = '';
+  document.getElementById('rtft-corrected').value = '';
+  document.getElementById('rtft-entered-bim').value = '';
+  document.getElementById('rtft-issue-desc').value = '';
+  document.getElementById('rtft-bim-number').value = '';
+  document.getElementById('rtft-l2-pass').value = '';
+  toggleRTFTIssueFields('');
+  document.getElementById('rtft-status-msg').className = 'q-hint';
+}
+
+function refreshRTFTAccess(){
+  const disabled = !authUser;
+  ['rtft-equipment-type', 'rtft-ofe', 'rtft-inspector', 'rtft-ops-present', 'rtft-cxa-present', 'rtft-gc-present',
+   'rtft-issues-found', 'rtft-corrected', 'rtft-entered-bim', 'rtft-issue-desc', 'rtft-bim-number', 'rtft-l2-pass', 'rtft-submit-btn']
+    .forEach(id => { document.getElementById(id).disabled = disabled; });
+
+  const msg = document.getElementById('rtft-status-msg');
+  if (disabled) {
+    msg.textContent = 'Sign in to submit an RTFT entry.';
+    msg.className = 'q-hint';
+  } else if (msg.className !== 'q-hint ok' && msg.className !== 'q-hint err') {
+    msg.textContent = `Signed in as ${authUser}.`;
+    msg.className = 'q-hint';
+  }
+}
+
+async function submitRTFTEntry(){
+  if (!authUser || selectedRowId == null) return;
+  const row = scheduleRows.find(r => String(r.id) === String(selectedRowId));
+  if (!row) return;
+
+  const msg = document.getElementById('rtft-status-msg');
+
+  const urlProblem = describeAppsScriptUrlProblem(RTFT_APPSCRIPT_URL);
+  if (urlProblem) {
+    msg.className = 'q-hint err';
+    msg.textContent = urlProblem;
+    return;
+  }
+
+  const issuesFound = document.getElementById('rtft-issues-found').value;
+  const enteredBim = document.getElementById('rtft-entered-bim').value;
+  const inspector = document.getElementById('rtft-inspector').value.trim();
+  const l2Pass = document.getElementById('rtft-l2-pass').value;
+
+  if (!issuesFound || !l2Pass) {
+    msg.className = 'q-hint err';
+    msg.textContent = 'Answer "Were issues found?" and "L2 pass?" before submitting.';
+    return;
+  }
+
+  const payload = {
+    secret: RTFT_SHARED_SECRET,
+    date: selectedDate,
+    equipment: row.asset || '',
+    equipmentType: document.getElementById('rtft-equipment-type').value.trim(),
+    ofe: document.getElementById('rtft-ofe').checked,
+    inspector,
+    opsTeamPresent: document.getElementById('rtft-ops-present').value,
+    cxaPresent: document.getElementById('rtft-cxa-present').value,
+    gcPresent: document.getElementById('rtft-gc-present').value,
+    issuesFound,
+    correctedImmediately: issuesFound === 'Yes' ? document.getElementById('rtft-corrected').value : '',
+    issueDescription: issuesFound === 'Yes' ? document.getElementById('rtft-issue-desc').value.trim() : '',
+    enteredBIM: issuesFound === 'Yes' ? enteredBim : '',
+    bimIssueNumber: (issuesFound === 'Yes' && enteredBim === 'Yes') ? document.getElementById('rtft-bim-number').value.trim() : '',
+    l2Pass,
+  };
+
+  const btn = document.getElementById('rtft-submit-btn');
+  btn.disabled = true;
+  msg.className = 'q-hint';
+  msg.textContent = 'Submitting to Google Sheets…';
+
+  try {
+    // text/plain avoids a CORS preflight that Apps Script Web Apps don't
+    // handle — the script still parses the body as JSON on its end.
+    const res = await fetch(RTFT_APPSCRIPT_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+      body: JSON.stringify(payload),
+    });
+    if (!res.ok) throw new Error(`Apps Script responded with ${res.status}`);
+    const result = await res.json().catch(() => ({}));
+    if (result && result.status === 'error') throw new Error(result.message || 'Apps Script reported an error.');
+
+    msg.className = 'q-hint ok';
+    msg.textContent = `Logged to the sheet${result && result.row ? ' (row ' + result.row + ')' : ''}.`;
+    resetRTFTForm(row);
+    document.getElementById('rtft-inspector').value = inspector; // keep inspector filled for the next entry
+  } catch (err) {
+    msg.className = 'q-hint err';
+    msg.textContent = 'Failed to submit: ' + err.message;
+  } finally {
+    btn.disabled = !authUser;
+  }
+}
+
+function describeAppsScriptUrlProblem(url){
+  if (!url || url.startsWith('PASTE_')) {
+    return "RTFT_APPSCRIPT_URL hasn't been set yet — deploy rtft-appscript.gs as a Web App and paste its /exec URL into the script.";
+  }
+  if (url.includes('/dev')) {
+    return 'This looks like a "test deployment" URL (ends in /dev) — it only works while the script owner is signed into Google in this exact browser, so it won\'t work for the rest of the team. Use Deploy ▸ New deployment ▸ Web app to get a stable published URL ending in /exec instead.';
+  }
+  if (!url.includes('/exec')) {
+    return 'This URL doesn\'t look like a published Apps Script Web App URL (those end in /exec). Double check it was copied from Deploy ▸ New deployment, not from the Apps Script project\'s general URL.';
+  }
+  return null;
+}
+
+document.getElementById('rtft-test-conn-btn').addEventListener('click', async () => {
+  const msg = document.getElementById('rtft-status-msg');
+  const problem = describeAppsScriptUrlProblem(RTFT_APPSCRIPT_URL);
+  if (problem) {
+    msg.className = 'q-hint err';
+    msg.textContent = problem;
+    return;
+  }
+
+  msg.className = 'q-hint';
+  msg.textContent = 'Testing connection…';
+  try {
+    const res = await fetch(RTFT_APPSCRIPT_URL, { method: 'GET' });
+    const data = await res.json().catch(() => null);
+    if (!res.ok || !data) throw new Error(`Unexpected response (HTTP ${res.status})`);
+    msg.className = 'q-hint ok';
+    msg.textContent = `Connected — ${data.message || 'Apps Script responded OK.'}`;
+  } catch (err) {
+    msg.className = 'q-hint err';
+    msg.textContent = 'Connection failed: ' + err.message;
+  }
+});
+
+document.getElementById('rtft-submit-btn').addEventListener('click', submitRTFTEntry);
 
 // Delegated row click — works for both the docked table and the fullscreen-expanded copy,
 // since the <table> node itself is only ever moved, never re-created.
