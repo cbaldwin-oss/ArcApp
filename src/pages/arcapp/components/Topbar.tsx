@@ -1,39 +1,10 @@
-type NavKey =
-  | 'dashboard'
-  | 'todo'
-  | 'milestones'
-  | 'schedule'
-  | 'checklists'
-  | 'issues'
-  | 'submittals'
-  | 'jointpacks'
-  | 'tamperseals'
-  | 'rtft'
-  | 'settings'
-
 type TopbarProps = {
-  active: NavKey
-  onNavigate: (key: NavKey) => void
   userName: string | null
   userInitials: string
   onAuthClick: () => void
 }
 
-const NAV: Array<{ key: NavKey; label: string }> = [
-  { key: 'dashboard', label: 'Dashboard' },
-  { key: 'todo', label: 'To-Do' },
-  { key: 'milestones', label: 'Milestones' },
-  { key: 'schedule', label: 'Activities' },
-  { key: 'checklists', label: 'Checklists' },
-  { key: 'issues', label: 'Issues' },
-  { key: 'submittals', label: 'Submittals' },
-  { key: 'jointpacks', label: 'Joint Packs' },
-  { key: 'tamperseals', label: 'Tamper Seals' },
-  { key: 'rtft', label: 'RTFT' },
-  { key: 'settings', label: 'Settings' },
-]
-
-export default function Topbar({ active, onNavigate, userName, userInitials, onAuthClick }: TopbarProps) {
+export default function Topbar({ userName, userInitials, onAuthClick }: TopbarProps) {
   return (
     <div className="topbar">
       <div className="brand">
@@ -56,19 +27,6 @@ export default function Topbar({ active, onNavigate, userName, userInitials, onA
           <div className="brand-tagline">Mission Control for Commissioning</div>
         </div>
       </div>
-
-      <nav className="nav">
-        {NAV.map((n) => (
-          // eslint-disable-next-line jsx-a11y/anchor-is-valid
-          <a
-            key={n.key}
-            className={active === n.key ? 'active' : ''}
-            onClick={() => onNavigate(n.key)}
-          >
-            {n.label}
-          </a>
-        ))}
-      </nav>
 
       <div className="topbar-right">
         <div className="site-chip">

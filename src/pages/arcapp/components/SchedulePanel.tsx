@@ -23,7 +23,7 @@ type SchedulePanelProps = {
   onRetry: () => void
 }
 
-function ConnPill({ state }: { state: ScheduleState }) {
+export function ConnPill({ state }: { state: ScheduleState }) {
   if (state === 'loading') {
     return (
       <span className="conn-pill loading">
@@ -45,7 +45,7 @@ function ConnPill({ state }: { state: ScheduleState }) {
   )
 }
 
-function syncNote(state: ScheduleState, sourceLabel: string, lastSync: string | null) {
+export function syncNote(state: ScheduleState, sourceLabel: string, lastSync: string | null) {
   if (state === 'loading') return <>Source: <b style={{ color: 'var(--text-muted)' }}>{sourceLabel}</b> · syncing…</>
   if (state === 'ready')
     return (

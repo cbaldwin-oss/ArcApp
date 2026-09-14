@@ -1,46 +1,29 @@
 import { useState, useEffect, useCallback } from 'react'
+import { Outlet } from 'react-router-dom'
 import { useCurrentUser } from '../../lib/useCurrentUser'
 import { useGetSchedule, useGetResultOptions, useCheckEditor, useSaveResult, useLogTamperSeals, useSubmitRtft, useGetSettings, useSaveSetting, useGetWorkflows, useGetWorkflowItems } from '../../lib/api'
 import type { WorkflowItem } from './workflowItems'
+import type { ShellContext } from './ShellContext'
 import type { ScheduleRow, ScheduleState, ActivityAnswer, Todo } from './types'
-import { TODOS, MILESTONES } from './sampleData'
+import { TODOS } from './sampleData'
 import { localIsoDate, addDaysIso } from './utils'
 import Topbar from './components/Topbar'
+import Sidebar from './components/Sidebar'
 import ContextStrip from './components/ContextStrip'
-import KpiRow from './components/KpiRow'
-import TodoPanel, { TodoList } from './components/TodoPanel'
-import MilestonesPanel, { MilestoneList } from './components/MilestonesPanel'
-import SchedulePanel from './components/SchedulePanel'
-import ScheduleTable from './components/ScheduleTable'
-import JointPackPhotosPanel from './components/JointPackPhotosPanel'
-import SettingsPanel from './components/SettingsPanel'
-import TamperSealLogPanel from './components/TamperSealLogPanel'
-import RtftTrackerPanel from './components/RtftTrackerPanel'
-import ChecklistReadyPanel from './components/ChecklistReadyPanel'
-import IssuesReviewPanel from './components/IssuesReviewPanel'
-import SubmittalReviewerPanel from './components/SubmittalReviewerPanel'
 import ActivityDrawer from './components/ActivityDrawer'
-import FullscreenOverlay from './components/FullscreenOverlay'
 import type { SealPayloadRow } from './components/TamperSealSection'
 import type { RtftPayload } from './components/RtftSection'
 
-type NavKey =
-  | 'dashboard'
-  | 'todo'
-  | 'milestones'
-  | 'schedule'
-  | 'checklists'
-  | 'issues'
-  | 'submittals'
-  | 'jointpacks'
-  | 'tamperseals'
-  | 'rtft'
-  | 'settings'
-type FsPanel = null | 'todo' | 'milestones' | 'schedule'
-
 const SOURCE_LABEL = 'STY4BackEndData'
 
-export default function ArcAppDashboard() {
+/**
+ * The persistent app shell: sidebar navigation + everything every routed page might need,
+ * fetched/held once here and handed down via <Outlet context>. Replaces the old single-page
+ * Dashboard — each nav item that used to scroll to a section on one long page now routes to its
+ * own page (see App.tsx), with this shell providing the surrounding chrome (topbar, sidebar,
+ * footer) and the Activity Drawer, which can be opened from more than one page.
+ */
+export default function AppShell() {
   const { user, signInWithEmail, signOut } = useCurrentUser()
 
   const scheduleFn = useGetSchedule()
@@ -54,7 +37,6 @@ export default function ArcAppDashboard() {
   const workflowsFn = useGetWorkflows()
   const workflowItemsFn = useGetWorkflowItems()
 
-  const [activeNav, setActiveNav] = useState<NavKey>('dashboard')
   const [selectedDate, setSelectedDate] = useState<string>(localIsoDate())
   const [rows, setRows] = useState<ScheduleRow[]>([])
   const [lastSync, setLastSync] = useState<string | null>(null)
@@ -63,9 +45,6 @@ export default function ArcAppDashboard() {
   const [todos, setTodos] = useState<Todo[]>(TODOS)
   const [selectedRowId, setSelectedRowId] = useState<string | number | null>(null)
   const [answers, setAnswers] = useState<Record<string, ActivityAnswer>>({})
-
-  const [fsPanel, setFsPanel] = useState<FsPanel>(null)
-  const [fsFilter, setFsFilter] = useState('')
 
   // Load schedule whenever the selected day changes.
   useEffect(() => {
@@ -148,12 +127,6 @@ export default function ArcAppDashboard() {
       .finally(() => setTimeout(() => setRefreshing(false), 400))
   }
 
-  function handleNavigate(key: NavKey) {
-    setActiveNav(key)
-    const id = key === 'dashboard' ? 'dashboard' : key
-    document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
-  }
-
   function toggleTodo(id: number) {
     setTodos((prev) => prev.map((t) => (t.id === id ? { ...t, done: !t.done } : t)))
   }
@@ -172,7 +145,7 @@ export default function ArcAppDashboard() {
     [saveResultFn],
   )
 
-  // Tamper seals log to SLC1Assets; RTFT stores to SLC1RTFT (signoff stamped server-side).
+  // Tamper seals log to STY4Assets; RTFT stores to STY4RTFT (signoff stamped server-side).
   const saveSeals = useCallback(
     async (rows: SealPayloadRow[]) => {
       await logSealsFn.trigger({ rows }).result
@@ -216,91 +189,58 @@ export default function ArcAppDashboard() {
     ? answers[String(selectedRow.id)] ?? { offsetHrs: 0, caCount: 1 }
     : { offsetHrs: 0, caCount: 1 }
 
-  const fsTitle =
-    fsPanel === 'todo' ? 'Your To-Dos' : fsPanel === 'milestones' ? 'Milestones' : 'Scheduled Activities'
+  const outletContext: ShellContext = {
+    todos,
+    onToggleTodo: toggleTodo,
+
+    scheduleState,
+    rows,
+    scheduleError: scheduleFn.error ?? '',
+    selectedDate,
+    lastSync,
+    refreshing,
+    selectedRowId,
+    answeredIds,
+    onPrevDay: () => goToDate(addDaysIso(selectedDate, -1)),
+    onNextDay: () => goToDate(addDaysIso(selectedDate, 1)),
+    onToday: () => goToDate(localIsoDate()),
+    onPickDate: goToDate,
+    onRefresh: handleRefresh,
+    onRowClick: (r) => setSelectedRowId(r.id),
+    onScheduleRetry: () => void scheduleFn.trigger({ date: selectedDate }),
+
+    jointPackFolder,
+    driveReady,
+    onLogJointPackPhotos: logJointPackPhotos,
+
+    canEdit,
+    canManageWorkflows,
+
+    checklistReadyStatuses,
+    issueReviewStatuses,
+    settingsLoading: settingsFn.loading,
+    onSaveSetting: saveSetting,
+  }
 
   return (
     <div className="arcapp">
       <div className="starfield" />
 
-      <Topbar
-        active={activeNav}
-        onNavigate={handleNavigate}
-        userName={userName}
-        userInitials={initials}
-        onAuthClick={handleAuthClick}
-      />
+      <Topbar userName={userName} userInitials={initials} onAuthClick={handleAuthClick} />
       <ContextStrip />
 
-      <main>
-        <div className="page-heading" id="dashboard">
-          <h1>Mission Dashboard</h1>
-          <p>Your checklist, milestones, and live activity feed for Phoenix Data Center 3.</p>
-        </div>
+      <div className="arcapp-layout">
+        <Sidebar />
 
-        <KpiRow />
+        <main>
+          <Outlet context={outletContext} />
 
-        <div className="dash-grid">
-          <TodoPanel todos={todos} onToggle={toggleTodo} onExpand={() => setFsPanel('todo')} />
-          <MilestonesPanel milestones={MILESTONES} onExpand={() => setFsPanel('milestones')} />
-        </div>
-
-        <SchedulePanel
-          state={scheduleState}
-          rows={rows}
-          errorMsg={scheduleFn.error ?? ''}
-          selectedDate={selectedDate}
-          sourceLabel={SOURCE_LABEL}
-          lastSync={lastSync}
-          refreshing={refreshing}
-          selectedRowId={selectedRowId}
-          answeredIds={answeredIds}
-          onPrevDay={() => goToDate(addDaysIso(selectedDate, -1))}
-          onNextDay={() => goToDate(addDaysIso(selectedDate, 1))}
-          onToday={() => goToDate(localIsoDate())}
-          onPickDate={goToDate}
-          onRefresh={handleRefresh}
-          onExpand={() => {
-            setFsFilter('')
-            setFsPanel('schedule')
-          }}
-          onRowClick={(r) => setSelectedRowId(r.id)}
-          onRetry={() => void scheduleFn.trigger({ date: selectedDate })}
-        />
-
-        <ChecklistReadyPanel />
-
-        <IssuesReviewPanel />
-
-        <SubmittalReviewerPanel canEdit={canEdit} />
-
-        <JointPackPhotosPanel
-          folder={jointPackFolder}
-          driveReady={driveReady}
-          canEdit={canEdit}
-          onLogPhotos={logJointPackPhotos}
-          onGoToSettings={() => handleNavigate('settings')}
-        />
-
-        <TamperSealLogPanel />
-
-        <RtftTrackerPanel />
-
-        <SettingsPanel
-          jointPackFolder={jointPackFolder}
-          checklistReadyStatuses={checklistReadyStatuses}
-          issueReviewStatuses={issueReviewStatuses}
-          canEdit={canEdit}
-          canManageWorkflows={canManageWorkflows}
-          loading={settingsFn.loading}
-          onSaveSetting={saveSetting}
-        />
-
-        <footer>
-          ArcApp Commissioning · Phoenix Data Center 3 · To-dos &amp; milestones are sample data — Scheduled
-          Activities reads live from {SOURCE_LABEL}
-        </footer>
-      </main>
+          <footer>
+            ArcApp Commissioning · Phoenix Data Center 3 · To-dos &amp; milestones are sample data — Scheduled
+            Activities reads live from {SOURCE_LABEL}
+          </footer>
+        </main>
+      </div>
 
       {selectedRow && (
         <ActivityDrawer
@@ -318,36 +258,6 @@ export default function ArcAppDashboard() {
           onSubmitRTFT={submitRTFT}
           onOpenPhotos={openPhotos}
         />
-      )}
-
-      {fsPanel && (
-        <FullscreenOverlay title={fsTitle} onClose={() => setFsPanel(null)}>
-          {fsPanel === 'todo' && <TodoList todos={todos} onToggle={toggleTodo} />}
-          {fsPanel === 'milestones' && <MilestoneList milestones={MILESTONES} />}
-          {fsPanel === 'schedule' && (
-            <>
-              <div className="fs-toolbar">
-                <input
-                  type="text"
-                  placeholder="Filter by place, activity, asset, status..."
-                  value={fsFilter}
-                  onChange={(e) => setFsFilter(e.target.value)}
-                />
-              </div>
-              <ScheduleTable
-                state={scheduleState}
-                rows={rows}
-                errorMsg={scheduleFn.error ?? ''}
-                filter={fsFilter}
-                selectedDate={selectedDate}
-                selectedRowId={selectedRowId}
-                answeredIds={answeredIds}
-                onRowClick={(r) => setSelectedRowId(r.id)}
-                onRetry={() => void scheduleFn.trigger({ date: selectedDate })}
-              />
-            </>
-          )}
-        </FullscreenOverlay>
       )}
     </div>
   )

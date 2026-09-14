@@ -1,7 +1,18 @@
 import './arcapp.css'
-import { Routes, Route } from 'react-router-dom'
-import ArcAppDashboard from './pages/arcapp/Dashboard'
+import { Routes, Route, Navigate } from 'react-router-dom'
 import { isSupabaseConfigured } from './lib/supabaseClient'
+import AppShell from './pages/arcapp/AppShell'
+import DashboardPage from './pages/arcapp/pages/DashboardPage'
+import TodoPage from './pages/arcapp/pages/TodoPage'
+import MilestonesPage from './pages/arcapp/pages/MilestonesPage'
+import SchedulePage from './pages/arcapp/pages/SchedulePage'
+import JointPacksPage from './pages/arcapp/pages/JointPacksPage'
+import SubmittalsPage from './pages/arcapp/pages/SubmittalsPage'
+import SettingsPage from './pages/arcapp/pages/SettingsPage'
+import ChecklistReadyPanel from './pages/arcapp/components/ChecklistReadyPanel'
+import IssuesReviewPanel from './pages/arcapp/components/IssuesReviewPanel'
+import TamperSealLogPanel from './pages/arcapp/components/TamperSealLogPanel'
+import RtftTrackerPanel from './pages/arcapp/components/RtftTrackerPanel'
 
 function SetupRequired() {
   return (
@@ -45,8 +56,20 @@ export default function App() {
   if (!isSupabaseConfigured) return <SetupRequired />
   return (
     <Routes>
-      <Route path="/" element={<ArcAppDashboard />} />
-      <Route path="*" element={<ArcAppDashboard />} />
+      <Route path="/" element={<AppShell />}>
+        <Route index element={<DashboardPage />} />
+        <Route path="todo" element={<TodoPage />} />
+        <Route path="milestones" element={<MilestonesPage />} />
+        <Route path="schedule" element={<SchedulePage />} />
+        <Route path="checklists" element={<ChecklistReadyPanel />} />
+        <Route path="issues" element={<IssuesReviewPanel />} />
+        <Route path="submittals" element={<SubmittalsPage />} />
+        <Route path="jointpacks" element={<JointPacksPage />} />
+        <Route path="tamperseals" element={<TamperSealLogPanel />} />
+        <Route path="rtft" element={<RtftTrackerPanel />} />
+        <Route path="settings" element={<SettingsPage />} />
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Route>
     </Routes>
   )
 }
