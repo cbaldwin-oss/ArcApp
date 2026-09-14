@@ -102,6 +102,10 @@ export default function ArcAppDashboard() {
   const editorPerm = editorFn.data as { isAuthorized?: boolean; email?: string | null } | undefined
   const editorUser = editorPerm?.isAuthorized && editorPerm.email ? editorPerm.email : null
   const canEdit = !!editorUser
+  // TEMPORARY (per request, 2026-09-14): any signed-in user can manage Workflows, not just
+  // authorized editors — see supabase/policies.sql for the matching RLS relaxation and how to
+  // revert. Everything else gated by `canEdit` (settings, the item catalog, submittals) is unchanged.
+  const canManageWorkflows = !!user
 
   const workflows = (workflowsFn.data as Array<{ id: string; activities: string[]; items: string[] }> | undefined) ?? []
   const workflowItems = (workflowItemsFn.data as WorkflowItem[] | undefined) ?? []
@@ -287,6 +291,7 @@ export default function ArcAppDashboard() {
           checklistReadyStatuses={checklistReadyStatuses}
           issueReviewStatuses={issueReviewStatuses}
           canEdit={canEdit}
+          canManageWorkflows={canManageWorkflows}
           loading={settingsFn.loading}
           onSaveSetting={saveSetting}
         />

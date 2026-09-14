@@ -11,7 +11,14 @@ function newId(): string {
   return `wf_${Date.now()}_${Math.random().toString(16).slice(2)}`
 }
 
-export default function WorkflowsBuilder({ canEdit }: { canEdit: boolean }) {
+type Props = {
+  /** Gates creating/editing/deleting Workflows (activity → items links). */
+  canEdit: boolean
+  /** Gates the Workflow Items catalog below it — kept separate, still editor-only. */
+  canEditItems: boolean
+}
+
+export default function WorkflowsBuilder({ canEdit, canEditItems }: Props) {
   const activitiesFn = useGetActivityOptions()
   const itemsFn = useGetWorkflowItems()
   const workflowsFn = useGetWorkflows()
@@ -179,7 +186,7 @@ export default function WorkflowsBuilder({ canEdit }: { canEdit: boolean }) {
   return (
     <>
       {state === 'ready' && (
-        <WorkflowItemsManager items={catalog} workflows={workflows} canEdit={canEdit} onChanged={() => itemsFn.trigger()} />
+        <WorkflowItemsManager items={catalog} workflows={workflows} canEdit={canEditItems} onChanged={() => itemsFn.trigger()} />
       )}
 
       <div style={{ marginTop: 26 }}>
@@ -197,7 +204,7 @@ export default function WorkflowsBuilder({ canEdit }: { canEdit: boolean }) {
           )}
         </div>
 
-        {!canEdit && <div className="q-hint">Only authorized editors can manage workflows.</div>}
+        {!canEdit && <div className="q-hint">Sign in to manage workflows.</div>}
 
         {state === 'loading' && <div className="q-hint">Loading workflows…</div>}
         {state === 'error' && (

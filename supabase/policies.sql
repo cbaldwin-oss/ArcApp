@@ -14,11 +14,21 @@ CREATE POLICY "workflows_select_authenticated" ON arcapp_workflows
 CREATE POLICY "settings_select_authenticated" ON arcapp_settings
   FOR SELECT TO authenticated USING (true);
 
--- Only emails present in STY4authorized_editors may write.
-CREATE POLICY "workflows_write_editors" ON arcapp_workflows
+-- TEMPORARY (requested 2026-09-14): any signed-in user may create/edit/delete Workflows, not just
+-- authorized editors. Matches the app-side relaxation in Dashboard.tsx (`canManageWorkflows`).
+-- To revert: drop this policy and re-create "workflows_write_editors" with the editor-restricted
+-- USING/WITH CHECK clause below (kept here for exactly that purpose), then flip
+-- `canManageWorkflows` back to `canEdit` in Dashboard.tsx.
+CREATE POLICY "workflows_write_authenticated" ON arcapp_workflows
   FOR ALL TO authenticated
-  USING (EXISTS (SELECT 1 FROM "STY4authorized_editors" e WHERE lower(e.email) = lower(auth.jwt() ->> 'email')))
-  WITH CHECK (EXISTS (SELECT 1 FROM "STY4authorized_editors" e WHERE lower(e.email) = lower(auth.jwt() ->> 'email')));
+  USING (true)
+  WITH CHECK (true);
+-- Editor-restricted version this replaced — the "arcapp_workflow_items" catalog below still
+-- uses this exact pattern, unchanged:
+-- CREATE POLICY "workflows_write_editors" ON arcapp_workflows
+--   FOR ALL TO authenticated
+--   USING (EXISTS (SELECT 1 FROM "STY4authorized_editors" e WHERE lower(e.email) = lower(auth.jwt() ->> 'email')))
+--   WITH CHECK (EXISTS (SELECT 1 FROM "STY4authorized_editors" e WHERE lower(e.email) = lower(auth.jwt() ->> 'email')));
 
 CREATE POLICY "settings_write_editors" ON arcapp_settings
   FOR ALL TO authenticated

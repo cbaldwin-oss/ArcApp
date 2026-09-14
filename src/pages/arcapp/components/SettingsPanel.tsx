@@ -7,6 +7,8 @@ type Props = {
   checklistReadyStatuses: string[]
   issueReviewStatuses: string[]
   canEdit: boolean
+  /** Separate, looser gate for Workflows specifically — see Dashboard.tsx for why. */
+  canManageWorkflows: boolean
   loading: boolean
   onSaveSetting: (key: string, value: string) => Promise<void>
 }
@@ -81,6 +83,7 @@ export default function SettingsPanel({
   checklistReadyStatuses,
   issueReviewStatuses,
   canEdit,
+  canManageWorkflows,
   loading,
   onSaveSetting,
 }: Props) {
@@ -118,7 +121,7 @@ export default function SettingsPanel({
           onSave={(v) => onSaveSetting('issue_review_statuses', v)}
         />
 
-        <WorkflowsBuilder canEdit={canEdit} />
+        <WorkflowsBuilder canEdit={canManageWorkflows} canEditItems={canEdit} />
       </div>
     </section>
   )
