@@ -26,6 +26,24 @@ CREATE POLICY "settings_write_editors" ON arcapp_settings
   WITH CHECK (EXISTS (SELECT 1 FROM "STY4authorized_editors" e WHERE lower(e.email) = lower(auth.jwt() ->> 'email')));
 
 
+
+-- =============================================================================
+-- NOT YET APPLIED — run this alongside the arcapp_workflow_items table in
+-- schema.sql. Same shape as arcapp_workflows: any signed-in user can read the
+-- item catalog, only authorized editors can change it.
+-- =============================================================================
+
+ALTER TABLE arcapp_workflow_items ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "workflow_items_select_authenticated" ON arcapp_workflow_items
+  FOR SELECT TO authenticated USING (true);
+
+CREATE POLICY "workflow_items_write_editors" ON arcapp_workflow_items
+  FOR ALL TO authenticated
+  USING (EXISTS (SELECT 1 FROM "STY4authorized_editors" e WHERE lower(e.email) = lower(auth.jwt() ->> 'email')))
+  WITH CHECK (EXISTS (SELECT 1 FROM "STY4authorized_editors" e WHERE lower(e.email) = lower(auth.jwt() ->> 'email')));
+
+
 -- =============================================================================
 -- NOT YET APPLIED — recommended, but left for you to review and run yourself.
 --

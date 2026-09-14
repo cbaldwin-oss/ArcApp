@@ -19,6 +19,7 @@
 
 import { useApiFn } from './useApiFn'
 import { supabase } from './supabaseClient'
+import { FALLBACK_WORKFLOW_ITEMS, type WorkflowItem } from '../pages/arcapp/workflowItems'
 
 // ---------------------------------------------------------------------------
 // shared helpers
@@ -477,6 +478,78 @@ export function useLogTamperSeals() {
 }
 
 // ---------------------------------------------------------------------------
+// workflow items — the catalog of on-site modules a workflow can include.
+// Backed by arcapp_workflow_items; each row will later also carry the definition of what the
+// item does (its `config` jsonb). New in this app — no Retool equivalent.
+// ---------------------------------------------------------------------------
+
+export type { WorkflowItem }
+
+/**
+ * Reads the item catalog. Falls back to the built-in list if the table is missing or empty so the
+ * app still works before supabase/schema.sql has been applied.
+ */
+async function getWorkflowItems(): Promise<WorkflowItem[]> {
+  const res = await supabase
+    .from('arcapp_workflow_items')
+    .select('item_key, label, description, sort_order, enabled')
+    .order('sort_order', { ascending: true, nullsFirst: false })
+
+  if (res.error) {
+    console.warn(`arcapp_workflow_items unavailable (${res.error.message}); using built-in item list.`)
+    return FALLBACK_WORKFLOW_ITEMS
+  }
+  const rows = (res.data ?? []) as Array<{
+    item_key: string
+    label: string | null
+    description: string | null
+    sort_order: number | null
+    enabled: boolean | null
+  }>
+  if (rows.length === 0) return FALLBACK_WORKFLOW_ITEMS
+
+  return rows.map((r, idx) => ({
+    key: String(r.item_key),
+    label: r.label || String(r.item_key),
+    description: r.description || '',
+    sortOrder: r.sort_order ?? idx,
+    enabled: r.enabled !== false,
+  }))
+}
+export function useGetWorkflowItems() {
+  return useApiFn(getWorkflowItems)
+}
+
+/**
+ * Updates one catalog row. Only the presentation/availability fields are writable here — the
+ * `config` payload that defines an item's behavior gets its own editor once those are specified.
+ */
+async function saveWorkflowItem(params: {
+  key: string
+  label?: string
+  description?: string
+  enabled?: boolean
+  sortOrder?: number
+}): Promise<{ key: string }> {
+  const key = (params.key ?? '').trim()
+  if (!key) throw new Error('An item key is required.')
+  const updatedBy = (await getCurrentUserEmail()) || 'admin'
+
+  const patch: Record<string, unknown> = { updated_at: new Date().toISOString(), updated_by: updatedBy }
+  if (params.label !== undefined) patch.label = params.label.trim()
+  if (params.description !== undefined) patch.description = params.description
+  if (params.enabled !== undefined) patch.enabled = params.enabled
+  if (params.sortOrder !== undefined) patch.sort_order = params.sortOrder
+
+  const res = await supabase.from('arcapp_workflow_items').update(patch).eq('item_key', key)
+  if (res.error) throw new Error(res.error.message)
+  return { key }
+}
+export function useSaveWorkflowItem() {
+  return useApiFn(saveWorkflowItem)
+}
+
+// ---------------------------------------------------------------------------
 // workflows — mirrors getWorkflows.ts / saveWorkflows.ts (now backed by Supabase)
 // ---------------------------------------------------------------------------
 
@@ -506,23 +579,18 @@ export function useGetWorkflows() {
   return useApiFn(getWorkflows)
 }
 
-const VALID_WORKFLOW_ITEMS = new Set([
-  'late_time_personnel',
-  'tamper_seal',
-  'joint_pack_photos',
-  'rtft',
-  'launchpad_status',
-  'cmms_data_collection',
-])
 async function saveWorkflows(params: { workflows: Workflow[] }): Promise<{ count: number }> {
   const incoming = Array.isArray(params.workflows) ? params.workflows : []
   const updatedBy = (await getCurrentUserEmail()) || 'admin'
+
+  // Valid item keys come from the catalog table, so adding an item is a data change, not a deploy.
+  const validItems = new Set((await getWorkflowItems()).map((i) => i.key))
 
   const clean: Workflow[] = incoming.map((w) => {
     const activities = (Array.isArray(w.activities) ? w.activities : [])
       .map((a) => (a ?? '').toString().trim())
       .filter(Boolean)
-    const items = (Array.isArray(w.items) ? w.items : []).filter((i) => VALID_WORKFLOW_ITEMS.has(i))
+    const items = (Array.isArray(w.items) ? w.items : []).filter((i) => validItems.has(i))
     if (!w.id) throw new Error('Every workflow needs an id.')
     if (activities.length === 0) throw new Error('Every workflow needs at least one activity.')
     if (items.length === 0) throw new Error('Every workflow needs at least one item.')

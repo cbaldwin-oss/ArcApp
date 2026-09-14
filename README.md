@@ -37,6 +37,21 @@ Supabase project and tables it already used inside Retool.
    `arcapp_settings`). See `supabase/policies.sql` for what's applied vs. what's recommended but
    left for you to review on the shared tables — see the security section below, this matters.
 
+## Pending migration — workflow items
+
+The Workflows builder no longer hardcodes its list of on-site modules; it reads them from a new
+table, `arcapp_workflow_items`. **That table hasn't been created yet** — run the
+`arcapp_workflow_items` section of `supabase/schema.sql` plus the matching policies in
+`supabase/policies.sql` against your project. Until you do, the app falls back to the built-in
+list in `src/pages/arcapp/workflowItems.ts` (a console warning says so) and `Select all` /
+workflow editing still work, but changes to the catalog can't be persisted.
+
+Each row in that table has a `config jsonb` column reserved for the definition of what the item
+should actually do. Six of the eight items already have hand-written forms in `ActivityDrawer`
+(`late_time_personnel`, `tamper_seal`, `joint_pack_photos`, `rtft`, `launchpad_status`,
+`cmms_data_collection`); `equipment_photos` and `scaaf_study` render a "not configured yet"
+placeholder until their behavior is specified.
+
 ## Setup
 
 ```bash

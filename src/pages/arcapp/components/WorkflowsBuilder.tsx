@@ -1,17 +1,7 @@
 import { useEffect, useState, useMemo } from 'react'
 import { Plus, GripVertical, Pencil, Trash2, X } from 'lucide-react'
-import { useGetActivityOptions, useGetWorkflows, useSaveWorkflows } from '../../../lib/api'
-
-// The 6 fixed form modules. Stable keys — never renamed/added/removed here.
-const ITEMS: Array<{ key: string; label: string }> = [
-  { key: 'late_time_personnel', label: 'Late Time/Personnel' },
-  { key: 'tamper_seal', label: 'Tamper Seal' },
-  { key: 'joint_pack_photos', label: 'Joint Pack Photos' },
-  { key: 'rtft', label: 'RTFT' },
-  { key: 'launchpad_status', label: 'LaunchPad Status' },
-  { key: 'cmms_data_collection', label: 'CMMS Data Collection' },
-]
-const LABELS: Record<string, string> = Object.fromEntries(ITEMS.map((i) => [i.key, i.label]))
+import { useGetActivityOptions, useGetWorkflowItems, useGetWorkflows, useSaveWorkflows } from '../../../lib/api'
+import { itemLabels, type WorkflowItem } from '../workflowItems'
 
 type Workflow = { id: string; activities: string[]; items: string[] }
 
@@ -22,6 +12,7 @@ function newId(): string {
 
 export default function WorkflowsBuilder({ canEdit }: { canEdit: boolean }) {
   const activitiesFn = useGetActivityOptions()
+  const itemsFn = useGetWorkflowItems()
   const workflowsFn = useGetWorkflows()
   const saveFn = useSaveWorkflows()
 
@@ -39,6 +30,7 @@ export default function WorkflowsBuilder({ canEdit }: { canEdit: boolean }) {
 
   function load() {
     void activitiesFn.trigger()
+    void itemsFn.trigger()
     void workflowsFn.trigger()
   }
   useEffect(() => {
@@ -51,7 +43,17 @@ export default function WorkflowsBuilder({ canEdit }: { canEdit: boolean }) {
   }, [workflowsFn.data])
 
   const activities = (activitiesFn.data as string[] | undefined) ?? []
-  const state = activitiesFn.error || workflowsFn.error ? 'error' : !activitiesFn.data || !workflowsFn.data ? 'loading' : 'ready'
+  const catalog = (itemsFn.data as WorkflowItem[] | undefined) ?? []
+  // Retired items stay renderable on existing workflows, but can't be added to new ones.
+  const selectableItems = useMemo(() => catalog.filter((i) => i.enabled), [catalog])
+  const LABELS = useMemo(() => itemLabels(catalog), [catalog])
+
+  const state =
+    activitiesFn.error || workflowsFn.error || itemsFn.error
+      ? 'error'
+      : !activitiesFn.data || !workflowsFn.data || !itemsFn.data
+        ? 'loading'
+        : 'ready'
 
   // Activities already claimed by OTHER workflows (excluded from the picker).
   const claimedByOthers = useMemo(() => {
@@ -97,6 +99,21 @@ export default function WorkflowsBuilder({ canEdit }: { canEdit: boolean }) {
   }
   function toggleItem(key: string, checked: boolean) {
     setFormItems((prev) => (checked ? [...prev.filter((k) => k !== key), key] : prev.filter((k) => k !== key)))
+  }
+
+  // "Select all" acts on what's currently listed (i.e. respects the search filter);
+  // "Deselect all" clears the whole selection, including anything filtered out of view.
+  function selectAllActivities() {
+    setFormActivities((prev) => Array.from(new Set([...prev, ...availableActivities])))
+  }
+  function deselectAllActivities() {
+    setFormActivities([])
+  }
+  function selectAllItems() {
+    setFormItems((prev) => [...prev, ...selectableItems.map((i) => i.key).filter((k) => !prev.includes(k))])
+  }
+  function deselectAllItems() {
+    setFormItems([])
   }
 
   function reorder(from: number, to: number) {
@@ -190,7 +207,23 @@ export default function WorkflowsBuilder({ canEdit }: { canEdit: boolean }) {
           {formOpen && canEdit && (
             <div className="wf-form">
               <div className="form-field">
-                <label>Activities (select one or more)</label>
+                <div className="wf-field-head">
+                  <label>Activities (select one or more)</label>
+                  <div className="wf-bulk">
+                    <button
+                      type="button"
+                      className="wf-link-btn"
+                      disabled={availableActivities.length === 0 || availableActivities.every((a) => formActivities.includes(a))}
+                      onClick={selectAllActivities}
+                    >
+                      Select all{activitySearch.trim() ? ' shown' : ''}
+                    </button>
+                    <span className="wf-bulk-sep">·</span>
+                    <button type="button" className="wf-link-btn" disabled={formActivities.length === 0} onClick={deselectAllActivities}>
+                      Deselect all
+                    </button>
+                  </div>
+                </div>
                 {formActivities.length > 0 && (
                   <div className="wf-chips" style={{ marginBottom: 8 }}>
                     {formActivities.map((a) => (
@@ -243,12 +276,28 @@ export default function WorkflowsBuilder({ canEdit }: { canEdit: boolean }) {
               </div>
 
               <div className="form-field">
-                <label>Items to include</label>
+                <div className="wf-field-head">
+                  <label>Items to include</label>
+                  <div className="wf-bulk">
+                    <button
+                      type="button"
+                      className="wf-link-btn"
+                      disabled={selectableItems.every((i) => formItems.includes(i.key))}
+                      onClick={selectAllItems}
+                    >
+                      Select all
+                    </button>
+                    <span className="wf-bulk-sep">·</span>
+                    <button type="button" className="wf-link-btn" disabled={formItems.length === 0} onClick={deselectAllItems}>
+                      Deselect all
+                    </button>
+                  </div>
+                </div>
                 <div className="wf-check-grid">
-                  {ITEMS.map((it) => {
+                  {selectableItems.map((it) => {
                     const checked = formItems.includes(it.key)
                     return (
-                      <label key={it.key} className="wf-check-row">
+                      <label key={it.key} className="wf-check-row" title={it.description || undefined}>
                         <input type="checkbox" checked={checked} onChange={(e) => toggleItem(it.key, e.target.checked)} />
                         {it.label}
                       </label>

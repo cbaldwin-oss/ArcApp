@@ -6,19 +6,10 @@ import { fmtDate, fmtOffset } from '../utils'
 import { getChecklist } from '../checklists'
 import TamperSealSection, { type SealPayloadRow } from './TamperSealSection'
 import RtftSection, { type RtftPayload } from './RtftSection'
+import { FALLBACK_WORKFLOW_ITEMS, type WorkflowItem } from '../workflowItems'
 
 type Workflow = { id: string; activities: string[]; items: string[] }
 
-// The 6 gated modules; order used when an activity has no configured workflow.
-const DEFAULT_ITEMS = [
-  'late_time_personnel',
-  'joint_pack_photos',
-  'tamper_seal',
-  'rtft',
-  'launchpad_status',
-  'cmms_data_collection',
-]
-const VALID_ITEMS = new Set(DEFAULT_ITEMS)
 const LAUNCHPAD_STATUSES = ['', 'On Track', 'At Risk', 'Delayed']
 
 type Props = {
@@ -28,6 +19,8 @@ type Props = {
   selectedDate: string
   answer: ActivityAnswer
   workflows: Workflow[]
+  /** Item catalog from arcapp_workflow_items — decides which keys are valid and their labels. */
+  workflowItems?: WorkflowItem[]
   onAnswerChange: (rowId: string | number, answer: ActivityAnswer) => void
   onClose: () => void
   onSaveResult: (rowId: string | number, value: string) => Promise<void>
@@ -124,10 +117,19 @@ export default function ActivityDrawer(props: Props) {
   const options = Array.from(new Set([...resultOptions, ...(resultVal ? [resultVal] : [])])).sort()
 
   // Decide which gated sections to render and in what order.
+  const catalog = props.workflowItems?.length ? props.workflowItems : FALLBACK_WORKFLOW_ITEMS
+  const validItems = new Set(catalog.map((i) => i.key))
+  const itemLabel = (key: string) => catalog.find((i) => i.key === key)?.label ?? key
+  const itemDescription = (key: string) => catalog.find((i) => i.key === key)?.description ?? ''
+
   const wf = workflows.find((w) =>
     w.activities.some((a) => a.trim().toLowerCase() === (activeRow.activity || '').trim().toLowerCase()),
   )
-  const orderedItems = wf && wf.items.length ? wf.items.filter((k) => VALID_ITEMS.has(k)) : DEFAULT_ITEMS
+  // No configured workflow ⇒ show every enabled item, in catalog order.
+  const orderedItems =
+    wf && wf.items.length
+      ? wf.items.filter((k) => validItems.has(k))
+      : catalog.filter((i) => i.enabled).map((i) => i.key)
 
   function renderItem(key: string): ReactNode {
     switch (key) {
@@ -187,7 +189,7 @@ export default function ActivityDrawer(props: Props) {
       case 'joint_pack_photos':
         return (
           <div className="q-block" key={key}>
-            <label className="q-label">Equipment photos</label>
+            <label className="q-label">{itemLabel(key)}</label>
             <button className="photo-log-btn" type="button" onClick={() => props.onOpenPhotos(activeRow)}>
               <Camera />
               Log Photos to Drive
@@ -295,8 +297,18 @@ export default function ActivityDrawer(props: Props) {
             <div className={cmmsSaved ? 'q-hint ok' : 'q-hint'}>{cmmsSaved ? 'Saved.' : 'Records equipment ID, work order, and notes.'}</div>
           </div>
         )
-      default:
-        return null
+      default: {
+        // A catalog item whose behavior hasn't been defined yet (arcapp_workflow_items.config).
+        // Shown rather than silently dropped so admins can see their workflow took effect.
+        if (!validItems.has(key)) return null
+        return (
+          <div className="q-block" key={key}>
+            <label className="q-label">{itemLabel(key)}</label>
+            <div className="q-hint">{itemDescription(key) || 'This item is part of the workflow.'}</div>
+            <div className="q-hint">Not configured yet — no form has been defined for this item.</div>
+          </div>
+        )
+      }
     }
   }
 

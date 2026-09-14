@@ -518,6 +518,12 @@
 .arcapp .wf-btn:hover{ border-color:var(--green); color:var(--green); }
 .arcapp .wf-btn.danger:hover{ border-color:var(--red); color:var(--red); }
 .arcapp .wf-form{ border:1px solid var(--border-strong); background:var(--bg-elev-2); border-radius:var(--radius-sm); padding:16px; margin-bottom:16px; }
+.arcapp .wf-field-head{ display:flex; justify-content:space-between; align-items:baseline; gap:12px; flex-wrap:wrap; }
+.arcapp .wf-bulk{ display:flex; align-items:baseline; gap:7px; }
+.arcapp .wf-bulk-sep{ font-family:var(--font-mono); font-size:11px; color:var(--text-faint); }
+.arcapp .wf-link-btn{ background:none; border:none; padding:0; cursor:pointer; font-family:var(--font-mono); font-size:11px; letter-spacing:0.3px; text-transform:uppercase; color:var(--green); transition:color .15s ease; }
+.arcapp .wf-link-btn:hover:not(:disabled){ text-decoration:underline; }
+.arcapp .wf-link-btn:disabled{ color:var(--text-faint); cursor:default; }
 .arcapp .wf-check-grid{ display:grid; grid-template-columns:1fr 1fr; gap:2px 18px; }
 @media (max-width:520px){ .arcapp .wf-check-grid{ grid-template-columns:1fr; } }
 .arcapp .wf-check-row{ display:flex; align-items:center; gap:9px; padding:7px 0; font-size:13.5px; color:var(--text); cursor:pointer; }

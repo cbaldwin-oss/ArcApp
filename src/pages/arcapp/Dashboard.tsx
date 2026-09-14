@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useCurrentUser } from '../../lib/useCurrentUser'
-import { useGetSchedule, useGetResultOptions, useCheckEditor, useSaveResult, useLogTamperSeals, useSubmitRtft, useGetSettings, useSaveSetting, useGetWorkflows } from '../../lib/api'
+import { useGetSchedule, useGetResultOptions, useCheckEditor, useSaveResult, useLogTamperSeals, useSubmitRtft, useGetSettings, useSaveSetting, useGetWorkflows, useGetWorkflowItems } from '../../lib/api'
+import type { WorkflowItem } from './workflowItems'
 import type { ScheduleRow, ScheduleState, ActivityAnswer, Todo } from './types'
 import { TODOS, MILESTONES } from './sampleData'
 import { localIsoDate, addDaysIso } from './utils'
@@ -51,6 +52,7 @@ export default function ArcAppDashboard() {
   const settingsFn = useGetSettings()
   const saveSettingFn = useSaveSetting()
   const workflowsFn = useGetWorkflows()
+  const workflowItemsFn = useGetWorkflowItems()
 
   const [activeNav, setActiveNav] = useState<NavKey>('dashboard')
   const [selectedDate, setSelectedDate] = useState<string>(localIsoDate())
@@ -86,6 +88,7 @@ export default function ArcAppDashboard() {
     void editorFn.trigger()
     void settingsFn.trigger()
     void workflowsFn.trigger()
+    void workflowItemsFn.trigger()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
@@ -101,6 +104,7 @@ export default function ArcAppDashboard() {
   const canEdit = !!editorUser
 
   const workflows = (workflowsFn.data as Array<{ id: string; activities: string[]; items: string[] }> | undefined) ?? []
+  const workflowItems = (workflowItemsFn.data as WorkflowItem[] | undefined) ?? []
 
   const settingsData = settingsFn.data as
     | { jointPackPhotosFolder?: string; checklistReadyStatuses?: string[]; issueReviewStatuses?: string[] }
@@ -301,6 +305,7 @@ export default function ArcAppDashboard() {
           selectedDate={selectedDate}
           answer={currentAnswer}
           workflows={workflows}
+          workflowItems={workflowItems}
           onAnswerChange={handleAnswerChange}
           onClose={() => setSelectedRowId(null)}
           onSaveResult={saveResult}
