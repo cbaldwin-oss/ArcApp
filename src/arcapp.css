@@ -541,3 +541,13 @@
 .arcapp .wf-remove:hover{ color:var(--red); }
 .arcapp .wf-confirm{ display:flex; align-items:center; gap:10px; font-size:12.5px; color:var(--red); flex-wrap:wrap; }
 .arcapp .wf-subtitle{ font-family:var(--font-display); font-size:13px; font-weight:700; letter-spacing:0.4px; text-transform:uppercase; color:var(--text); margin:0 0 4px; }
+.arcapp .wf-item-row{ display:flex; align-items:flex-start; gap:10px; background:var(--bg-elev); border:1px solid var(--border-strong); border-radius:var(--radius-sm); padding:9px 11px; margin-bottom:6px; }
+.arcapp .wf-item-move{ display:flex; flex-direction:column; gap:2px; flex:0 0 auto; }
+.arcapp .wf-item-move button{ background:none; border:none; padding:2px; cursor:pointer; color:var(--text-faint); display:flex; }
+.arcapp .wf-item-move button:hover:not(:disabled){ color:var(--green); }
+.arcapp .wf-item-move button:disabled{ opacity:0.3; cursor:default; }
+.arcapp .wf-item-body{ flex:1; min-width:0; }
+.arcapp .wf-item-title{ display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+.arcapp .wf-item-desc{ margin:2px 0 0; }
+.arcapp .wf-item-actions{ display:flex; gap:6px; flex:0 0 auto; flex-wrap:wrap; }
+.arcapp .wf-tag-disabled{ font-family:var(--font-mono); font-size:10.5px; letter-spacing:0.3px; text-transform:uppercase; color:var(--text-faint); border:1px solid var(--border-strong); border-radius:999px; padding:2px 8px; }

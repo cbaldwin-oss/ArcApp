@@ -1,6 +1,7 @@
 node_modules
 dist
 *.tsbuildinfo
+supabase/.temp/
 .env
 .env.local
 *.log

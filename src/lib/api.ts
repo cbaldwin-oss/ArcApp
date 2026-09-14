@@ -520,33 +520,67 @@ export function useGetWorkflowItems() {
   return useApiFn(getWorkflowItems)
 }
 
+const ITEM_KEY_RE = /^[a-z][a-z0-9_]*$/
+
+/** Suggests an item_key from a label ("Equipment Photos" -> "equipment_photos"). Editable by the admin before first save. */
+export function slugifyItemKey(label: string): string {
+  return label
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '_')
+    .replace(/^_+|_+$/g, '')
+}
+
 /**
- * Updates one catalog row. Only the presentation/availability fields are writable here — the
- * `config` payload that defines an item's behavior gets its own editor once those are specified.
+ * Creates or updates one catalog row (upsert on item_key). Only the presentation/availability
+ * fields are writable here — the `config` payload that defines an item's behavior gets its own
+ * editor once those are specified. Key format is enforced because it's stored verbatim inside
+ * arcapp_workflows.items and should never need re-encoding once a workflow references it.
  */
 async function saveWorkflowItem(params: {
   key: string
-  label?: string
-  description?: string
-  enabled?: boolean
-  sortOrder?: number
+  label: string
+  description: string
+  enabled: boolean
+  sortOrder: number
 }): Promise<{ key: string }> {
-  const key = (params.key ?? '').trim()
-  if (!key) throw new Error('An item key is required.')
+  const key = (params.key ?? '').trim().toLowerCase()
+  const label = (params.label ?? '').trim()
+  if (!key || !ITEM_KEY_RE.test(key)) {
+    throw new Error('Key must start with a letter and contain only lowercase letters, numbers, and underscores.')
+  }
+  if (!label) throw new Error('A label is required.')
   const updatedBy = (await getCurrentUserEmail()) || 'admin'
 
-  const patch: Record<string, unknown> = { updated_at: new Date().toISOString(), updated_by: updatedBy }
-  if (params.label !== undefined) patch.label = params.label.trim()
-  if (params.description !== undefined) patch.description = params.description
-  if (params.enabled !== undefined) patch.enabled = params.enabled
-  if (params.sortOrder !== undefined) patch.sort_order = params.sortOrder
-
-  const res = await supabase.from('arcapp_workflow_items').update(patch).eq('item_key', key)
+  const res = await supabase.from('arcapp_workflow_items').upsert(
+    {
+      item_key: key,
+      label,
+      description: params.description ?? '',
+      enabled: params.enabled,
+      sort_order: params.sortOrder,
+      updated_at: new Date().toISOString(),
+      updated_by: updatedBy,
+    },
+    { onConflict: 'item_key' },
+  )
   if (res.error) throw new Error(res.error.message)
   return { key }
 }
 export function useSaveWorkflowItem() {
   return useApiFn(saveWorkflowItem)
+}
+
+/** Deletes a catalog row outright. Callers should confirm no workflow still references the key first. */
+async function deleteWorkflowItem(params: { key: string }): Promise<{ key: string }> {
+  const key = (params.key ?? '').trim()
+  if (!key) throw new Error('An item key is required.')
+  const res = await supabase.from('arcapp_workflow_items').delete().eq('item_key', key)
+  if (res.error) throw new Error(res.error.message)
+  return { key }
+}
+export function useDeleteWorkflowItem() {
+  return useApiFn(deleteWorkflowItem)
 }
 
 // ---------------------------------------------------------------------------
