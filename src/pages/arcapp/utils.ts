@@ -53,9 +53,25 @@ export function fmtOffset(v: number): string {
   return n.toString()
 }
 
-export function parseOmitted(str: string): number[] {
+// Full seal-number strings (not bare numbers) — a seal range can include a letter prefix/suffix
+// (see parseSealNumberParts), so an omitted entry only excludes a seal if it matches the whole
+// thing. Comparison is case-insensitive at the call site; original casing is kept here so it can
+// still be displayed back to the user as typed.
+export function parseOmitted(str: string): string[] {
   return str
     .split(',')
-    .map((s) => parseInt(s.trim(), 10))
-    .filter((n) => !isNaN(n))
+    .map((s) => s.trim())
+    .filter(Boolean)
+}
+
+/**
+ * Splits a seal number into a leading non-digit prefix, a numeric core, and a trailing non-digit
+ * suffix — e.g. "A-1001-B" -> prefix "A-", num "1001", suffix "-B". Returns null if there's no
+ * numeric core at all (a range needs something to increment). Ported from tamperseal.html so
+ * seal ranges behave identically here.
+ */
+export function parseSealNumberParts(value: string): { prefix: string; num: string; suffix: string } | null {
+  const match = String(value).trim().match(/^(\D*)(\d+)(\D*)$/)
+  if (!match) return null
+  return { prefix: match[1], num: match[2], suffix: match[3] }
 }

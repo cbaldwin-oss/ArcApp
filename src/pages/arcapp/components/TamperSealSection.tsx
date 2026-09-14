@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import type { ScheduleRow, SealSummary } from '../types'
-import { parseOmitted } from '../utils'
+import { parseOmitted, parseSealNumberParts } from '../utils'
 
 type SealInstance = {
   id: number
@@ -56,17 +56,50 @@ function nextPreviewId(): number {
   return previewCounter
 }
 
+type RangeResult = { sealNumbers: string[] } | { error: string }
+
+/**
+ * Expands one range into its individual seal numbers — allows an optional non-digit
+ * prefix/suffix around the numeric core (e.g. "A-1001" through "A-1010"), matching
+ * tamperseal.html's parseSealNumberParts/generatePreview exactly, padding width included.
+ */
+function buildSealRange(inst: SealInstance): RangeResult {
+  const startParts = parseSealNumberParts(inst.start)
+  const endParts = parseSealNumberParts(inst.end)
+  if (!startParts || !endParts) {
+    return { error: 'Enter valid seal numbers — each needs a numeric part (letters/dashes around it are fine, e.g. "A-1001").' }
+  }
+  if (startParts.prefix !== endParts.prefix || startParts.suffix !== endParts.suffix) {
+    return { error: 'The first and last seal numbers need matching letters/prefix and suffix — only the numeric part should differ, e.g. "A-1001" to "A-1010".' }
+  }
+  const start = parseInt(startParts.num, 10)
+  const end = parseInt(endParts.num, 10)
+  if (isNaN(start) || isNaN(end) || start > end) {
+    return { error: 'First seal # must be less than or equal to the last.' }
+  }
+  const padWidth = startParts.num.length // preserves leading-zero width, e.g. "001" -> "010" not "10"
+  // Omitted entries match against the FULL seal number (case-insensitive), not just the bare
+  // number, since the range itself can include letters now too.
+  const omittedSet = new Set(parseOmitted(inst.omit).map((o) => o.toLowerCase()))
+  const sealNumbers: string[] = []
+  for (let i = start; i <= end; i++) {
+    const sealNumber = `${startParts.prefix}${String(i).padStart(padWidth, '0')}${startParts.suffix}`
+    if (omittedSet.has(sealNumber.toLowerCase())) continue
+    sealNumbers.push(sealNumber)
+  }
+  return { sealNumbers }
+}
+
 function previewFor(inst: SealInstance): { text: string; cls: string } {
-  const start = parseInt(inst.start, 10)
-  const end = parseInt(inst.end, 10)
+  if (!inst.start.trim() || !inst.end.trim()) return { text: 'Enter a first and last seal number.', cls: 'seal-preview' }
+  const result = buildSealRange(inst)
+  if ('error' in result) return { text: result.error, cls: 'seal-preview err' }
+  const { sealNumbers } = result
+  if (sealNumbers.length === 0) return { text: 'All seals in this range are omitted.', cls: 'seal-preview err' }
   const omitted = parseOmitted(inst.omit)
-  if (isNaN(start) || isNaN(end)) return { text: 'Enter a first and last seal number.', cls: 'seal-preview' }
-  if (start > end) return { text: 'First seal # must be less than or equal to the last.', cls: 'seal-preview err' }
-  const omittedSet = new Set(omitted)
-  let count = 0
-  for (let i = start; i <= end; i++) if (!omittedSet.has(i)) count++
   const omitText = omitted.length ? ` (excluding ${omitted.join(', ')})` : ''
-  return { text: `${count} seal${count === 1 ? '' : 's'}: ${start}–${end}${omitText}`, cls: 'seal-preview ok' }
+  const rangeText = `${sealNumbers[0]}–${sealNumbers[sealNumbers.length - 1]}`
+  return { text: `${sealNumbers.length} seal${sealNumbers.length === 1 ? '' : 's'}: ${rangeText}${omitText}`, cls: 'seal-preview ok' }
 }
 
 export default function TamperSealSection({ row, authUser, selectedDate, onSubmit }: Props) {
@@ -97,19 +130,15 @@ export default function TamperSealSection({ row, authUser, selectedDate, onSubmi
   function generatePreview() {
     const rows: PreviewSeal[] = []
     for (const inst of instances) {
-      const start = parseInt(inst.start, 10)
-      const end = parseInt(inst.end, 10)
-      const omitted = parseOmitted(inst.omit)
-      if (isNaN(start) || isNaN(end) || start > end) {
-        setMsg({ text: 'Every range needs a valid first and last seal number (first ≤ last).', cls: 'q-hint err' })
+      const result = buildSealRange(inst)
+      if ('error' in result) {
+        setMsg({ text: result.error, cls: 'q-hint err' })
         return
       }
-      const omittedSet = new Set(omitted)
-      for (let i = start; i <= end; i++) {
-        if (omittedSet.has(i)) continue
+      for (const sealNumber of result.sealNumbers) {
         rows.push({
           id: nextPreviewId(),
-          sealNumber: i.toString(),
+          sealNumber,
           subArea: inst.subArea.trim(),
           notes: inst.notes.trim(),
           status: 'Intact',
@@ -206,8 +235,7 @@ export default function TamperSealSection({ row, authUser, selectedDate, onSubmi
                       <label>First seal #</label>
                       <input
                         type="text"
-                        inputMode="numeric"
-                        placeholder="e.g. 48201"
+                        placeholder="e.g. 48201 or A-48201"
                         value={inst.start}
                         disabled={disabled}
                         onChange={(e) => update(inst.id, { start: e.target.value })}
@@ -217,8 +245,7 @@ export default function TamperSealSection({ row, authUser, selectedDate, onSubmi
                       <label>Last seal #</label>
                       <input
                         type="text"
-                        inputMode="numeric"
-                        placeholder="e.g. 48215"
+                        placeholder="e.g. 48215 or A-48215"
                         value={inst.end}
                         disabled={disabled}
                         onChange={(e) => update(inst.id, { end: e.target.value })}
@@ -228,7 +255,7 @@ export default function TamperSealSection({ row, authUser, selectedDate, onSubmi
                       <label>Omitted (comma-sep)</label>
                       <input
                         type="text"
-                        placeholder="e.g. 48205, 48210"
+                        placeholder="e.g. 48205, A-48210"
                         value={inst.omit}
                         disabled={disabled}
                         onChange={(e) => update(inst.id, { omit: e.target.value })}
