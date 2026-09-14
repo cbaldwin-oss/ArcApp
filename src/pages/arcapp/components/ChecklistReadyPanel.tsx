@@ -1,8 +1,9 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { RefreshCw } from 'lucide-react'
-import { useGetChecklists } from '../../../lib/api'
+import { useGetChecklists, cxAlloyChecklistUrl } from '../../../lib/api'
 
 type Row = {
+  checklist_id: string
   number: string
   name: string
   asset_name: string
@@ -13,9 +14,12 @@ type Row = {
   date_created: string
 }
 
+const ALL_TYPES = 'All types'
+
 export default function ChecklistReadyPanel() {
   const fn = useGetChecklists()
   const [filter, setFilter] = useState('')
+  const [typeFilter, setTypeFilter] = useState(ALL_TYPES)
 
   useEffect(() => {
     void fn.trigger()
@@ -25,9 +29,17 @@ export default function ChecklistReadyPanel() {
   const data = fn.data as { rows: Row[]; readyStatuses: string[] } | undefined
   const rows = data?.rows ?? []
   const state = fn.error ? 'error' : fn.loading || !fn.data ? 'loading' : 'ready'
+
+  // Derived from whatever's actually loaded (the statuses selected in Settings), not from the
+  // CxAlloy Settings tab's Checklist Type list — that list doesn't currently match the type
+  // names real checklists use, so a type-filter option pulled from there could filter to zero.
+  const types = useMemo(() => Array.from(new Set(rows.map((r) => r.type_name).filter(Boolean))).sort(), [rows])
+
   const f = filter.trim().toLowerCase()
   const filtered = rows.filter(
-    (r) => !f || (r.number + r.name + r.asset_name + r.type_name + r.discipline + r.assigned_name).toLowerCase().includes(f),
+    (r) =>
+      (typeFilter === ALL_TYPES || r.type_name === typeFilter) &&
+      (!f || (r.number + r.name + r.asset_name + r.type_name + r.discipline + r.assigned_name).toLowerCase().includes(f)),
   )
 
   return (
@@ -52,17 +64,32 @@ export default function ChecklistReadyPanel() {
         Ready for CxA review · source: <b style={{ color: 'var(--text-muted)' }}>STY4A API Database · Checklists</b>
       </div>
       {state === 'ready' && (
-        <div style={{ padding: '0 20px 12px' }}>
+        <div style={{ padding: '0 20px 12px', display: 'flex', gap: 10, flexWrap: 'wrap' }}>
           <input
             type="text"
             placeholder="Filter by number, name, asset, discipline, company..."
             value={filter}
             onChange={(e) => setFilter(e.target.value)}
             style={{
-              width: '100%', maxWidth: 380, background: 'var(--bg-elev-2)', border: '1px solid var(--border)',
+              flex: '1 1 320px', maxWidth: 380, background: 'var(--bg-elev-2)', border: '1px solid var(--border)',
               borderRadius: 'var(--radius-sm)', color: 'var(--text)', fontFamily: 'var(--font-mono)', fontSize: 12.5, padding: '9px 13px',
             }}
           />
+          <select
+            value={typeFilter}
+            onChange={(e) => setTypeFilter(e.target.value)}
+            style={{
+              background: 'var(--bg-elev-2)', border: '1px solid var(--border)',
+              borderRadius: 'var(--radius-sm)', color: 'var(--text)', fontFamily: 'var(--font-mono)', fontSize: 12.5, padding: '9px 13px',
+            }}
+          >
+            <option value={ALL_TYPES}>{ALL_TYPES}</option>
+            {types.map((t) => (
+              <option key={t} value={t}>
+                {t}
+              </option>
+            ))}
+          </select>
         </div>
       )}
       <div className="panel-body no-pad">
@@ -96,8 +123,16 @@ export default function ChecklistReadyPanel() {
                 <tr><td colSpan={8} className="table-empty">No checklists match.</td></tr>
               )}
               {state === 'ready' && filtered.map((r, i) => (
-                <tr key={`${r.number}-${i}`}>
-                  <td className="tag-cell">{r.number}</td>
+                <tr key={`${r.checklist_id || r.number}-${i}`}>
+                  <td className="tag-cell">
+                    {r.checklist_id ? (
+                      <a href={cxAlloyChecklistUrl(r.checklist_id)} target="_blank" rel="noopener noreferrer">
+                        {r.number}
+                      </a>
+                    ) : (
+                      r.number
+                    )}
+                  </td>
                   <td>{r.name}</td>
                   <td className="discipline-cell">{r.asset_name}</td>
                   <td className="discipline-cell">{r.type_name}</td>

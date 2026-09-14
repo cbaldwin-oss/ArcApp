@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { Save } from 'lucide-react'
 import WorkflowsBuilder from './WorkflowsBuilder'
+import CxAlloyStatusPicker from './CxAlloyStatusPicker'
 
 type Props = {
   jointPackFolder: string
@@ -12,9 +13,6 @@ type Props = {
   loading: boolean
   onSaveSetting: (key: string, value: string) => Promise<void>
 }
-
-const CHECKLIST_STATUS_HINT = 'Not Started, In Progress, GC to Verify, Finished, CxP Verified'
-const ISSUE_STATUS_HINT = 'Open, In Progress, Pending Verification, Closed, Void'
 
 function Field({
   label,
@@ -104,21 +102,23 @@ export default function SettingsPanel({
           loading={loading}
           onSave={(v) => onSaveSetting('joint_pack_photos_folder', v)}
         />
-        <Field
+        <CxAlloyStatusPicker
           label="Checklist Ready — status(es) that count as ready for CxA review"
-          hint={`Comma-separated. Available: ${CHECKLIST_STATUS_HINT}`}
-          initial={checklistReadyStatuses.join(', ')}
+          hint="Pulled live from the CxAlloy Settings tab (STY4A API Database). Checked statuses show up on the Checklists page."
+          column="checklistStatuses"
+          value={checklistReadyStatuses}
           canEdit={canEdit}
           loading={loading}
-          onSave={(v) => onSaveSetting('checklist_ready_statuses', v)}
+          onSave={(values) => onSaveSetting('checklist_ready_statuses', values.join(', '))}
         />
-        <Field
+        <CxAlloyStatusPicker
           label="Issues for Review — status(es) that count as ready for review"
-          hint={`Comma-separated. Available: ${ISSUE_STATUS_HINT}`}
-          initial={issueReviewStatuses.join(', ')}
+          hint="Pulled live from the CxAlloy Settings tab (STY4A API Database). Checked statuses show up on the Issues page."
+          column="issueStatuses"
+          value={issueReviewStatuses}
           canEdit={canEdit}
           loading={loading}
-          onSave={(v) => onSaveSetting('issue_review_statuses', v)}
+          onSave={(values) => onSaveSetting('issue_review_statuses', values.join(', '))}
         />
 
         <WorkflowsBuilder canEdit={canManageWorkflows} canEditItems={canEdit} />

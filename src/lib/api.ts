@@ -109,12 +109,93 @@ export function useGetResultOptions() {
 }
 
 // ---------------------------------------------------------------------------
-// checklists / issues — these read from a Google Sheet in the original app, not Supabase.
-// Porting that integration is out of scope here; wire up your own Google Sheets API client
-// (a service account + `googleapis`, or a Supabase Edge Function) and replace these two bodies.
+// checklists / issues — read from the "STY4A API Database" Google Sheet (tabs: Checklists,
+// Issues, CxAlloy Settings), via that project's Apps Script web app. The script URL isn't
+// hardcoded here — it's looked up from `launchpad_projects` (already anon-readable; shared with
+// LaunchPad), keyed by table_prefix, so this keeps working if the deployment URL ever changes.
+//
+// The Apps Script itself only exposes read-only actions added specifically for this
+// (getChecklists / getIssues / getCxAlloySettings) — see the "ADDED FOR ArcApp" block in that
+// script. Status filtering happens server-side (query params) since Checklists/Issues each run
+// 15-20k+ rows and callers only ever want a handful of statuses.
 // ---------------------------------------------------------------------------
 
+const CXALLOY_TABLE_PREFIX = 'STY4'
+// CxAlloy's own numeric project id (not this app's Supabase data) — used only to build
+// https://google.cxalloy.com/... deep links. Matches the id already hardcoded in the Apps Script.
+const CXALLOY_PROJECT_ID = '50506'
+
+export function cxAlloyChecklistUrl(checklistId: string): string {
+  return `https://google.cxalloy.com/project/${CXALLOY_PROJECT_ID}/checklists/${encodeURIComponent(checklistId)}`
+}
+export function cxAlloyIssueUrl(issueId: string): string {
+  return `https://google.cxalloy.com/project/${CXALLOY_PROJECT_ID}/constructionissue/${encodeURIComponent(issueId)}#sort%5B%5D=identified-d`
+}
+
+async function getCxAlloyScriptUrl(): Promise<string> {
+  const res = await supabase
+    .from('launchpad_projects')
+    .select('google_script_url')
+    .eq('table_prefix', CXALLOY_TABLE_PREFIX)
+    .maybeSingle()
+  if (res.error) throw new Error(res.error.message)
+  const url = (res.data as { google_script_url: string | null } | null)?.google_script_url
+  if (!url) throw new Error(`No google_script_url configured for project "${CXALLOY_TABLE_PREFIX}" in launchpad_projects.`)
+  return url
+}
+
+async function fetchCxAlloySheet(action: string, params: Record<string, string> = {}): Promise<Array<Record<string, string>>> {
+  const scriptUrl = await getCxAlloyScriptUrl()
+  const url = new URL(scriptUrl)
+  url.searchParams.set('action', action)
+  for (const [k, v] of Object.entries(params)) {
+    if (v) url.searchParams.set(k, v)
+  }
+
+  const res = await fetch(url.toString())
+  if (!res.ok) throw new Error(`CxAlloy data request failed (HTTP ${res.status})`)
+  const json = (await res.json()) as { status?: string; error?: string; data?: Array<Record<string, string>> }
+  if (json.status === 'error') throw new Error(json.error || 'CxAlloy data request failed')
+  return json.data ?? []
+}
+
+// ---- CxAlloy Settings tab — the selectable status/type/priority vocabulary ----
+
+export type CxAlloySettingsData = {
+  checklistStatuses: string[]
+  checklistTypes: string[]
+  issueStatuses: string[]
+  issuePriorities: string[]
+}
+function distinctColumn(rows: Array<Record<string, string>>, column: string): string[] {
+  const seen = new Set<string>()
+  const out: string[] = []
+  for (const r of rows) {
+    const v = (r[column] ?? '').toString().trim()
+    if (v && !seen.has(v)) {
+      seen.add(v)
+      out.push(v)
+    }
+  }
+  return out
+}
+async function getCxAlloySettingsSheet(): Promise<CxAlloySettingsData> {
+  const rows = await fetchCxAlloySheet('getCxAlloySettings')
+  return {
+    checklistStatuses: distinctColumn(rows, 'Checklist Status Name'),
+    checklistTypes: distinctColumn(rows, 'Checklist Type Name'),
+    issueStatuses: distinctColumn(rows, 'Issue Status Name'),
+    issuePriorities: distinctColumn(rows, 'Issue Priority Name'),
+  }
+}
+export function useGetCxAlloySettingsSheet() {
+  return useApiFn(getCxAlloySettingsSheet)
+}
+
+// ---- Checklists ----
+
 export type ChecklistRow = {
+  checklist_id: string
   number: string
   name: string
   asset_name: string
@@ -125,14 +206,26 @@ export type ChecklistRow = {
   date_created: string
 }
 async function getChecklists(): Promise<{ rows: ChecklistRow[]; readyStatuses: string[] }> {
-  throw new Error(
-    'Checklists come from a Google Sheet in the original app (STY4A API Database). ' +
-      'Wire up a Google Sheets API client here — see README "Known gaps".',
-  )
+  const { checklistReadyStatuses: readyStatuses } = await getSettings()
+  const raw = await fetchCxAlloySheet('getChecklists', { status: readyStatuses.join(',') })
+  const rows: ChecklistRow[] = raw.map((r) => ({
+    checklist_id: (r.checklist_id ?? '').toString(),
+    number: (r.number ?? '').toString(),
+    name: (r.name ?? '').toString(),
+    asset_name: (r.asset_name ?? '').toString(),
+    type_name: (r.type_name ?? '').toString(),
+    status: (r.status ?? '').toString(),
+    discipline: (r.discipline ?? '').toString(),
+    assigned_name: (r.assigned_name ?? '').toString(),
+    date_created: (r.date_created ?? '').toString(),
+  }))
+  return { rows, readyStatuses }
 }
 export function useGetChecklists() {
   return useApiFn(getChecklists)
 }
+
+// ---- Issues ----
 
 export type IssueRow = {
   issue_id: string
@@ -148,10 +241,22 @@ export type IssueRow = {
   date_created: string
 }
 async function getIssues(): Promise<{ rows: IssueRow[]; reviewStatuses: string[] }> {
-  throw new Error(
-    'Issues come from a Google Sheet in the original app (STY4A API Database). ' +
-      'Wire up a Google Sheets API client here — see README "Known gaps".',
-  )
+  const { issueReviewStatuses: reviewStatuses } = await getSettings()
+  const raw = await fetchCxAlloySheet('getIssues', { status: reviewStatuses.join(',') })
+  const rows: IssueRow[] = raw.map((r) => ({
+    issue_id: (r.issue_id ?? '').toString(),
+    name: (r.name ?? '').toString(),
+    description: (r.description ?? '').toString(),
+    asset_name: (r.asset_name ?? '').toString(),
+    priority: (r.priority ?? '').toString(),
+    status: (r.status ?? '').toString(),
+    created_by: (r.created_by ?? '').toString(),
+    assigned_name: (r.assigned_name ?? '').toString(),
+    source_type: (r.source_type ?? '').toString(),
+    due_date: (r.due_date ?? '').toString(),
+    date_created: (r.date_created ?? '').toString(),
+  }))
+  return { rows, reviewStatuses }
 }
 export function useGetIssues() {
   return useApiFn(getIssues)

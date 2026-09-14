@@ -21,22 +21,45 @@ Supabase project and tables it already used inside Retool.
 
 ## Known gaps (things Retool was doing that this export doesn't replicate)
 
-1. **Checklists and Issues panels read from a Google Sheet**, not Supabase (`getChecklists` /
-   `getIssues` in the original app called a Google Sheets resource). That integration isn't
-   ported — `useGetChecklists`/`useGetIssues` in `src/lib/api.ts` currently just throw a
-   descriptive error, which the existing UI already displays as a friendly "couldn't load" state.
-   To restore this, add a Google Sheets API client (service account + `googleapis`, or a Supabase
-   Edge Function) and fill in those two functions.
-2. **Joint Pack Photos / Google Drive upload** was already a stub in the Retool version too
+1. **Joint Pack Photos / Google Drive upload** was already a stub in the Retool version too
    (`driveReady` was hardcoded `false`) — nothing to port, but still not implemented.
-3. **Authentication UI is intentionally minimal.** Retool handled sign-in for you automatically;
+2. **Authentication UI is intentionally minimal.** Retool handled sign-in for you automatically;
    this version adds a bare `window.prompt()`-based magic-link flow (click the "Sign In" pill in
    the top bar) just so the app has *some* working auth. Swap in a real login form/modal before
    shipping this to real users.
-4. **Row Level Security on `arcapp_workflows` / `arcapp_workflow_items` is currently wide open**
+3. **Row Level Security on `arcapp_workflows` / `arcapp_workflow_items` is currently wide open**
    (`anon` + `authenticated`, no editor check), by request, so anyone can build/edit workflows
    without signing in. `arcapp_settings` stays editor-only. See `supabase/policies.sql` for the
    editor-restricted versions this replaced, kept commented out for an easy revert.
+
+## Checklists & Issues (CxAlloy, via Google Sheet)
+
+Unlike the rest of this app, Checklists and Issues don't come from Supabase — they come from the
+**"STY4A API Database"** Google Sheet (tabs: `Checklists`, `Issues`, `CxAlloy Settings`), synced
+there from CxAlloy by that sheet's own Apps Script. Since this app is 100% client-side and that
+sheet is private (not "anyone with the link"), `useGetChecklists`/`useGetIssues` in `src/lib/api.ts`
+call the sheet's existing Apps Script **web app** (`doGet`) instead of talking to the sheet
+directly:
+
+- The web app's URL is looked up at runtime from `launchpad_projects.google_script_url`
+  (Supabase, already `anon`-readable, shared with LaunchPad), keyed by `table_prefix = 'STY4'` —
+  not hardcoded, so a redeploy of the Apps Script (same URL) or a different `google_script_url`
+  needs no code change here.
+- That Apps Script needed three new **read-only, additive** `doGet` actions
+  (`getChecklists`, `getIssues`, `getCxAlloySettings`) that didn't exist before this — nothing
+  existing in that script was modified. If these ever go missing (script reverted, etc.), both
+  panels degrade to the same "couldn't load" error state the rest of the app already uses.
+- **Settings → Checklist Ready / Issues for Review** are multi-selects populated live from the
+  `CxAlloy Settings` tab, not free text. The **Checklist Type** and **Issue Priority** filters on
+  the Checklists/Issues pages are *not* sourced from that tab, though — its Type/Priority lists
+  don't currently match the names actually used on real rows (e.g. Issue Priority there is
+  "P0 - Critical"/etc., but real issues are labeled Low/Moderate/High), so those two filters are
+  built from whatever values are actually present in the loaded rows instead. If the CxAlloy
+  Settings tab gets reconciled with real data, `ChecklistReadyPanel.tsx`/`IssuesReviewPanel.tsx`
+  have a comment marking where to switch that filter's source over.
+- Checklist numbers and issue names link out to `google.cxalloy.com/project/50506/...` — `50506`
+  is CxAlloy's own project id, hardcoded in `src/lib/api.ts` (`CXALLOY_PROJECT_ID`) to match what
+  the Apps Script itself already hardcodes.
 
 ## Workflow items
 

@@ -326,6 +326,8 @@
 .arcapp table.sched td{ padding:12px 14px; border-bottom:1px solid var(--border); color:var(--text); white-space:nowrap; }
 .arcapp table.sched tbody tr:hover{ background:var(--green-tint); }
 .arcapp .tag-cell{ font-family:var(--font-mono); font-weight:600; color:var(--green-soft); }
+.arcapp .tag-cell a, .arcapp .cx-link{ text-decoration:none; border-bottom:1px dashed var(--green-dim); }
+.arcapp .tag-cell a:hover, .arcapp .cx-link:hover{ color:var(--green); border-bottom-color:var(--green); }
 .arcapp .discipline-cell{ color:var(--text-muted); }
 .arcapp .loto-yes{ color:var(--red); font-family:var(--font-mono); font-weight:700; font-size:11px; }
 .arcapp .loto-no{ color:var(--text-faint); font-family:var(--font-mono); font-size:11px; }

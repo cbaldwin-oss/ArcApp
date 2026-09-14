@@ -1,6 +1,6 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { RefreshCw } from 'lucide-react'
-import { useGetIssues } from '../../../lib/api'
+import { useGetIssues, cxAlloyIssueUrl } from '../../../lib/api'
 
 type Row = {
   issue_id: string
@@ -16,6 +16,8 @@ type Row = {
   date_created: string
 }
 
+const ALL_PRIORITIES = 'All priorities'
+
 function priorityClass(p: string): string {
   const t = (p || '').toLowerCase()
   if (t.includes('high') || t.includes('critical')) return 'hold'
@@ -26,6 +28,7 @@ function priorityClass(p: string): string {
 export default function IssuesReviewPanel() {
   const fn = useGetIssues()
   const [filter, setFilter] = useState('')
+  const [priorityFilter, setPriorityFilter] = useState(ALL_PRIORITIES)
 
   useEffect(() => {
     void fn.trigger()
@@ -35,9 +38,17 @@ export default function IssuesReviewPanel() {
   const data = fn.data as { rows: Row[]; reviewStatuses: string[] } | undefined
   const rows = data?.rows ?? []
   const state = fn.error ? 'error' : fn.loading || !fn.data ? 'loading' : 'ready'
+
+  // Derived from what's actually loaded, not the CxAlloy Settings tab's Issue Priority list —
+  // that list (P0 - Critical, etc.) doesn't currently match the priority names real issues use
+  // (Low/Moderate/High), so a filter option pulled from there could filter to zero.
+  const priorities = useMemo(() => Array.from(new Set(rows.map((r) => r.priority).filter(Boolean))).sort(), [rows])
+
   const f = filter.trim().toLowerCase()
   const filtered = rows.filter(
-    (r) => !f || (r.name + r.description + r.asset_name + r.created_by + r.assigned_name).toLowerCase().includes(f),
+    (r) =>
+      (priorityFilter === ALL_PRIORITIES || r.priority === priorityFilter) &&
+      (!f || (r.name + r.description + r.asset_name + r.created_by + r.assigned_name).toLowerCase().includes(f)),
   )
 
   return (
@@ -62,17 +73,32 @@ export default function IssuesReviewPanel() {
         Ready for review · grouped by originator (created by) · source: <b style={{ color: 'var(--text-muted)' }}>STY4A API Database · Issues</b>
       </div>
       {state === 'ready' && (
-        <div style={{ padding: '0 20px 12px' }}>
+        <div style={{ padding: '0 20px 12px', display: 'flex', gap: 10, flexWrap: 'wrap' }}>
           <input
             type="text"
             placeholder="Filter by issue, asset, originator, company..."
             value={filter}
             onChange={(e) => setFilter(e.target.value)}
             style={{
-              width: '100%', maxWidth: 380, background: 'var(--bg-elev-2)', border: '1px solid var(--border)',
+              flex: '1 1 320px', maxWidth: 380, background: 'var(--bg-elev-2)', border: '1px solid var(--border)',
               borderRadius: 'var(--radius-sm)', color: 'var(--text)', fontFamily: 'var(--font-mono)', fontSize: 12.5, padding: '9px 13px',
             }}
           />
+          <select
+            value={priorityFilter}
+            onChange={(e) => setPriorityFilter(e.target.value)}
+            style={{
+              background: 'var(--bg-elev-2)', border: '1px solid var(--border)',
+              borderRadius: 'var(--radius-sm)', color: 'var(--text)', fontFamily: 'var(--font-mono)', fontSize: 12.5, padding: '9px 13px',
+            }}
+          >
+            <option value={ALL_PRIORITIES}>{ALL_PRIORITIES}</option>
+            {priorities.map((p) => (
+              <option key={p} value={p}>
+                {p}
+              </option>
+            ))}
+          </select>
         </div>
       )}
       <div className="panel-body no-pad">
@@ -107,7 +133,15 @@ export default function IssuesReviewPanel() {
               )}
               {state === 'ready' && filtered.map((r, i) => (
                 <tr key={`${r.issue_id}-${i}`}>
-                  <td className="tag-cell">{r.name}</td>
+                  <td className="tag-cell">
+                    {r.issue_id ? (
+                      <a href={cxAlloyIssueUrl(r.issue_id)} target="_blank" rel="noopener noreferrer">
+                        {r.name}
+                      </a>
+                    ) : (
+                      r.name
+                    )}
+                  </td>
                   <td>{r.description}</td>
                   <td className="discipline-cell">{r.asset_name}</td>
                   <td>{r.created_by || '—'}</td>
