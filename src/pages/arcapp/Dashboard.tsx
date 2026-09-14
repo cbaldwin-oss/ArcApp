@@ -305,7 +305,7 @@ export default function ArcAppDashboard() {
       {selectedRow && (
         <ActivityDrawer
           row={selectedRow}
-          authUser={editorUser}
+          authUser={user?.email ?? null}
           resultOptions={resultOptions}
           selectedDate={selectedDate}
           answer={currentAnswer}

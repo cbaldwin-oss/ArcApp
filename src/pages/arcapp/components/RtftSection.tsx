@@ -60,12 +60,13 @@ export default function RtftSection({ row, authUser, selectedDate, onSubmit }: P
     setMsg({ text: '', cls: 'q-hint' })
   }, [row.id, authUser])
 
-  const disabled = !authUser || busy
+  // No sign-in required to submit an RTFT entry yet — the inspector field is still pre-filled
+  // from authUser when available, just not required. Revisit once real auth is in place.
+  const disabled = busy
   const showIssueFields = issuesFound === 'Yes'
   const showBimNumber = showIssueFields && enteredBim === 'Yes'
 
   async function submit() {
-    if (!authUser) return
     if (!issuesFound || !l2Pass) {
       setMsg({ text: 'Answer "Were issues found?" and "L2 pass?" before submitting.', cls: 'q-hint err' })
       return
@@ -110,9 +111,7 @@ export default function RtftSection({ row, authUser, selectedDate, onSubmit }: P
     }
   }
 
-  const statusText = !authUser
-    ? 'Sign in to submit an RTFT entry.'
-    : msg.text || `Signed in as ${authUser}.`
+  const statusText = msg.text || (authUser ? `Signed in as ${authUser}.` : 'Not signed in — entry will save without an inspector signoff unless typed above.')
 
   return (
     <div className="q-block">

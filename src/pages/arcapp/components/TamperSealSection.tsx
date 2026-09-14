@@ -50,13 +50,12 @@ function previewFor(inst: SealInstance): { text: string; cls: string } {
 export default function TamperSealSection({ row, authUser, selectedDate, onSubmit }: Props) {
   const [instances, setInstances] = useState<SealInstance[]>([newInstance()])
   const [log, setLog] = useState<SealSummary[]>([])
-  const [msg, setMsg] = useState<{ text: string; cls: string }>({
-    text: 'Sign in to log tamper seals.',
-    cls: 'q-hint',
-  })
+  const [msg, setMsg] = useState<{ text: string; cls: string }>({ text: '', cls: 'q-hint' })
   const [busy, setBusy] = useState(false)
 
-  const disabled = !authUser || busy
+  // No sign-in required to log tamper seals yet — attribute the entry if someone happens to be
+  // signed in, otherwise it's logged without a signoff. Revisit once real auth is in place.
+  const disabled = busy
 
   function update(id: number, patch: Partial<SealInstance>) {
     setInstances((prev) => prev.map((i) => (i.id === id ? { ...i, ...patch } : i)))
@@ -72,7 +71,6 @@ export default function TamperSealSection({ row, authUser, selectedDate, onSubmi
   }
 
   async function submit() {
-    if (!authUser) return
     const payloadRows: SealPayloadRow[] = []
     const summaries: Array<{ start: number; end: number; omitted: number[]; count: number }> = []
     for (const inst of instances) {
@@ -211,7 +209,9 @@ export default function TamperSealSection({ row, authUser, selectedDate, onSubmi
       <button className="seal-submit-btn" type="button" disabled={disabled} onClick={submit}>
         Log All Seals
       </button>
-      <div className={msg.cls}>{authUser && msg.cls === 'q-hint' && !busy ? `Signed in as ${authUser}.` : msg.text}</div>
+      <div className={msg.cls}>
+        {msg.text || (busy ? '' : authUser ? `Signed in as ${authUser}.` : 'Logged without a signoff — not signed in.')}
+      </div>
 
       {log.length > 0 && (
         <div className="seal-log-list">

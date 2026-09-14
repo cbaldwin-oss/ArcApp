@@ -100,7 +100,6 @@ export default function ActivityDrawer(props: Props) {
   }
 
   async function saveResult(value: string) {
-    if (!authUser) return
     setResultVal(value)
     setResultMsg({ text: 'Saving…', cls: 'q-hint' })
     try {
@@ -111,9 +110,9 @@ export default function ActivityDrawer(props: Props) {
     }
   }
 
-  const resultStatusText = !authUser
-    ? 'Sign in to edit the result.'
-    : resultMsg.text || `Signed in as ${authUser} — changes save immediately.`
+  // No sign-in required to log activities yet — attribute the change if someone happens to be
+  // signed in, otherwise just confirm the save. Revisit once real auth is in place.
+  const resultStatusText = resultMsg.text || (authUser ? `Signed in as ${authUser} — changes save immediately.` : 'Changes save immediately.')
   const options = Array.from(new Set([...resultOptions, ...(resultVal ? [resultVal] : [])])).sort()
 
   // Decide which gated sections to render and in what order.
@@ -353,7 +352,6 @@ export default function ActivityDrawer(props: Props) {
               <select
                 className="result-input"
                 value={resultVal}
-                disabled={!authUser}
                 onChange={(e) => saveResult(e.target.value)}
               >
                 <option value="">— No result yet —</option>
