@@ -33,8 +33,6 @@ export type Milestone = {
 export type ActivityAnswer = {
   offsetHrs: number
   caCount: number
-  launchpadStatus?: string
-  launchpadNotes?: string
   cmmsEquipmentId?: string
   cmmsWorkOrder?: string
   cmmsNotes?: string

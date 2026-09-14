@@ -25,7 +25,6 @@ export const FALLBACK_WORKFLOW_ITEMS: WorkflowItem[] = [
   { key: 'joint_pack_photos', label: 'Joint Pack Photos', description: 'File joint pack photos to the Activity → Asset → Date folder chain.', sortOrder: 30, enabled: true },
   { key: 'equipment_photos', label: 'Equipment Photos', description: 'Capture general equipment photos for the activity.', sortOrder: 40, enabled: true },
   { key: 'rtft', label: 'RTFT Logging', description: 'Ready to Fill/Turnover inspection record.', sortOrder: 50, enabled: true },
-  { key: 'launchpad_status', label: 'LaunchPad Result Logging', description: 'Schedule status and notes pushed back to LaunchPad.', sortOrder: 60, enabled: true },
   { key: 'cmms_data_collection', label: 'CMMS Data Collection', description: 'Equipment ID, work order number, and CMMS notes.', sortOrder: 70, enabled: true },
   { key: 'scaaf_study', label: 'SCAAF Study Information', description: 'SCAAF study data captured against the activity.', sortOrder: 80, enabled: true },
 ]

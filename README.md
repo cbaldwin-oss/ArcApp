@@ -33,24 +33,25 @@ Supabase project and tables it already used inside Retool.
    this version adds a bare `window.prompt()`-based magic-link flow (click the "Sign In" pill in
    the top bar) just so the app has *some* working auth. Swap in a real login form/modal before
    shipping this to real users.
-4. **Row Level Security is only fully set up for the two new tables** (`arcapp_workflows`,
-   `arcapp_settings`). See `supabase/policies.sql` for what's applied vs. what's recommended but
-   left for you to review on the shared tables — see the security section below, this matters.
+4. **Row Level Security on `arcapp_workflows` / `arcapp_workflow_items` is currently wide open**
+   (`anon` + `authenticated`, no editor check), by request, so anyone can build/edit workflows
+   without signing in. `arcapp_settings` stays editor-only. See `supabase/policies.sql` for the
+   editor-restricted versions this replaced, kept commented out for an easy revert.
 
-## Pending migration — workflow items
+## Workflow items
 
-The Workflows builder no longer hardcodes its list of on-site modules; it reads them from a new
-table, `arcapp_workflow_items`. **That table hasn't been created yet** — run the
-`arcapp_workflow_items` section of `supabase/schema.sql` plus the matching policies in
-`supabase/policies.sql` against your project. Until you do, the app falls back to the built-in
-list in `src/pages/arcapp/workflowItems.ts` (a console warning says so) and `Select all` /
-workflow editing still work, but changes to the catalog can't be persisted.
+The Workflows builder reads its list of on-site modules from `arcapp_workflow_items`
+(`supabase/schema.sql` — already applied), not a hardcoded list. Manage the catalog from
+Settings → Workflow Items: add, rename, enable/disable, or delete entries there. Order is **not**
+set there — each workflow sets its own item order when it's built (the "Order shown on-site" drag
+list in the workflow form). `src/pages/arcapp/workflowItems.ts` holds a fallback list used only if
+the table can't be read (logs a console warning when that happens).
 
-Each row in that table has a `config jsonb` column reserved for the definition of what the item
-should actually do. Six of the eight items already have hand-written forms in `ActivityDrawer`
-(`late_time_personnel`, `tamper_seal`, `joint_pack_photos`, `rtft`, `launchpad_status`,
-`cmms_data_collection`); `equipment_photos` and `scaaf_study` render a "not configured yet"
-placeholder until their behavior is specified.
+Each row has a `config jsonb` column reserved for the definition of what the item should actually
+do. Five items have hand-written forms in `ActivityDrawer` (`late_time_personnel`, `tamper_seal`,
+`joint_pack_photos`, `rtft`, `cmms_data_collection`); `equipment_photos` and `scaaf_study` render a
+"not configured yet" placeholder until their behavior is specified. `launchpad_status` was removed
+— its schedule-status info duplicated the always-present Activity Result field.
 
 ## Setup
 

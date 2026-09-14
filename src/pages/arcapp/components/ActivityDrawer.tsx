@@ -10,8 +10,6 @@ import { FALLBACK_WORKFLOW_ITEMS, type WorkflowItem } from '../workflowItems'
 
 type Workflow = { id: string; activities: string[]; items: string[] }
 
-const LAUNCHPAD_STATUSES = ['', 'On Track', 'At Risk', 'Delayed']
-
 type Props = {
   row: ScheduleRow | null
   authUser: string | null
@@ -37,8 +35,6 @@ export default function ActivityDrawer(props: Props) {
   const [caCount, setCaCount] = useState(answer.caCount)
   const [resultVal, setResultVal] = useState('')
   const [resultMsg, setResultMsg] = useState<{ text: string; cls: string }>({ text: '', cls: 'q-hint' })
-  const [lpStatus, setLpStatus] = useState('')
-  const [lpNotes, setLpNotes] = useState('')
   const [cmmsEquip, setCmmsEquip] = useState('')
   const [cmmsWo, setCmmsWo] = useState('')
   const [cmmsNotes, setCmmsNotes] = useState('')
@@ -50,8 +46,6 @@ export default function ActivityDrawer(props: Props) {
     setCaCount(answer.caCount)
     setResultVal(row.result && row.result !== '—' ? row.result : '')
     setResultMsg({ text: '', cls: 'q-hint' })
-    setLpStatus(answer.launchpadStatus ?? '')
-    setLpNotes(answer.launchpadNotes ?? '')
     setCmmsEquip(answer.cmmsEquipmentId ?? '')
     setCmmsWo(answer.cmmsWorkOrder ?? '')
     setCmmsNotes(answer.cmmsNotes ?? '')
@@ -79,8 +73,6 @@ export default function ActivityDrawer(props: Props) {
     onAnswerChange(rowId, {
       offsetHrs: offset,
       caCount,
-      launchpadStatus: lpStatus,
-      launchpadNotes: lpNotes,
       cmmsEquipmentId: cmmsEquip,
       cmmsWorkOrder: cmmsWo,
       cmmsNotes: cmmsNotes,
@@ -209,37 +201,6 @@ export default function ActivityDrawer(props: Props) {
       case 'rtft':
         return (
           <RtftSection key={key} row={activeRow} authUser={authUser} selectedDate={selectedDate} onSubmit={props.onSubmitRTFT} />
-        )
-      case 'launchpad_status':
-        return (
-          <div className="q-block" key={key}>
-            <label className="q-label">LaunchPad Status</label>
-            <select
-              className="result-input"
-              value={lpStatus}
-              onChange={(e) => {
-                setLpStatus(e.target.value)
-                commit({ launchpadStatus: e.target.value })
-              }}
-            >
-              {LAUNCHPAD_STATUSES.map((s) => (
-                <option key={s} value={s}>
-                  {s || '— Select status —'}
-                </option>
-              ))}
-            </select>
-            <div className="form-field" style={{ marginTop: 12 }}>
-              <label>Notes (optional)</label>
-              <textarea
-                value={lpNotes}
-                placeholder="Schedule status notes for this activity/asset"
-                onChange={(e) => {
-                  setLpNotes(e.target.value)
-                  commit({ launchpadNotes: e.target.value })
-                }}
-              />
-            </div>
-          </div>
         )
       case 'cmms_data_collection':
         return (
