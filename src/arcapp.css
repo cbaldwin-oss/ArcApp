@@ -498,6 +498,38 @@
 .arcapp .seal-log-item .num{ font-family:var(--font-mono); color:var(--text); font-weight:600; }
 .arcapp .seal-log-item .time{ font-family:var(--font-mono); font-size:10.5px; color:var(--text-faint); }
 
+/* Tamper seal "generate preview -> confirm/discard" panel — nothing here is saved until
+   Confirm & Save is clicked; each row can be individually edited or excluded (include). */
+.arcapp .seal-preview-panel{
+  border:1px solid var(--border-strong); border-radius:var(--radius-sm); background:var(--bg-elev-2);
+  padding:14px; margin-bottom:14px;
+}
+.arcapp .seal-preview-head{ display:flex; justify-content:space-between; align-items:flex-start; gap:12px; flex-wrap:wrap; margin-bottom:12px; }
+.arcapp .seal-preview-title{ font-family:var(--font-display); font-size:13px; font-weight:700; color:var(--text); margin-bottom:2px; }
+.arcapp .seal-preview-bulk{ display:flex; align-items:baseline; gap:7px; flex:0 0 auto; }
+.arcapp .seal-preview-list{ display:flex; flex-direction:column; gap:6px; max-height:360px; overflow-y:auto; }
+.arcapp .seal-preview-row{
+  display:flex; align-items:center; gap:10px; background:var(--bg-elev); border:1px solid var(--border-strong);
+  border-radius:var(--radius-sm); padding:8px 10px;
+}
+.arcapp .seal-preview-row input[type="checkbox"]{ width:16px; height:16px; accent-color:var(--green); flex:0 0 auto; }
+.arcapp .seal-preview-row.excluded{ opacity:0.45; }
+.arcapp .seal-preview-row.excluded .seal-preview-cell input,
+.arcapp .seal-preview-row.excluded .seal-preview-cell select{ text-decoration:line-through; }
+.arcapp .seal-preview-cell{ flex:1; min-width:0; }
+.arcapp .seal-preview-cell.num{ flex:0 0 90px; }
+.arcapp .seal-preview-cell.status{ flex:0 0 110px; }
+.arcapp .seal-preview-cell.notes{ flex:1.4; }
+.arcapp .seal-preview-cell label{
+  display:block; font-family:var(--font-mono); font-size:9px; letter-spacing:0.4px; text-transform:uppercase;
+  color:var(--text-faint); margin-bottom:3px;
+}
+.arcapp .seal-preview-cell input, .arcapp .seal-preview-cell select{
+  width:100%; box-sizing:border-box; background:var(--bg-elev-2); border:1px solid var(--border-strong);
+  border-radius:6px; color:var(--text); font-size:12.5px; padding:6px 8px; font-family:var(--font-body);
+}
+.arcapp .seal-preview-cell input:disabled, .arcapp .seal-preview-cell select:disabled{ opacity:0.6; cursor:not-allowed; }
+
 /* ---------- RTFT questionnaire ---------- */
 .arcapp .rtft-row2{ display:grid; grid-template-columns:1fr 1fr; gap:9px; }
 .arcapp .rtft-row3{ display:grid; grid-template-columns:1fr 1fr 1fr; gap:9px; margin-bottom:12px; }

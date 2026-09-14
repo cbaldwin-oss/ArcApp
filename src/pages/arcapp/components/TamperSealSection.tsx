@@ -21,6 +21,23 @@ export type SealPayloadRow = {
   status: string
 }
 
+/**
+ * One individually-editable row in the preview grid, generated from a seal range before it's
+ * saved. Mirrors the "Add Seals" -> "Generate Preview" -> "Confirm & Save"/"Cancel & Discard"
+ * flow in tamperseal.html: nothing hits the database until the preview is confirmed, and any row
+ * can be edited or excluded (via `include`) first.
+ */
+type PreviewSeal = {
+  id: number
+  sealNumber: string
+  subArea: string
+  notes: string
+  status: string
+  include: boolean
+}
+
+const STATUS_OPTIONS = ['Intact', 'Broken', 'Removed']
+
 type Props = {
   row: ScheduleRow
   authUser: string | null
@@ -32,6 +49,11 @@ let counter = 0
 function newInstance(): SealInstance {
   counter += 1
   return { id: counter, start: '', end: '', omit: '', subArea: '', notes: '' }
+}
+let previewCounter = 0
+function nextPreviewId(): number {
+  previewCounter += 1
+  return previewCounter
 }
 
 function previewFor(inst: SealInstance): { text: string; cls: string } {
@@ -49,6 +71,7 @@ function previewFor(inst: SealInstance): { text: string; cls: string } {
 
 export default function TamperSealSection({ row, authUser, selectedDate, onSubmit }: Props) {
   const [instances, setInstances] = useState<SealInstance[]>([newInstance()])
+  const [preview, setPreview] = useState<PreviewSeal[] | null>(null)
   const [log, setLog] = useState<SealSummary[]>([])
   const [msg, setMsg] = useState<{ text: string; cls: string }>({ text: '', cls: 'q-hint' })
   const [busy, setBusy] = useState(false)
@@ -70,9 +93,9 @@ export default function TamperSealSection({ row, authUser, selectedDate, onSubmi
     })
   }
 
-  async function submit() {
-    const payloadRows: SealPayloadRow[] = []
-    const summaries: Array<{ start: number; end: number; omitted: number[]; count: number }> = []
+  /** Step 1 -> 2: expand every range into individual, independently-editable preview rows. Nothing is saved yet. */
+  function generatePreview() {
+    const rows: PreviewSeal[] = []
     for (const inst of instances) {
       const start = parseInt(inst.start, 10)
       const end = parseInt(inst.end, 10)
@@ -82,39 +105,69 @@ export default function TamperSealSection({ row, authUser, selectedDate, onSubmi
         return
       }
       const omittedSet = new Set(omitted)
-      let rangeCount = 0
       for (let i = start; i <= end; i++) {
         if (omittedSet.has(i)) continue
-        payloadRows.push({
-          asset_name: row.asset,
-          location: row.place,
-          sub_area: inst.subArea.trim(),
-          seal_number: i.toString(),
-          inspection_date: selectedDate,
-          inspection_notes: inst.notes.trim(),
+        rows.push({
+          id: nextPreviewId(),
+          sealNumber: i.toString(),
+          subArea: inst.subArea.trim(),
+          notes: inst.notes.trim(),
           status: 'Intact',
+          include: true,
         })
-        rangeCount++
       }
-      summaries.push({ start, end, omitted, count: rangeCount })
     }
 
-    if (payloadRows.length === 0) {
-      setMsg({ text: 'No seals to log — check your ranges and omitted numbers.', cls: 'q-hint err' })
+    if (rows.length === 0) {
+      setMsg({ text: 'No seals to preview — check your ranges and omitted numbers.', cls: 'q-hint err' })
       return
     }
+
+    setMsg({ text: '', cls: 'q-hint' })
+    setPreview(rows)
+  }
+
+  function updatePreviewRow(id: number, patch: Partial<PreviewSeal>) {
+    setPreview((prev) => (prev ? prev.map((r) => (r.id === id ? { ...r, ...patch } : r)) : prev))
+  }
+  function setAllIncluded(include: boolean) {
+    setPreview((prev) => (prev ? prev.map((r) => ({ ...r, include })) : prev))
+  }
+  function discardPreview() {
+    setPreview(null)
+    setMsg({ text: '', cls: 'q-hint' })
+  }
+
+  /** Step 2 -> saved: only rows still checked "include" actually get written. */
+  async function confirmPreview() {
+    if (!preview) return
+    const included = preview.filter((r) => r.include)
+    if (included.length === 0) {
+      setMsg({ text: 'Nothing selected — check at least one seal or discard.', cls: 'q-hint err' })
+      return
+    }
+    const payloadRows: SealPayloadRow[] = included.map((r) => ({
+      asset_name: row.asset,
+      location: row.place,
+      sub_area: r.subArea,
+      seal_number: r.sealNumber,
+      inspection_date: selectedDate,
+      inspection_notes: r.notes,
+      status: r.status,
+    }))
 
     setBusy(true)
     setMsg({ text: `Logging ${payloadRows.length} seal${payloadRows.length === 1 ? '' : 's'}…`, cls: 'q-hint' })
     try {
       await onSubmit(payloadRows)
       const now = new Date().toLocaleTimeString()
-      const newEntries: SealSummary[] = summaries.map((s) => {
-        const omitText = s.omitted.length ? `, excl. ${s.omitted.join(', ')}` : ''
-        return { text: `${s.count} seal${s.count === 1 ? '' : 's'}: ${s.start}–${s.end}${omitText}`, time: now }
-      })
-      setLog((prev) => [...newEntries, ...prev])
-      setMsg({ text: `Logged ${payloadRows.length} seal${payloadRows.length === 1 ? '' : 's'}.`, cls: 'q-hint ok' })
+      const skipped = preview.length - included.length
+      const skipText = skipped ? ` (${skipped} excluded)` : ''
+      const first = included[0]?.sealNumber ?? ''
+      const last = included[included.length - 1]?.sealNumber ?? ''
+      setLog((prev) => [{ text: `${included.length} seal${included.length === 1 ? '' : 's'}: ${first}–${last}${skipText}`, time: now }, ...prev])
+      setMsg({ text: `Logged ${included.length} seal${included.length === 1 ? '' : 's'}.`, cls: 'q-hint ok' })
+      setPreview(null)
       setInstances([newInstance()])
     } catch (err) {
       setMsg({ text: 'Failed to log seals: ' + (err instanceof Error ? err.message : String(err)), cls: 'q-hint err' })
@@ -123,95 +176,190 @@ export default function TamperSealSection({ row, authUser, selectedDate, onSubmi
     }
   }
 
+  const includedCount = preview ? preview.filter((r) => r.include).length : 0
+
   return (
     <div className="q-block">
       <label className="q-label">Tamper seal log</label>
 
-      <div>
-        {instances.map((inst) => {
-          const preview = previewFor(inst)
-          return (
-            <div className="seal-instance" key={inst.id}>
-              <div className="seal-instance-head">
-                <span className="seal-instance-title">Seal Range</span>
-                <button
-                  className="seal-remove-btn"
-                  type="button"
-                  title="Remove this range"
-                  disabled={disabled}
-                  onClick={() => removeInstance(inst.id)}
-                >
-                  &times;
-                </button>
-              </div>
-              <div className="seal-row3">
-                <div className="seal-field">
-                  <label>First seal #</label>
-                  <input
-                    type="text"
-                    inputMode="numeric"
-                    placeholder="e.g. 48201"
-                    value={inst.start}
-                    disabled={disabled}
-                    onChange={(e) => update(inst.id, { start: e.target.value })}
-                  />
+      {!preview && (
+        <>
+          <div>
+            {instances.map((inst) => {
+              const p = previewFor(inst)
+              return (
+                <div className="seal-instance" key={inst.id}>
+                  <div className="seal-instance-head">
+                    <span className="seal-instance-title">Seal Range</span>
+                    <button
+                      className="seal-remove-btn"
+                      type="button"
+                      title="Remove this range"
+                      disabled={disabled}
+                      onClick={() => removeInstance(inst.id)}
+                    >
+                      &times;
+                    </button>
+                  </div>
+                  <div className="seal-row3">
+                    <div className="seal-field">
+                      <label>First seal #</label>
+                      <input
+                        type="text"
+                        inputMode="numeric"
+                        placeholder="e.g. 48201"
+                        value={inst.start}
+                        disabled={disabled}
+                        onChange={(e) => update(inst.id, { start: e.target.value })}
+                      />
+                    </div>
+                    <div className="seal-field">
+                      <label>Last seal #</label>
+                      <input
+                        type="text"
+                        inputMode="numeric"
+                        placeholder="e.g. 48215"
+                        value={inst.end}
+                        disabled={disabled}
+                        onChange={(e) => update(inst.id, { end: e.target.value })}
+                      />
+                    </div>
+                    <div className="seal-field">
+                      <label>Omitted (comma-sep)</label>
+                      <input
+                        type="text"
+                        placeholder="e.g. 48205, 48210"
+                        value={inst.omit}
+                        disabled={disabled}
+                        onChange={(e) => update(inst.id, { omit: e.target.value })}
+                      />
+                    </div>
+                  </div>
+                  <div className="seal-field">
+                    <label>Sub area (optional)</label>
+                    <input
+                      type="text"
+                      placeholder="e.g. North panel"
+                      value={inst.subArea}
+                      disabled={disabled}
+                      onChange={(e) => update(inst.id, { subArea: e.target.value })}
+                    />
+                  </div>
+                  <div className="seal-field">
+                    <label>Inspection notes (optional)</label>
+                    <textarea
+                      placeholder="Anything worth noting"
+                      value={inst.notes}
+                      disabled={disabled}
+                      onChange={(e) => update(inst.id, { notes: e.target.value })}
+                    />
+                  </div>
+                  <div className={p.cls}>{p.text}</div>
                 </div>
-                <div className="seal-field">
-                  <label>Last seal #</label>
-                  <input
-                    type="text"
-                    inputMode="numeric"
-                    placeholder="e.g. 48215"
-                    value={inst.end}
-                    disabled={disabled}
-                    onChange={(e) => update(inst.id, { end: e.target.value })}
-                  />
-                </div>
-                <div className="seal-field">
-                  <label>Omitted (comma-sep)</label>
-                  <input
-                    type="text"
-                    placeholder="e.g. 48205, 48210"
-                    value={inst.omit}
-                    disabled={disabled}
-                    onChange={(e) => update(inst.id, { omit: e.target.value })}
-                  />
-                </div>
-              </div>
-              <div className="seal-field">
-                <label>Sub area (optional)</label>
-                <input
-                  type="text"
-                  placeholder="e.g. North panel"
-                  value={inst.subArea}
-                  disabled={disabled}
-                  onChange={(e) => update(inst.id, { subArea: e.target.value })}
-                />
-              </div>
-              <div className="seal-field">
-                <label>Inspection notes (optional)</label>
-                <textarea
-                  placeholder="Anything worth noting"
-                  value={inst.notes}
-                  disabled={disabled}
-                  onChange={(e) => update(inst.id, { notes: e.target.value })}
-                />
-              </div>
-              <div className={preview.cls}>{preview.text}</div>
-            </div>
-          )
-        })}
-      </div>
+              )
+            })}
+          </div>
 
-      <button className="seal-add-btn" type="button" disabled={disabled} onClick={addInstance}>
-        + Add Another Range
-      </button>
-      <button className="seal-submit-btn" type="button" disabled={disabled} onClick={submit}>
-        Log All Seals
-      </button>
-      <div className={msg.cls}>
-        {msg.text || (busy ? '' : authUser ? `Signed in as ${authUser}.` : 'Logged without a signoff — not signed in.')}
-      </div>
+          <button className="seal-add-btn" type="button" disabled={disabled} onClick={addInstance}>
+            + Add Another Range
+          </button>
+          <button className="seal-submit-btn" type="button" disabled={disabled} onClick={generatePreview}>
+            Generate Preview
+          </button>
+          <div className={msg.cls}>
+            {msg.text || (busy ? '' : authUser ? `Signed in as ${authUser}.` : 'Logged without a signoff — not signed in.')}
+          </div>
+        </>
+      )}
+
+      {preview && (
+        <div className="seal-preview-panel">
+          <div className="seal-preview-head">
+            <div>
+              <div className="seal-preview-title">
+                Review {preview.length} seal{preview.length === 1 ? '' : 's'} — {row.asset} · {row.place}
+              </div>
+              <div className="q-hint" style={{ margin: 0 }}>
+                Nothing is saved yet. Uncheck any seal that shouldn&apos;t go through, edit fields as needed, then confirm.
+              </div>
+            </div>
+            <div className="seal-preview-bulk">
+              <button type="button" className="wf-link-btn" disabled={disabled} onClick={() => setAllIncluded(true)}>
+                Select all
+              </button>
+              <span className="wf-bulk-sep">·</span>
+              <button type="button" className="wf-link-btn" disabled={disabled} onClick={() => setAllIncluded(false)}>
+                Deselect all
+              </button>
+            </div>
+          </div>
+
+          <div className="seal-preview-list">
+            {preview.map((r) => (
+              <div className={`seal-preview-row${r.include ? '' : ' excluded'}`} key={r.id}>
+                <input
+                  type="checkbox"
+                  checked={r.include}
+                  disabled={disabled}
+                  title={r.include ? 'Included — uncheck to exclude' : 'Excluded — check to include'}
+                  onChange={(e) => updatePreviewRow(r.id, { include: e.target.checked })}
+                />
+                <div className="seal-preview-cell num">
+                  <label>Seal #</label>
+                  <input
+                    type="text"
+                    value={r.sealNumber}
+                    disabled={disabled || !r.include}
+                    onChange={(e) => updatePreviewRow(r.id, { sealNumber: e.target.value })}
+                  />
+                </div>
+                <div className="seal-preview-cell">
+                  <label>Sub area</label>
+                  <input
+                    type="text"
+                    value={r.subArea}
+                    disabled={disabled || !r.include}
+                    onChange={(e) => updatePreviewRow(r.id, { subArea: e.target.value })}
+                  />
+                </div>
+                <div className="seal-preview-cell status">
+                  <label>Status</label>
+                  <select
+                    value={r.status}
+                    disabled={disabled || !r.include}
+                    onChange={(e) => updatePreviewRow(r.id, { status: e.target.value })}
+                  >
+                    {STATUS_OPTIONS.map((s) => (
+                      <option key={s} value={s}>
+                        {s}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div className="seal-preview-cell notes">
+                  <label>Notes</label>
+                  <input
+                    type="text"
+                    value={r.notes}
+                    disabled={disabled || !r.include}
+                    onChange={(e) => updatePreviewRow(r.id, { notes: e.target.value })}
+                  />
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <div style={{ display: 'flex', gap: 10, marginTop: 12, alignItems: 'center' }}>
+            <button className="seal-submit-btn" style={{ maxWidth: 220 }} type="button" disabled={disabled || includedCount === 0} onClick={confirmPreview}>
+              {busy ? 'Saving…' : `Confirm & Save ${includedCount} Seal${includedCount === 1 ? '' : 's'}`}
+            </button>
+            <button className="wf-btn" style={{ padding: '0 16px' }} type="button" disabled={disabled} onClick={discardPreview}>
+              Cancel &amp; Discard
+            </button>
+          </div>
+          <div className={msg.cls}>{msg.text}</div>
+        </div>
+      )}
 
       {log.length > 0 && (
         <div className="seal-log-list">
