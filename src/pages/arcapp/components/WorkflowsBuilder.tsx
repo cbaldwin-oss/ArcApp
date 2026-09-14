@@ -53,7 +53,12 @@ export default function WorkflowsBuilder({ canEdit, canEditItems }: Props) {
   const activities = (activitiesFn.data as string[] | undefined) ?? []
   const catalog = (itemsFn.data as WorkflowItem[] | undefined) ?? []
   // Retired items stay renderable on existing workflows, but can't be added to new ones.
-  const selectableItems = useMemo(() => catalog.filter((i) => i.enabled), [catalog])
+  // Alphabetical, not by catalog sort order — the only order that matters is set per-workflow
+  // below ("Order shown on-site"), so this list is just for finding items to check off.
+  const selectableItems = useMemo(
+    () => catalog.filter((i) => i.enabled).sort((a, b) => a.label.localeCompare(b.label)),
+    [catalog],
+  )
   const LABELS = useMemo(() => itemLabels(catalog), [catalog])
 
   const state =

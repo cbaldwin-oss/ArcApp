@@ -7,24 +7,26 @@
 ALTER TABLE arcapp_workflows ENABLE ROW LEVEL SECURITY;
 ALTER TABLE arcapp_settings ENABLE ROW LEVEL SECURITY;
 
--- Any signed-in user can read app config (workflows, settings).
-CREATE POLICY "workflows_select_authenticated" ON arcapp_workflows
-  FOR SELECT TO authenticated USING (true);
-
+-- Any signed-in user can read app config (settings).
 CREATE POLICY "settings_select_authenticated" ON arcapp_settings
   FOR SELECT TO authenticated USING (true);
 
--- TEMPORARY (requested 2026-09-14): any signed-in user may create/edit/delete Workflows, not just
--- authorized editors. Matches the app-side relaxation in Dashboard.tsx (`canManageWorkflows`).
--- To revert: drop this policy and re-create "workflows_write_editors" with the editor-restricted
--- USING/WITH CHECK clause below (kept here for exactly that purpose), then flip
--- `canManageWorkflows` back to `canEdit` in Dashboard.tsx.
-CREATE POLICY "workflows_write_authenticated" ON arcapp_workflows
-  FOR ALL TO authenticated
+-- TEMPORARY (requested 2026-09-14, widened same day): NO sign-in required at all to
+-- read/create/edit/delete Workflows — `anon` and `authenticated` both allowed. Matches the
+-- app-side relaxation in Dashboard.tsx (`canManageWorkflows`, now hardcoded `true`).
+-- To revert: drop these two policies and re-create the editor-restricted versions below (kept
+-- here for exactly that purpose), then flip `canManageWorkflows` back to `canEdit` in Dashboard.tsx.
+CREATE POLICY "workflows_select_public" ON arcapp_workflows
+  FOR SELECT TO anon, authenticated USING (true);
+
+CREATE POLICY "workflows_write_public" ON arcapp_workflows
+  FOR ALL TO anon, authenticated
   USING (true)
   WITH CHECK (true);
--- Editor-restricted version this replaced — the "arcapp_workflow_items" catalog below still
--- uses this exact pattern, unchanged:
+-- Editor-restricted versions this replaced — the "arcapp_workflow_items" catalog below still
+-- uses this same read-open/write-editors pattern, unchanged:
+-- CREATE POLICY "workflows_select_authenticated" ON arcapp_workflows
+--   FOR SELECT TO authenticated USING (true);
 -- CREATE POLICY "workflows_write_editors" ON arcapp_workflows
 --   FOR ALL TO authenticated
 --   USING (EXISTS (SELECT 1 FROM "STY4authorized_editors" e WHERE lower(e.email) = lower(auth.jwt() ->> 'email')))
@@ -38,15 +40,16 @@ CREATE POLICY "settings_write_editors" ON arcapp_settings
 
 
 -- =============================================================================
--- NOT YET APPLIED — run this alongside the arcapp_workflow_items table in
--- schema.sql. Same shape as arcapp_workflows: any signed-in user can read the
--- item catalog, only authorized editors can change it.
+-- ALREADY APPLIED. Read is public (`anon` included) so the New Workflow form's item
+-- checklist works with no sign-in, matching arcapp_workflows above. Writing to the catalog
+-- itself (add/rename/retire an item) stays editor-only — that wasn't part of the "no sign-in"
+-- request, only building workflows was.
 -- =============================================================================
 
 ALTER TABLE arcapp_workflow_items ENABLE ROW LEVEL SECURITY;
 
-CREATE POLICY "workflow_items_select_authenticated" ON arcapp_workflow_items
-  FOR SELECT TO authenticated USING (true);
+CREATE POLICY "workflow_items_select_public" ON arcapp_workflow_items
+  FOR SELECT TO anon, authenticated USING (true);
 
 CREATE POLICY "workflow_items_write_editors" ON arcapp_workflow_items
   FOR ALL TO authenticated

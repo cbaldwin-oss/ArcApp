@@ -1,12 +1,12 @@
 import { useState } from 'react'
-import { Plus, Pencil, Trash2, ArrowUp, ArrowDown } from 'lucide-react'
+import { Plus, Pencil, Trash2 } from 'lucide-react'
 import { useSaveWorkflowItem, useDeleteWorkflowItem, slugifyItemKey } from '../../../lib/api'
 import type { WorkflowItem } from '../workflowItems'
 
 type Workflow = { id: string; activities: string[]; items: string[] }
 
 type Props = {
-  /** Full catalog (including disabled items), any order — this component sorts by sortOrder. */
+  /** Full catalog (including disabled items), any order — this component sorts alphabetically. */
   items: WorkflowItem[]
   /** Used only to block deleting an item still referenced by a workflow. */
   workflows: Workflow[]
@@ -29,9 +29,11 @@ export default function WorkflowItemsManager({ items, workflows, canEdit, onChan
   const [formError, setFormError] = useState('')
   const [saving, setSaving] = useState(false)
   const [deleteKey, setDeleteKey] = useState<string | null>(null)
-  const [busyKey, setBusyKey] = useState<string | null>(null) // move-up/down or enable toggle in flight
+  const [busyKey, setBusyKey] = useState<string | null>(null) // enable/disable toggle in flight
 
-  const sorted = [...items].sort((a, b) => a.sortOrder - b.sortOrder)
+  // Alphabetical — order isn't curated here anymore. Each workflow sets its own item order
+  // when it's built (the "Order shown on-site" drag list), so there's nothing to sort by here.
+  const sorted = [...items].sort((a, b) => a.label.localeCompare(b.label))
   const usageCount = (key: string) => workflows.filter((w) => w.items.includes(key)).length
 
   function openNew() {
@@ -76,10 +78,12 @@ export default function WorkflowItemsManager({ items, workflows, canEdit, onChan
       setFormError(`"${key}" is already in use.`)
       return
     }
+    // sort_order is just a stable insertion order now (nothing here lets an admin edit it) — new
+    // items go after everything that exists so far.
     const sortOrder = editingKey
       ? (items.find((i) => i.key === editingKey)?.sortOrder ?? 0)
-      : sorted.length
-        ? sorted[sorted.length - 1].sortOrder + 10
+      : items.length
+        ? Math.max(...items.map((i) => i.sortOrder)) + 10
         : 10
 
     setSaving(true)
@@ -108,24 +112,6 @@ export default function WorkflowItemsManager({ items, workflows, canEdit, onChan
     }
   }
 
-  async function move(key: string, direction: -1 | 1) {
-    const idx = sorted.findIndex((i) => i.key === key)
-    const swapIdx = idx + direction
-    if (idx < 0 || swapIdx < 0 || swapIdx >= sorted.length) return
-    const a = sorted[idx]
-    const b = sorted[swapIdx]
-    setBusyKey(key)
-    try {
-      await Promise.all([
-        saveFn.trigger({ key: a.key, label: a.label, description: a.description, enabled: a.enabled, sortOrder: b.sortOrder }).result,
-        saveFn.trigger({ key: b.key, label: b.label, description: b.description, enabled: b.enabled, sortOrder: a.sortOrder }).result,
-      ])
-      onChanged()
-    } finally {
-      setBusyKey(null)
-    }
-  }
-
   async function toggleEnabled(it: WorkflowItem) {
     setBusyKey(it.key)
     try {
@@ -142,7 +128,8 @@ export default function WorkflowItemsManager({ items, workflows, canEdit, onChan
         <div>
           <p className="wf-subtitle">Workflow Items</p>
           <div className="q-hint" style={{ marginTop: 0 }}>
-            The on-site modules a workflow can include. Add, rename, reorder, or retire them here.
+            The on-site modules a workflow can include. Add, rename, or retire them here — each workflow
+            sets its own item order when it&apos;s built.
           </div>
         </div>
         {canEdit && !formOpen && (
@@ -202,20 +189,11 @@ export default function WorkflowItemsManager({ items, workflows, canEdit, onChan
         <div className="q-hint" style={{ padding: '8px 0' }}>No items yet.</div>
       ) : (
         <div className="wf-order-list">
-          {sorted.map((it, idx) => {
+          {sorted.map((it) => {
             const uses = usageCount(it.key)
             const busy = busyKey === it.key
             return (
               <div className="wf-item-row" key={it.key}>
-                <div className="wf-item-move">
-                  <button disabled={idx === 0 || busy} title="Move up" onClick={() => move(it.key, -1)}>
-                    <ArrowUp style={{ width: 13, height: 13 }} />
-                  </button>
-                  <button disabled={idx === sorted.length - 1 || busy} title="Move down" onClick={() => move(it.key, 1)}>
-                    <ArrowDown style={{ width: 13, height: 13 }} />
-                  </button>
-                </div>
-
                 <div className="wf-item-body">
                   <div className="wf-item-title">
                     <span className="wf-order-label">{it.label}</span>
