@@ -264,6 +264,110 @@ export function useGetIssues() {
 }
 
 // ---------------------------------------------------------------------------
+// Joint Pack Photos — read from the "Joint Pack Photo - STY4A" Google Sheet (tabs: "Joint Packs",
+// "Settings") via its own Apps Script web app — a separate spreadsheet from CxAlloy's, so it has
+// its own script and its own URL, stored in arcapp_settings (not launchpad_projects — that row's
+// google_script_url is CxAlloy's and shared with LaunchPad; this one is ArcApp-only). Photos
+// themselves upload straight to Drive from that same script (DriveApp, running as the script's
+// owner) into whatever folder ID is set on the Settings page, so no separate Drive connection is
+// needed — see JointPackPhotoScript.gs (given to the user to deploy; not committed to this repo,
+// same as CxAlloy's script isn't) for the doGet/doPost implementation.
+// ---------------------------------------------------------------------------
+
+const JOINT_PACK_SCRIPT_SETTING_KEY = 'joint_pack_script_url'
+
+async function getJointPackScriptUrl(): Promise<string> {
+  const res = await supabase.from('arcapp_settings').select('setting_value').eq('setting_key', JOINT_PACK_SCRIPT_SETTING_KEY).maybeSingle()
+  if (res.error) throw new Error(res.error.message)
+  const url = (res.data as { setting_value: string | null } | null)?.setting_value
+  if (!url) throw new Error('Joint Pack Photo logging isn\'t wired up yet — no Apps Script URL configured.')
+  return url
+}
+
+async function fetchJointPackScript(action: string, params: Record<string, string> = {}): Promise<Record<string, unknown>> {
+  const scriptUrl = await getJointPackScriptUrl()
+  const url = new URL(scriptUrl)
+  url.searchParams.set('action', action)
+  for (const [k, v] of Object.entries(params)) {
+    if (v) url.searchParams.set(k, v)
+  }
+  const res = await fetch(url.toString())
+  if (!res.ok) throw new Error(`Joint Pack data request failed (HTTP ${res.status})`)
+  const json = (await res.json()) as { status?: string; error?: string } & Record<string, unknown>
+  if (json.status === 'error') throw new Error(json.error || 'Joint Pack data request failed')
+  return json
+}
+
+export type JointPackRow = {
+  row: number
+  building: string
+  asset: string
+  jointPackNumber: string
+  topUrl: string
+  sideUrl: string
+  bottomUrl: string
+}
+export type JointPackData = {
+  rows: JointPackRow[]
+  /** The full "Joint Pack Assets" list from the sheet's Settings tab — assets that need tracking,
+   * whether or not they have any Joint Pack # rows yet. */
+  knownAssets: string[]
+}
+async function getJointPackData(): Promise<JointPackData> {
+  const json = await fetchJointPackScript('getJointPackData')
+  const rawRows = (json.rows as Array<Record<string, unknown>>) ?? []
+  const rows: JointPackRow[] = rawRows.map((r) => ({
+    row: Number(r.row) || 0,
+    building: String(r.building ?? ''),
+    asset: String(r.asset ?? ''),
+    jointPackNumber: String(r.jointPackNumber ?? ''),
+    topUrl: String(r.topUrl ?? ''),
+    sideUrl: String(r.sideUrl ?? ''),
+    bottomUrl: String(r.bottomUrl ?? ''),
+  }))
+  const knownAssets = ((json.assets as string[] | undefined) ?? []).map((a) => String(a)).filter(Boolean)
+  return { rows, knownAssets }
+}
+export function useGetJointPackData() {
+  return useApiFn(getJointPackData)
+}
+
+export type JointPackSide = 'Top' | 'Side' | 'Bottom'
+export type LogJointPackPhotosParams = {
+  building: string
+  asset: string
+  jointPackNumber: string
+  /** dataUrl = a `data:image/jpeg;base64,...` string (see compressImageFile in utils.ts). */
+  photos: Array<{ side: JointPackSide; dataUrl: string }>
+}
+async function logJointPackPhotos(params: LogJointPackPhotosParams): Promise<{ results: Array<{ side: string; url: string }> }> {
+  const { jointPackPhotosFolder: folderId } = await getSettings()
+  if (!folderId.trim()) throw new Error('Set a Google Drive destination folder in Settings before logging Joint Pack photos.')
+  const scriptUrl = await getJointPackScriptUrl()
+  const res = await fetch(scriptUrl, {
+    method: 'POST',
+    // text/plain avoids a CORS preflight (Apps Script web apps don't answer OPTIONS) — the script
+    // still JSON.parses e.postData.contents regardless of the declared content type.
+    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+    body: JSON.stringify({
+      action: 'logPhotos',
+      building: params.building,
+      asset: params.asset,
+      jointPackNumber: params.jointPackNumber,
+      folderId: folderId.trim(),
+      photos: params.photos.map((p) => ({ side: p.side, base64: p.dataUrl })),
+    }),
+  })
+  if (!res.ok) throw new Error(`Photo upload failed (HTTP ${res.status})`)
+  const json = (await res.json()) as { status?: string; error?: string; results?: Array<{ side: string; url: string }> }
+  if (json.status === 'error') throw new Error(json.error || 'Photo upload failed')
+  return { results: json.results ?? [] }
+}
+export function useLogJointPackPhotos() {
+  return useApiFn(logJointPackPhotos)
+}
+
+// ---------------------------------------------------------------------------
 // RTFT — mirrors getRtft.ts / submitRtft.ts
 // ---------------------------------------------------------------------------
 

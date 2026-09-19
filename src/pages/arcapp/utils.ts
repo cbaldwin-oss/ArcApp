@@ -78,6 +78,39 @@ export function parseSealNumberParts(value: string): { prefix: string; num: stri
   return { prefix: match[1], num: match[2], suffix: match[3] }
 }
 
+/**
+ * Downscales + JPEG-compresses a photo before it's base64'd into a Joint Pack Photo upload —
+ * on-site cell signal is often poor and a raw phone/iPad photo can be 5-15MB, most of which is
+ * far more resolution than a torque-inspection reference photo needs.
+ */
+export function compressImageFile(file: File, maxDim = 1600, quality = 0.82): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onerror = () => reject(new Error('Could not read the selected file.'))
+    reader.onload = () => {
+      const img = new Image()
+      img.onerror = () => reject(new Error('Could not read the selected image.'))
+      img.onload = () => {
+        const scale = Math.min(1, maxDim / Math.max(img.width, img.height))
+        const w = Math.max(1, Math.round(img.width * scale))
+        const h = Math.max(1, Math.round(img.height * scale))
+        const canvas = document.createElement('canvas')
+        canvas.width = w
+        canvas.height = h
+        const ctx = canvas.getContext('2d')
+        if (!ctx) {
+          reject(new Error('Canvas not supported on this device.'))
+          return
+        }
+        ctx.drawImage(img, 0, 0, w, h)
+        resolve(canvas.toDataURL('image/jpeg', quality))
+      }
+      img.src = reader.result as string
+    }
+    reader.readAsDataURL(file)
+  })
+}
+
 /* ============ Tasks & Teams ============ */
 
 const TAG_LABELS: Record<Todo['tag'], string> = { crit: 'Critical', high: 'High', norm: 'Normal' }

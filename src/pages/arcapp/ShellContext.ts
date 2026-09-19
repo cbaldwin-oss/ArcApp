@@ -40,9 +40,9 @@ export type ShellContext = {
   onRowClick: (row: ScheduleRow) => void
   onScheduleRetry: () => void
 
+  /** Google Drive folder ID photos upload into — see JointPackPhotosPanel, which fetches/logs
+   * Joint Pack data itself (this is the only piece of it that lives on shared shell state). */
   jointPackFolder: string
-  driveReady: boolean
-  onLogJointPackPhotos: () => void
 
   canEdit: boolean
   canManageWorkflows: boolean

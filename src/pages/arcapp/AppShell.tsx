@@ -118,7 +118,6 @@ export default function AppShell() {
   const jointPackFolder = settingsData?.jointPackPhotosFolder ?? ''
   const checklistReadyStatuses = settingsData?.checklistReadyStatuses ?? []
   const issueReviewStatuses = settingsData?.issueReviewStatuses ?? []
-  const driveReady = false // turns on once the "ArcApp Connections" Google Drive resource is connected
 
   const userName = user?.name ?? null
   const initials = user
@@ -220,7 +219,6 @@ export default function AppShell() {
   )
 
   const openPhotos = useCallback((row: ScheduleRow) => {
-    // Google Drive upload wires up once the "ArcApp Connections" resource is available.
     // eslint-disable-next-line no-console
     console.info('Log photos requested for', row.activity, '·', row.asset, '·', row.date)
   }, [])
@@ -232,11 +230,6 @@ export default function AppShell() {
     },
     [saveSettingFn, settingsFn],
   )
-
-  const logJointPackPhotos = useCallback(() => {
-    // eslint-disable-next-line no-console
-    console.info('Log Joint Pack photos to Drive folder:', jointPackFolder)
-  }, [jointPackFolder])
 
   const answeredIds = new Set<string | number>(
     Object.keys(answers).map((k) => {
@@ -282,8 +275,6 @@ export default function AppShell() {
     onScheduleRetry: () => void scheduleFn.trigger({ date: selectedDate }),
 
     jointPackFolder,
-    driveReady,
-    onLogJointPackPhotos: logJointPackPhotos,
 
     canEdit,
     canManageWorkflows,

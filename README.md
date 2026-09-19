@@ -21,13 +21,10 @@ Supabase project and tables it already used inside Retool.
 
 ## Known gaps (things Retool was doing that this export doesn't replicate)
 
-1. **Joint Pack Photos / Google Drive upload** was already a stub in the Retool version too
-   (`driveReady` was hardcoded `false`) — nothing to port, but still not implemented.
-2. **Authentication UI is intentionally minimal.** Retool handled sign-in for you automatically;
-   this version adds a bare `window.prompt()`-based magic-link flow (click the "Sign In" pill in
-   the top bar) just so the app has *some* working auth. Swap in a real login form/modal before
-   shipping this to real users.
-3. **Row Level Security on `arcapp_workflows` / `arcapp_workflow_items` is currently wide open**
+1. **Authentication UI is intentionally minimal.** Retool handled sign-in for you automatically;
+   this version adds a Google sign-in button + a magic-link fallback (click the "Sign In" pill in
+   the top bar) — see "Sign-in" below.
+2. **Row Level Security on `arcapp_workflows` / `arcapp_workflow_items` is currently wide open**
    (`anon` + `authenticated`, no editor check), by request, so anyone can build/edit workflows
    without signing in. `arcapp_settings` stays editor-only. See `supabase/policies.sql` for the
    editor-restricted versions this replaced, kept commented out for an easy revert.
@@ -60,6 +57,38 @@ directly:
 - Checklist numbers and issue names link out to `google.cxalloy.com/project/50506/...` — `50506`
   is CxAlloy's own project id, hardcoded in `src/lib/api.ts` (`CXALLOY_PROJECT_ID`) to match what
   the Apps Script itself already hardcodes.
+
+## Joint Pack Photos (via Google Sheet + Drive, its own Apps Script)
+
+Same shape as Checklists/Issues, but a **separate** private Google Sheet — **"Joint Pack Photo -
+STY4A"** (tabs: `Joint Packs` — Building / Asset / Joint Pack # / Top / Side / Bottom, and
+`Settings` — the full "Joint Pack Assets" list) — with its own Apps Script web app, since it's a
+different spreadsheet from CxAlloy's. `useGetJointPackData`/`useLogJointPackPhotos` in
+`src/lib/api.ts` call it via `doGet`/`doPost`.
+
+- **Diagnosis**: the Joint Packs page cross-references the `Joint Packs` tab's rows against the
+  `Settings` tab's asset list to show, per asset, whether it hasn't been started at all, still has
+  outstanding sides, or is fully photographed — then drills into a specific asset to show each
+  Joint Pack #'s Top/Side/Bottom status individually.
+- **Logging a photo** compresses it client-side (`compressImageFile` in `utils.ts` — downscaled to
+  1600px, JPEG ~0.82 quality, to keep uploads fast on-site) then POSTs it to the Apps Script, which
+  uploads it to Drive (via `DriveApp`, running as the script's own account — no per-user Google
+  Drive permission needed) into the folder ID set in **Settings → Joint Pack Photos**, named
+  `Building - Asset - Joint Pack # - Side.jpg`, and writes that file's URL back into the matching
+  Top/Side/Bottom cell. Logging a photo for a Building/Asset/Joint Pack # combination that isn't in
+  the sheet yet appends a new row for it — the app doesn't require pre-registering a Joint Pack #
+  before photographing it.
+- The Apps Script's URL is stored in `arcapp_settings` under the key `joint_pack_script_url` — set
+  directly in Supabase (not exposed as an editable Settings field, same as CxAlloy's script URL
+  isn't editable from this app either). Redeploying the script as a new version of the same
+  deployment keeps the same URL; only a brand-new deployment would need this key updated.
+- The script itself (`doGet`/`doPost`, not committed to this repo — see `JointPackPhotoScript.gs`
+  shared separately, same as CxAlloy's script isn't committed here either) needs to be pasted into
+  **Extensions → Apps Script** on the "Joint Pack Photo - STY4A" spreadsheet and deployed as a web
+  app (**Execute as: Me**, **Who has access: Anyone**) — its Drive permission is whatever Google
+  account owns that deployment, so that account needs write access to the destination folder.
+- Logging photos doesn't require signing in (same as Tamper Seal/RTFT logging) — only changing the
+  destination folder in Settings is editor-gated.
 
 ## To-Do — Teams & task assignment
 

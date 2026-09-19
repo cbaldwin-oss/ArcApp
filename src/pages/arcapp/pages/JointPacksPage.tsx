@@ -5,13 +5,5 @@ import JointPackPhotosPanel from '../components/JointPackPhotosPanel'
 export default function JointPacksPage() {
   const ctx = useOutletContext<ShellContext>()
   const navigate = useNavigate()
-  return (
-    <JointPackPhotosPanel
-      folder={ctx.jointPackFolder}
-      driveReady={ctx.driveReady}
-      canEdit={ctx.canEdit}
-      onLogPhotos={ctx.onLogJointPackPhotos}
-      onGoToSettings={() => navigate('/settings')}
-    />
-  )
+  return <JointPackPhotosPanel folder={ctx.jointPackFolder} onGoToSettings={() => navigate('/settings')} />
 }

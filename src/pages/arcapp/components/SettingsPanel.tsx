@@ -96,8 +96,8 @@ export default function SettingsPanel({
       </div>
       <div className="panel-body">
         <Field
-          label="Joint Pack Photos — Google Drive destination folder"
-          hint="Folder name, path, or Drive folder ID."
+          label="Joint Pack Photos — Google Drive destination folder ID"
+          hint="Open the destination folder in Drive and copy the ID from its URL (.../folders/<THIS PART>). Must be a folder the Joint Pack Apps Script's account can write to."
           initial={jointPackFolder}
           canEdit={canEdit}
           loading={loading}
