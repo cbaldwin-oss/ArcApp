@@ -423,7 +423,37 @@
   text-transform:uppercase; padding:9px 16px; border-radius:var(--radius-sm); cursor:pointer;
 }
 .arcapp .camera-open-btn:hover{ border-color:var(--green); color:var(--green); }
+.arcapp .camera-open-btn:disabled{ opacity:0.4; cursor:not-allowed; }
 .arcapp .camera-queued-thumb{ width:34px; height:34px; border-radius:6px; object-fit:cover; border:2px solid var(--green); vertical-align:middle; }
+
+/* ---------- Joint Pack camera workspace: asset / Joint Pack # columns + camera main area ---------- */
+.arcapp .jp-camera-layout{ display:flex; gap:18px; align-items:flex-start; }
+.arcapp .jp-camera-col{
+  flex:0 0 190px; display:flex; flex-direction:column; gap:8px;
+}
+.arcapp .jp-camera-col-title{
+  font-family:var(--font-mono); font-size:10.5px; letter-spacing:0.5px; text-transform:uppercase; color:var(--text-muted);
+}
+.arcapp .jp-camera-col .wf-order-list{ max-height:420px; overflow-y:auto; }
+.arcapp .jp-camera-pick{
+  width:100%; text-align:left; cursor:pointer; border:1px solid transparent; background:transparent;
+}
+.arcapp .jp-camera-pick.active{ border-color:var(--green-dim); background:var(--green-tint); }
+.arcapp .jp-camera-new-row{ display:flex; gap:6px; }
+.arcapp .jp-camera-new-row input{
+  flex:1; min-width:0; background:var(--bg-elev-2); border:1px solid var(--border-strong); border-radius:var(--radius-sm);
+  color:var(--text); font-family:var(--font-mono); font-size:11.5px; padding:8px 10px;
+}
+.arcapp .jp-camera-main{ flex:1; min-width:0; }
+.arcapp .jp-camera-context{
+  font-family:var(--font-display); font-size:13.5px; font-weight:700; letter-spacing:0.4px; color:var(--text);
+  margin-bottom:14px; display:flex; align-items:baseline; flex-wrap:wrap; gap:2px;
+}
+@media (max-width:860px){
+  .arcapp .jp-camera-layout{ flex-direction:column; }
+  .arcapp .jp-camera-col{ flex-basis:auto; width:100%; }
+  .arcapp .jp-camera-col .wf-order-list{ max-height:160px; }
+}
 
 .arcapp footer{ text-align:center; padding:34px; color:var(--text-faint); font-family:var(--font-mono); font-size:11px; border-top:1px solid var(--border); }
 

@@ -87,15 +87,25 @@ different spreadsheet from CxAlloy's. `useGetJointPackData`/`useLogJointPackPhot
   **Extensions → Apps Script** on the "Joint Pack Photo - STY4A" spreadsheet and deployed as a web
   app (**Execute as: Me**, **Who has access: Anyone**) — its Drive permission is whatever Google
   account owns that deployment, so that account needs write access to the destination folder.
-- **In-page camera** (`CameraCaptureModal.tsx`): "Open Camera" on a Joint Pack # row opens a live
-  `getUserMedia` feed inside the app (rear camera preferred via `facingMode: environment`) with Top/
-  Side/Bottom tabs above it — tap a tab, tap the shutter, it auto-advances to whichever side still
-  needs a shot, all in one continuous session instead of bouncing out to the OS camera app three
-  times. Each shot is drawn to a canvas and compressed the same way as a picked file (1600px/0.82
-  JPEG) before being queued; closing the camera returns to the row with those shots already staged
-  as thumbnails, ready for **Save Photos**. A plain `<input type=file>` per side stays underneath as
-  a fallback (e.g. picking an existing photo from the library, or browsers without camera support).
+- **In-page camera** (`JointPackCameraWorkspace` in `JointPackPhotosPanel.tsx`, opened via **Open
+  Camera** in the page header, not nested under any one asset): a live `getUserMedia` feed (rear
+  camera preferred via `facingMode: environment`) alongside two picker columns — **Asset**, then
+  **Joint Pack #** — with Top/Side/Bottom angle tabs above the feed itself. The camera stream is
+  requested once when this opens and stays live for as long as it's open; switching asset, Joint
+  Pack #, or angle only changes where the next shutter press gets filed; none of it stops or
+  re-requests the camera, so a crew walking a row of assets never has to "click in and out" between
+  shots. Each shot is drawn to a canvas and compressed the same way as a picked file (1600px/0.82
+  JPEG) and queued (with a thumbnail on its angle tab and a status dot on its Joint Pack # in the
+  column); **Save Photos** uploads whatever's queued for the currently-selected Joint Pack # only —
+  switching away and back preserves anything queued elsewhere that hasn't been saved yet. A new
+  Joint Pack # can be typed directly into the second column without leaving camera mode. Per-row
+  `<input type=file>` fields still exist as a fallback (e.g. picking an existing photo from the
+  library, or browsers without camera support) — expand a row's **Log Photos** to use those instead.
   Requires a secure context (HTTPS or localhost) and camera permission — Chrome/Safari will prompt.
+  (`FullscreenOverlay` — used by this and other full-screen panels — portals its content directly
+  onto the `.arcapp` root rather than rendering in place, because `<main>` has its own
+  `position:relative; z-index:1` that would otherwise trap a z-index:100 overlay mounted from deep
+  inside it, rendering it behind the sidebar wherever the two overlap on screen.)
 - Logging photos doesn't require signing in (same as Tamper Seal/RTFT logging) — only changing the
   destination folder in Settings is editor-gated.
 

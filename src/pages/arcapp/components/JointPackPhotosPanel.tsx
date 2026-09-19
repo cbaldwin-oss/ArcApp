@@ -1,9 +1,12 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Camera, FolderOpen, Plus, RefreshCw } from 'lucide-react'
 import { useGetJointPackData, useLogJointPackPhotos } from '../../../lib/api'
 import type { JointPackRow, JointPackSide } from '../../../lib/api'
 import { compressImageFile } from '../utils'
-import CameraCaptureModal from './CameraCaptureModal'
+import FullscreenOverlay from './FullscreenOverlay'
+
+const MAX_CAPTURE_DIM = 1600
+const CAPTURE_QUALITY = 0.82
 
 type Props = {
   /** Google Drive folder ID from Settings — see the label there for how to find one. */
@@ -60,6 +63,7 @@ export default function JointPackPhotosPanel({ folder, onGoToSettings }: Props) 
 
   const [search, setSearch] = useState('')
   const [selectedAsset, setSelectedAsset] = useState<string | null>(null)
+  const [cameraOpen, setCameraOpen] = useState(false)
 
   const filteredAssets = useMemo(() => {
     const f = search.trim().toLowerCase()
@@ -76,7 +80,16 @@ export default function JointPackPhotosPanel({ folder, onGoToSettings }: Props) 
           <h2 className="panel-title">Joint Pack Photos</h2>
           <span className="panel-count">{state === 'ready' ? `${totals.sidesOutstanding} sides outstanding` : '—'}</span>
         </div>
-        <div className="panel-header-right">
+        <div className="panel-header-right" style={{ gap: 10 }}>
+          <button
+            type="button"
+            className="camera-open-btn"
+            disabled={state !== 'ready'}
+            onClick={() => setCameraOpen(true)}
+          >
+            <Camera style={{ width: 15, height: 15 }} />
+            Open Camera
+          </button>
           <button className={fn.loading ? 'icon-btn spin' : 'icon-btn'} title="Refresh" onClick={() => void fn.trigger()} aria-label="Refresh Joint Pack data">
             <RefreshCw />
           </button>
@@ -194,6 +207,16 @@ export default function JointPackPhotosPanel({ folder, onGoToSettings }: Props) 
           </>
         )}
       </div>
+
+      {cameraOpen && (
+        <JointPackCameraWorkspace
+          rows={rows}
+          knownAssets={data?.knownAssets ?? []}
+          folderId={folder}
+          onClose={() => setCameraOpen(false)}
+          onLogged={() => void fn.trigger()}
+        />
+      )}
     </section>
   )
 }
@@ -305,10 +328,7 @@ function JointPackRowItem({
   onLogged: () => void
 }) {
   const logFn = useLogJointPackPhotos()
-  // Always a compressed data URL, whichever source it came from (camera or file picker) — so
-  // save() has one shape to send regardless of how the photo got taken.
   const [pending, setPending] = useState<Partial<Record<JointPackSide, string>>>({})
-  const [cameraOpen, setCameraOpen] = useState(false)
   const [error, setError] = useState('')
   const [saving, setSaving] = useState(false)
 
@@ -397,26 +417,20 @@ function JointPackRowItem({
 
       {open && (
         <>
-          <button
-            type="button"
-            className="camera-open-btn"
-            style={{ alignSelf: 'flex-start' }}
-            onClick={() => setCameraOpen(true)}
-          >
-            <Camera style={{ width: 15, height: 15 }} />
-            Open Camera
-          </button>
-
           <div className="seal-row3" style={{ gridTemplateColumns: 'repeat(3, 1fr)' }}>
             {SIDES.map((side) => (
               <div className="form-field" key={side} style={{ marginBottom: 0 }}>
                 <label>
                   {side}
-                  {urls[side] ? ' (replace)' : ''} — or pick a file
+                  {urls[side] ? ' (replace)' : ''}
                 </label>
                 <input type="file" accept="image/*" onChange={(e) => void pickFile(side, e.target.files?.[0] ?? null)} />
               </div>
             ))}
+          </div>
+          <div className="q-hint">
+            Prefer shooting from a live camera view instead? Use <b style={{ color: 'var(--text)' }}>Open Camera</b> at
+            the top of this page — it lets you switch assets, Joint Pack #s, and angles without closing the camera.
           </div>
           <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
             <button
@@ -430,19 +444,332 @@ function JointPackRowItem({
             </button>
             {error && <span className="q-hint err">{error}</span>}
           </div>
-
-          {cameraOpen && (
-            <CameraCaptureModal
-              title={`${asset} · ${row.jointPackNumber}`}
-              sides={SIDES}
-              existing={urls}
-              pending={pending}
-              onCapture={(side, dataUrl) => setPendingSide(side, dataUrl)}
-              onClose={() => setCameraOpen(false)}
-            />
-          )}
         </>
       )}
     </div>
+  )
+}
+
+/**
+ * The camera lives here, at the page level, instead of inside a single Joint Pack #'s expanded
+ * row — a crew walking a row of assets needs to switch which asset and which Joint Pack # they're
+ * shooting constantly, and re-requesting the camera (and re-granting the permission prompt) every
+ * time would be exactly the "click in and out" friction this is meant to avoid. The camera stream
+ * is requested once when this opens and stays alive for as long as it's open, no matter how many
+ * times the asset/Joint Pack #/angle selection changes underneath it.
+ */
+function JointPackCameraWorkspace({
+  rows,
+  knownAssets,
+  folderId,
+  onClose,
+  onLogged,
+}: {
+  rows: JointPackRow[]
+  knownAssets: string[]
+  folderId: string
+  onClose: () => void
+  onLogged: () => void
+}) {
+  const logFn = useLogJointPackPhotos()
+  const videoRef = useRef<HTMLVideoElement>(null)
+  const streamRef = useRef<MediaStream | null>(null)
+  const [cameraError, setCameraError] = useState('')
+  const [ready, setReady] = useState(false)
+
+  const assets = useMemo(() => {
+    const set = new Set<string>()
+    for (const a of knownAssets) set.add(a)
+    for (const r of rows) if (r.asset) set.add(r.asset)
+    return Array.from(set).sort((a, b) => a.localeCompare(b, undefined, { numeric: true }))
+  }, [knownAssets, rows])
+
+  const rowsByAsset = useMemo(() => {
+    const map = new Map<string, JointPackRow[]>()
+    for (const r of rows) {
+      if (!map.has(r.asset)) map.set(r.asset, [])
+      map.get(r.asset)!.push(r)
+    }
+    return map
+  }, [rows])
+
+  const [selectedAsset, setSelectedAsset] = useState<string>(assets[0] ?? '')
+  const assetRows = useMemo(
+    () =>
+      [...(rowsByAsset.get(selectedAsset) ?? [])].sort((a, b) =>
+        a.jointPackNumber.localeCompare(b.jointPackNumber, undefined, { numeric: true }),
+      ),
+    [rowsByAsset, selectedAsset],
+  )
+  const [selectedJP, setSelectedJP] = useState<string>('')
+  const [newJP, setNewJP] = useState('')
+
+  // Jumping to a new asset always resets which Joint Pack # is selected — the previous one
+  // belongs to the asset we just left.
+  useEffect(() => {
+    setSelectedJP(assetRows[0]?.jointPackNumber ?? '')
+    setNewJP('')
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedAsset])
+
+  const building = assetRows[0]?.building || rows[0]?.building || DEFAULT_BUILDING
+  const activeRow = assetRows.find((r) => r.jointPackNumber === selectedJP)
+  const existing = activeRow ? sideUrls(activeRow) : { Top: '', Side: '', Bottom: '' }
+
+  // Keyed by asset+Joint Pack # so switching around doesn't lose photos already queued elsewhere.
+  const [pendingByPack, setPendingByPack] = useState<Record<string, Partial<Record<JointPackSide, string>>>>({})
+  const packKey = (asset: string, jp: string) => `${asset}::${jp}`
+  const activeKey = packKey(selectedAsset, selectedJP)
+  const pending = pendingByPack[activeKey] ?? {}
+
+  const [activeSide, setActiveSide] = useState<JointPackSide>('Top')
+  useEffect(() => {
+    setActiveSide(SIDES.find((s) => !existing[s] && !pending[s]) ?? 'Top')
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeKey])
+
+  // Requested once for the life of this workspace — asset/Joint Pack #/angle switches below only
+  // change which tab is highlighted and where the next shutter press gets filed, never the stream.
+  useEffect(() => {
+    let cancelled = false
+    async function start() {
+      if (!navigator.mediaDevices?.getUserMedia) {
+        setCameraError("This browser doesn't support in-page camera capture — use a Joint Pack #'s file picker instead.")
+        return
+      }
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: { ideal: 'environment' } },
+          audio: false,
+        })
+        if (cancelled) {
+          stream.getTracks().forEach((t) => t.stop())
+          return
+        }
+        streamRef.current = stream
+        if (videoRef.current) {
+          videoRef.current.srcObject = stream
+          await videoRef.current.play()
+          setReady(true)
+        }
+      } catch (err) {
+        setCameraError(err instanceof Error ? err.message : 'Could not open the camera.')
+      }
+    }
+    void start()
+    return () => {
+      cancelled = true
+      streamRef.current?.getTracks().forEach((t) => t.stop())
+    }
+  }, [])
+
+  function capture() {
+    const video = videoRef.current
+    if (!video || !video.videoWidth || !selectedJP.trim()) return
+    const scale = Math.min(1, MAX_CAPTURE_DIM / Math.max(video.videoWidth, video.videoHeight))
+    const canvas = document.createElement('canvas')
+    canvas.width = Math.max(1, Math.round(video.videoWidth * scale))
+    canvas.height = Math.max(1, Math.round(video.videoHeight * scale))
+    const ctx = canvas.getContext('2d')
+    if (!ctx) return
+    ctx.drawImage(video, 0, 0, canvas.width, canvas.height)
+    const dataUrl = canvas.toDataURL('image/jpeg', CAPTURE_QUALITY)
+
+    setPendingByPack((p) => ({ ...p, [activeKey]: { ...p[activeKey], [activeSide]: dataUrl } }))
+    const stillNeeded = SIDES.filter((s) => s !== activeSide && !existing[s] && !pending[s])
+    if (stillNeeded.length) setActiveSide(stillNeeded[0])
+  }
+
+  function clearPendingSide(side: JointPackSide) {
+    setPendingByPack((p) => {
+      const next = { ...(p[activeKey] ?? {}) }
+      delete next[side]
+      return { ...p, [activeKey]: next }
+    })
+  }
+
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState('')
+
+  async function saveActive() {
+    const entries = Object.entries(pending) as Array<[JointPackSide, string]>
+    if (!entries.length) {
+      setError('Capture at least one photo first.')
+      return
+    }
+    if (!folderId.trim()) {
+      setError('Set a Google Drive destination folder in Settings first.')
+      return
+    }
+    setSaving(true)
+    setError('')
+    try {
+      const photos = entries.map(([side, dataUrl]) => ({ side, dataUrl }))
+      await logFn.trigger({ building, asset: selectedAsset, jointPackNumber: selectedJP, photos }).result
+      setPendingByPack((p) => ({ ...p, [activeKey]: {} }))
+      onLogged()
+    } catch (err) {
+      setError('Failed to save: ' + (err instanceof Error ? err.message : String(err)))
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  function startNewJointPack() {
+    const trimmed = newJP.trim()
+    if (!trimmed) return
+    setSelectedJP(trimmed)
+    setNewJP('')
+  }
+
+  return (
+    <FullscreenOverlay title="Joint Pack Camera" onClose={onClose}>
+      <div className="jp-camera-layout">
+        <div className="jp-camera-col">
+          <div className="jp-camera-col-title">Asset</div>
+          <div className="wf-order-list">
+            {assets.map((a) => {
+              const rowsForA = rowsByAsset.get(a) ?? []
+              const outstanding = rowsForA.reduce((sum, r) => sum + outstandingCount(r), 0)
+              return (
+                <button
+                  key={a}
+                  type="button"
+                  className={`wf-order-item jp-camera-pick${selectedAsset === a ? ' active' : ''}`}
+                  onClick={() => setSelectedAsset(a)}
+                >
+                  <span className="wf-order-label">{a}</span>
+                  {rowsForA.length === 0 ? (
+                    <span className="wf-tag-disabled">new</span>
+                  ) : outstanding > 0 ? (
+                    <span className="status-chip caution">{outstanding}</span>
+                  ) : (
+                    <span className="status-chip complete">✓</span>
+                  )}
+                </button>
+              )
+            })}
+          </div>
+        </div>
+
+        <div className="jp-camera-col">
+          <div className="jp-camera-col-title">Joint Pack #</div>
+          <div className="wf-order-list">
+            {assetRows.length === 0 && <div className="wf-order-empty">None yet — start one below.</div>}
+            {assetRows.map((r) => {
+              const outstanding = outstandingCount(r)
+              const hasPending = Object.keys(pendingByPack[packKey(selectedAsset, r.jointPackNumber)] ?? {}).length > 0
+              return (
+                <button
+                  key={r.jointPackNumber}
+                  type="button"
+                  className={`wf-order-item jp-camera-pick${selectedJP === r.jointPackNumber ? ' active' : ''}`}
+                  onClick={() => setSelectedJP(r.jointPackNumber)}
+                >
+                  <span className="wf-order-label" style={{ fontFamily: 'var(--font-mono)', fontSize: 12 }}>
+                    {r.jointPackNumber}
+                  </span>
+                  {outstanding === 0 ? (
+                    <span className="status-chip complete">✓</span>
+                  ) : hasPending ? (
+                    <span className="status-chip go">●</span>
+                  ) : (
+                    <span className="status-chip caution">{outstanding}</span>
+                  )}
+                </button>
+              )
+            })}
+          </div>
+          <div className="jp-camera-new-row">
+            <input
+              type="text"
+              placeholder="New Joint Pack #..."
+              value={newJP}
+              onChange={(e) => setNewJP(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && startNewJointPack()}
+            />
+            <button className="wf-btn" disabled={!newJP.trim()} onClick={startNewJointPack}>
+              <Plus style={{ width: 13, height: 13 }} />
+            </button>
+          </div>
+        </div>
+
+        <div className="jp-camera-main">
+          {!selectedAsset ? (
+            <div className="q-hint">Pick an asset to begin.</div>
+          ) : !selectedJP.trim() ? (
+            <div className="q-hint">Pick or start a Joint Pack # to begin shooting.</div>
+          ) : (
+            <>
+              <div className="jp-camera-context">
+                {selectedAsset}
+                <span className="q-hint" style={{ margin: '0 0 0 8px' }}>
+                  {building}
+                </span>
+                <span className="wf-order-label" style={{ marginLeft: 10, fontFamily: 'var(--font-mono)' }}>
+                  {selectedJP}
+                </span>
+              </div>
+
+              <div className="camera-side-tabs">
+                {SIDES.map((side) => {
+                  const isDone = !!pending[side] || !!existing[side]
+                  return (
+                    <button
+                      key={side}
+                      type="button"
+                      className={`camera-side-tab${activeSide === side ? ' active' : ''}${isDone ? ' done' : ''}`}
+                      onClick={() => setActiveSide(side)}
+                    >
+                      {pending[side] && <img src={pending[side]} className="camera-thumb" alt="" />}
+                      {side}
+                      {isDone && !pending[side] ? ' ✓' : ''}
+                    </button>
+                  )
+                })}
+              </div>
+
+              {cameraError ? (
+                <div className="table-error" style={{ textAlign: 'center' }}>
+                  {cameraError}
+                </div>
+              ) : (
+                <>
+                  {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
+                  <video ref={videoRef} className="camera-video" playsInline muted />
+                  <div className="camera-shutter-row">
+                    <button
+                      type="button"
+                      className="camera-shutter-btn"
+                      disabled={!ready}
+                      onClick={capture}
+                      aria-label={`Capture ${activeSide}`}
+                    />
+                  </div>
+                </>
+              )}
+
+              <div style={{ display: 'flex', gap: 10, alignItems: 'center', justifyContent: 'center', marginTop: 14, flexWrap: 'wrap' }}>
+                <button
+                  className="seal-submit-btn"
+                  style={{ maxWidth: 200, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}
+                  disabled={saving || Object.keys(pending).length === 0}
+                  onClick={saveActive}
+                >
+                  <Camera style={{ width: 15, height: 15 }} />
+                  {saving ? 'Saving…' : 'Save Photos'}
+                </button>
+                {pending[activeSide] && (
+                  <button className="wf-btn" onClick={() => clearPendingSide(activeSide)}>
+                    Clear {activeSide}
+                  </button>
+                )}
+                {error && <span className="q-hint err">{error}</span>}
+              </div>
+            </>
+          )}
+        </div>
+      </div>
+    </FullscreenOverlay>
   )
 }
