@@ -1,7 +1,7 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useOutletContext } from 'react-router-dom'
 import { Plus, RefreshCw } from 'lucide-react'
-import { useGetAssetOptions, useGetTamperSeals, useLogTamperSeals } from '../../../lib/api'
+import { useGetAssetPlaceOptions, useGetTamperSeals, useLogTamperSeals } from '../../../lib/api'
 import type { SealInput } from '../../../lib/api'
 import { fmtDate, localIsoDate } from '../utils'
 import TamperSealSection from './TamperSealSection'
@@ -29,23 +29,26 @@ function sealStatusClass(status: string): string {
 export default function TamperSealLogPanel() {
   const { currentUserEmail } = useOutletContext<ShellContext>()
   const fn = useGetTamperSeals()
-  const assetsFn = useGetAssetOptions()
+  const assetPlaceFn = useGetAssetPlaceOptions()
   const logFn = useLogTamperSeals()
 
   useEffect(() => {
     void fn.trigger()
-    void assetsFn.trigger()
+    void assetPlaceFn.trigger()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   const rows = (fn.data as SealRow[] | undefined) ?? []
-  const assetOptions = (assetsFn.data as string[] | undefined) ?? []
+  const assetPlaceOptions = assetPlaceFn.data ?? []
   const state = fn.error ? 'error' : fn.loading || !fn.data ? 'loading' : 'ready'
 
   const [addOpen, setAddOpen] = useState(false)
   const [asset, setAsset] = useState('')
-  const [location, setLocation] = useState('')
   const [date, setDate] = useState(localIsoDate())
+
+  // The place isn't picked separately — it's whatever this asset is paired with in
+  // STY4dropdownoptions, same source the Activities/Results dropdowns already read from.
+  const place = useMemo(() => assetPlaceOptions.find((o) => o.asset === asset)?.place ?? '', [assetPlaceOptions, asset])
 
   async function submitSeals(sealRows: SealInput[]) {
     await logFn.trigger({ rows: sealRows }).result
@@ -78,22 +81,32 @@ export default function TamperSealLogPanel() {
           <div className="seal-row3" style={{ gridTemplateColumns: '1.4fr 1.4fr 1fr' }}>
             <div className="form-field" style={{ marginBottom: 0 }}>
               <label>Asset</label>
-              <input
-                type="text"
-                list="tamper-seal-asset-options"
-                placeholder="e.g. MDA-ROW-1"
-                value={asset}
-                onChange={(e) => setAsset(e.target.value)}
-              />
-              <datalist id="tamper-seal-asset-options">
-                {assetOptions.map((a) => (
-                  <option key={a} value={a} />
+              <select value={asset} disabled={assetPlaceFn.loading && !assetPlaceFn.data} onChange={(e) => setAsset(e.target.value)}>
+                <option value="">
+                  {assetPlaceFn.loading && !assetPlaceFn.data ? 'Loading assets…' : 'Select an asset...'}
+                </option>
+                {assetPlaceOptions.map((o) => (
+                  <option key={o.asset} value={o.asset}>
+                    {o.asset}
+                  </option>
                 ))}
-              </datalist>
+              </select>
             </div>
             <div className="form-field" style={{ marginBottom: 0 }}>
-              <label>Location (optional)</label>
-              <input type="text" placeholder="e.g. Electrical Room 3" value={location} onChange={(e) => setLocation(e.target.value)} />
+              <label>Place</label>
+              <div
+                style={{
+                  background: 'var(--bg-elev-2)',
+                  border: '1px solid var(--border-strong)',
+                  borderRadius: 'var(--radius-sm)',
+                  color: place ? 'var(--text)' : 'var(--text-faint)',
+                  fontFamily: 'var(--font-mono)',
+                  fontSize: 13.5,
+                  padding: '9px 11px',
+                }}
+              >
+                {place || (asset ? 'No place on file for this asset' : 'Auto-filled from the selected asset')}
+              </div>
             </div>
             <div className="form-field" style={{ marginBottom: 0 }}>
               <label>Inspection date</label>
@@ -101,16 +114,16 @@ export default function TamperSealLogPanel() {
             </div>
           </div>
 
-          {asset.trim() ? (
+          {asset ? (
             <TamperSealSection
-              assetName={asset.trim()}
-              location={location.trim()}
+              assetName={asset}
+              location={place}
               authUser={currentUserEmail}
               selectedDate={date}
               onSubmit={submitSeals}
             />
           ) : (
-            <div className="q-hint">Enter an asset above to start a seal range.</div>
+            <div className="q-hint">Select an asset above to start a seal range.</div>
           )}
         </div>
       )}

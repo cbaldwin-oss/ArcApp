@@ -101,6 +101,26 @@ export function useGetAssetOptions() {
   return useApiFn(getAssetOptions)
 }
 
+// Each STY4dropdownoptions row is a correlated tuple (Places, Times, Activities, Assets,
+// Trade_Partners, Results, Zone) — unlike the flat single-column pulls above, this keeps the
+// Asset->Place pairing so picking an asset can auto-fill its place instead of asking for both.
+async function getAssetPlaceOptions(): Promise<Array<{ asset: string; place: string }>> {
+  const res = await supabase.from('STY4dropdownoptions').select('Assets, Places').not('Assets', 'is', null)
+  const rows = unwrap(res) as Array<{ Assets: string | null; Places: string | null }>
+  const seen = new Set<string>()
+  const out: Array<{ asset: string; place: string }> = []
+  for (const r of rows) {
+    const asset = (r.Assets ?? '').trim()
+    if (!asset || seen.has(asset)) continue
+    seen.add(asset)
+    out.push({ asset, place: (r.Places ?? '').trim() })
+  }
+  return out.sort((a, b) => a.asset.localeCompare(b.asset))
+}
+export function useGetAssetPlaceOptions() {
+  return useApiFn(getAssetPlaceOptions)
+}
+
 async function getResultOptions(): Promise<string[]> {
   const res = await supabase.from('STY4dropdownoptions').select('Results').not('Results', 'is', null)
   return distinctTrimmed(unwrap(res) as Array<Record<string, unknown>>, 'Results')

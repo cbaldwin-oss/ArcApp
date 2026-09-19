@@ -113,13 +113,23 @@ different spreadsheet from CxAlloy's. `useGetJointPackData`/`useLogJointPackPhot
 
 The Tamper Seals page (`TamperSealLogPanel.tsx`) used to be read-only — seals could only be logged
 from inside an Activity's drawer. **Log Seals** in its header now opens the exact same range-entry
-flow (`TamperSealSection.tsx`, shared with the Activity Drawer) directly on this page: pick/type an
-**Asset** (autocompletes from `STY4Assets` via `useGetAssetOptions`, but free text works too),
-optionally a **Location** and inspection **date** (defaults to today), then First/Last seal #,
-omitted numbers, sub area, and notes — same "Generate Preview" → editable grid → "Confirm & Save"
-flow as always, writing to the same `STY4Assets` table either way. `TamperSealSection` itself was
-generalized to take a plain `assetName`/`location` pair instead of requiring a whole
-`ScheduleRow` — the Activity Drawer usage just passes `activeRow.asset`/`activeRow.place` now.
+flow (`TamperSealSection.tsx`, shared with the Activity Drawer) directly on this page: pick an
+**Asset** from a dropdown, **Place** auto-fills from it, pick an inspection **date** (defaults to
+today), then First/Last seal #, omitted numbers, sub area, and notes — same "Generate Preview" →
+editable grid → "Confirm & Save" flow as always, writing to the same `STY4Assets` table either way.
+- **Asset dropdown + auto-filled Place**: `getAssetPlaceOptions()` in `src/lib/api.ts` reads
+  `STY4dropdownoptions` — unlike the existing `getAssetOptions()`/`getActivityOptions()`/etc, which
+  each pull one column as an independent flat list, this keeps each row's `Assets`↔`Places`
+  pairing (that table's rows are correlated tuples: Places, Times, Activities, Assets,
+  Trade_Partners, Results, Zone). Picking an asset looks up its place from that same table instead
+  of asking for it — there's no separate Place input to fill in.
+- **Signoff**: already automatic and unrelated to this change — `logTamperSeals()` stamps
+  `signoff` from the signed-in session's email server-side on every insert (activity-drawer or
+  standalone), and the form's hint line under Generate Preview shows "Signed in as X" (or "not
+  signed in") so it's clear before submitting either way.
+- `TamperSealSection` itself was generalized to take a plain `assetName`/`location` pair instead
+  of requiring a whole `ScheduleRow` — the Activity Drawer usage just passes
+  `activeRow.asset`/`activeRow.place` now.
 
 ## To-Do — Teams & task assignment
 
