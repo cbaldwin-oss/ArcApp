@@ -1,5 +1,10 @@
 @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@500;600;700;800&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600;700&display=swap');
 
+/* The browser's default UA stylesheet gives <body> an 8px margin and leaves <html>/<body>/#root
+   with no background — without this reset, that 8px shows through as a white/default-colored
+   frame around the app on every page (only visible outside .arcapp's own background). */
+html, body, #root{ margin:0; padding:0; min-height:100%; background:#05070d; }
+
 .arcapp{
   --bg:#05070d;
   --bg-elev:#0b0f1c;
@@ -417,13 +422,13 @@
   box-shadow:0 0 0 2px var(--green); cursor:pointer; flex:0 0 auto;
 }
 .arcapp .camera-shutter-btn:disabled{ opacity:0.35; cursor:not-allowed; }
-.arcapp .camera-open-btn{
+.arcapp .panel-action-btn{
   display:flex; align-items:center; gap:8px; background:var(--green-deep); border:1px solid var(--green-dim);
   color:var(--green-soft); font-family:var(--font-display); font-size:12.5px; font-weight:600; letter-spacing:0.4px;
   text-transform:uppercase; padding:9px 16px; border-radius:var(--radius-sm); cursor:pointer;
 }
-.arcapp .camera-open-btn:hover{ border-color:var(--green); color:var(--green); }
-.arcapp .camera-open-btn:disabled{ opacity:0.4; cursor:not-allowed; }
+.arcapp .panel-action-btn:hover{ border-color:var(--green); color:var(--green); }
+.arcapp .panel-action-btn:disabled{ opacity:0.4; cursor:not-allowed; }
 .arcapp .camera-queued-thumb{ width:34px; height:34px; border-radius:6px; object-fit:cover; border:2px solid var(--green); vertical-align:middle; }
 
 /* ---------- Joint Pack camera workspace: asset / Joint Pack # columns + camera main area ---------- */

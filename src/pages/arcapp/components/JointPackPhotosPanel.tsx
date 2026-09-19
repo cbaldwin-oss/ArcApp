@@ -83,7 +83,7 @@ export default function JointPackPhotosPanel({ folder, onGoToSettings }: Props) 
         <div className="panel-header-right" style={{ gap: 10 }}>
           <button
             type="button"
-            className="camera-open-btn"
+            className="panel-action-btn"
             disabled={state !== 'ready'}
             onClick={() => setCameraOpen(true)}
           >

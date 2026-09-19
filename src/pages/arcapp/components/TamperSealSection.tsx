@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import type { ScheduleRow, SealSummary } from '../types'
+import type { SealSummary } from '../types'
 import { parseOmitted, parseSealNumberParts } from '../utils'
 
 type SealInstance = {
@@ -39,7 +39,11 @@ type PreviewSeal = {
 const STATUS_OPTIONS = ['Intact', 'Broken', 'Removed']
 
 type Props = {
-  row: ScheduleRow
+  /** Free-typed on the standalone Tamper Seals page, or a scheduled activity's row.asset/row.place
+   * when this runs inside the Activity Drawer — either way it's just what gets stamped onto each
+   * seal row, this component doesn't care where it came from. */
+  assetName: string
+  location: string
   authUser: string | null
   selectedDate: string
   onSubmit: (rows: SealPayloadRow[]) => Promise<void>
@@ -102,7 +106,7 @@ function previewFor(inst: SealInstance): { text: string; cls: string } {
   return { text: `${sealNumbers.length} seal${sealNumbers.length === 1 ? '' : 's'}: ${rangeText}${omitText}`, cls: 'seal-preview ok' }
 }
 
-export default function TamperSealSection({ row, authUser, selectedDate, onSubmit }: Props) {
+export default function TamperSealSection({ assetName, location, authUser, selectedDate, onSubmit }: Props) {
   const [instances, setInstances] = useState<SealInstance[]>([newInstance()])
   const [preview, setPreview] = useState<PreviewSeal[] | null>(null)
   const [log, setLog] = useState<SealSummary[]>([])
@@ -176,8 +180,8 @@ export default function TamperSealSection({ row, authUser, selectedDate, onSubmi
       return
     }
     const payloadRows: SealPayloadRow[] = included.map((r) => ({
-      asset_name: row.asset,
-      location: row.place,
+      asset_name: assetName,
+      location,
       sub_area: r.subArea,
       seal_number: r.sealNumber,
       inspection_date: selectedDate,
@@ -304,7 +308,8 @@ export default function TamperSealSection({ row, authUser, selectedDate, onSubmi
           <div className="seal-preview-head">
             <div>
               <div className="seal-preview-title">
-                Review {preview.length} seal{preview.length === 1 ? '' : 's'} — {row.asset} · {row.place}
+                Review {preview.length} seal{preview.length === 1 ? '' : 's'} — {assetName}
+                {location ? ` · ${location}` : ''}
               </div>
               <div className="q-hint" style={{ margin: 0 }}>
                 Nothing is saved yet. Uncheck any seal that shouldn&apos;t go through, edit fields as needed, then confirm.

@@ -1,7 +1,11 @@
-import { useEffect } from 'react'
-import { RefreshCw } from 'lucide-react'
-import { useGetTamperSeals } from '../../../lib/api'
-import { fmtDate } from '../utils'
+import { useEffect, useState } from 'react'
+import { useOutletContext } from 'react-router-dom'
+import { Plus, RefreshCw } from 'lucide-react'
+import { useGetAssetOptions, useGetTamperSeals, useLogTamperSeals } from '../../../lib/api'
+import type { SealInput } from '../../../lib/api'
+import { fmtDate, localIsoDate } from '../utils'
+import TamperSealSection from './TamperSealSection'
+import type { ShellContext } from '../ShellContext'
 
 type SealRow = {
   id: number
@@ -23,15 +27,30 @@ function sealStatusClass(status: string): string {
 }
 
 export default function TamperSealLogPanel() {
+  const { currentUserEmail } = useOutletContext<ShellContext>()
   const fn = useGetTamperSeals()
+  const assetsFn = useGetAssetOptions()
+  const logFn = useLogTamperSeals()
 
   useEffect(() => {
     void fn.trigger()
+    void assetsFn.trigger()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   const rows = (fn.data as SealRow[] | undefined) ?? []
+  const assetOptions = (assetsFn.data as string[] | undefined) ?? []
   const state = fn.error ? 'error' : fn.loading || !fn.data ? 'loading' : 'ready'
+
+  const [addOpen, setAddOpen] = useState(false)
+  const [asset, setAsset] = useState('')
+  const [location, setLocation] = useState('')
+  const [date, setDate] = useState(localIsoDate())
+
+  async function submitSeals(sealRows: SealInput[]) {
+    await logFn.trigger({ rows: sealRows }).result
+    void fn.trigger()
+  }
 
   return (
     <section className="panel" id="tamperseals">
@@ -43,12 +62,59 @@ export default function TamperSealLogPanel() {
             <span className={state === 'error' ? 'led red' : 'led'} /> {state === 'ready' ? 'Live' : state === 'error' ? 'Offline' : 'Syncing'}
           </span>
         </div>
-        <div className="panel-header-right">
+        <div className="panel-header-right" style={{ gap: 10 }}>
+          <button type="button" className="panel-action-btn" onClick={() => setAddOpen((v) => !v)}>
+            <Plus style={{ width: 15, height: 15 }} />
+            {addOpen ? 'Close' : 'Log Seals'}
+          </button>
           <button className={fn.loading ? 'icon-btn spin' : 'icon-btn'} title="Refresh" onClick={() => void fn.trigger()} aria-label="Refresh tamper seals">
             <RefreshCw />
           </button>
         </div>
       </div>
+
+      {addOpen && (
+        <div className="panel-body" style={{ borderBottom: '1px solid var(--border)' }}>
+          <div className="seal-row3" style={{ gridTemplateColumns: '1.4fr 1.4fr 1fr' }}>
+            <div className="form-field" style={{ marginBottom: 0 }}>
+              <label>Asset</label>
+              <input
+                type="text"
+                list="tamper-seal-asset-options"
+                placeholder="e.g. MDA-ROW-1"
+                value={asset}
+                onChange={(e) => setAsset(e.target.value)}
+              />
+              <datalist id="tamper-seal-asset-options">
+                {assetOptions.map((a) => (
+                  <option key={a} value={a} />
+                ))}
+              </datalist>
+            </div>
+            <div className="form-field" style={{ marginBottom: 0 }}>
+              <label>Location (optional)</label>
+              <input type="text" placeholder="e.g. Electrical Room 3" value={location} onChange={(e) => setLocation(e.target.value)} />
+            </div>
+            <div className="form-field" style={{ marginBottom: 0 }}>
+              <label>Inspection date</label>
+              <input type="date" value={date} onChange={(e) => setDate(e.target.value)} />
+            </div>
+          </div>
+
+          {asset.trim() ? (
+            <TamperSealSection
+              assetName={asset.trim()}
+              location={location.trim()}
+              authUser={currentUserEmail}
+              selectedDate={date}
+              onSubmit={submitSeals}
+            />
+          ) : (
+            <div className="q-hint">Enter an asset above to start a seal range.</div>
+          )}
+        </div>
+      )}
+
       <div className="panel-body no-pad">
         <div style={{ overflowX: 'auto' }}>
           <table className="sched">

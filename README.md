@@ -109,6 +109,18 @@ different spreadsheet from CxAlloy's. `useGetJointPackData`/`useLogJointPackPhot
 - Logging photos doesn't require signing in (same as Tamper Seal/RTFT logging) — only changing the
   destination folder in Settings is editor-gated.
 
+## Tamper Seals — standalone logging
+
+The Tamper Seals page (`TamperSealLogPanel.tsx`) used to be read-only — seals could only be logged
+from inside an Activity's drawer. **Log Seals** in its header now opens the exact same range-entry
+flow (`TamperSealSection.tsx`, shared with the Activity Drawer) directly on this page: pick/type an
+**Asset** (autocompletes from `STY4Assets` via `useGetAssetOptions`, but free text works too),
+optionally a **Location** and inspection **date** (defaults to today), then First/Last seal #,
+omitted numbers, sub area, and notes — same "Generate Preview" → editable grid → "Confirm & Save"
+flow as always, writing to the same `STY4Assets` table either way. `TamperSealSection` itself was
+generalized to take a plain `assetName`/`location` pair instead of requiring a whole
+`ScheduleRow` — the Activity Drawer usage just passes `activeRow.asset`/`activeRow.place` now.
+
 ## To-Do — Teams & task assignment
 
 To-Dos are no longer hardcoded sample data — they're real, persisted rows (`arcapp_tasks`), and

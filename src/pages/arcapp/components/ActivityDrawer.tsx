@@ -192,7 +192,8 @@ export default function ActivityDrawer(props: Props) {
         return (
           <TamperSealSection
             key={key}
-            row={activeRow}
+            assetName={activeRow.asset}
+            location={activeRow.place}
             authUser={authUser}
             selectedDate={selectedDate}
             onSubmit={props.onSaveSeals}
