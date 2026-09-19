@@ -11,15 +11,36 @@ export type ScheduleRow = {
   result: string
 }
 
+export type TeamMember = {
+  name: string
+  email: string
+}
+
+export type Team = {
+  id: string
+  name: string
+  members: TeamMember[]
+}
+
+export type TaskTag = 'crit' | 'high' | 'norm'
+
+/**
+ * A real, persisted task (arcapp_tasks) — replaces the old hardcoded sample To-Do list.
+ * `tagLabel`/`due`/`today` used to be stored directly; they're now derived for display via
+ * `todoTagLabel()`/`todoDueDisplay()` in utils.ts instead, computed from `tag`/`dueDate`/`done`.
+ */
 export type Todo = {
-  id: number
+  id: string
   text: string
-  tag: 'crit' | 'high' | 'norm'
-  tagLabel: string
+  tag: TaskTag
   sys: string
-  due: string
-  today: boolean
+  dueDate: string | null // ISO yyyy-mm-dd
   done: boolean
+  completedAt: string | null
+  /** A task is assigned to at most one of: a team, or a specific person (assignedEmail/Name). */
+  assignedTeamId: string | null
+  assignedEmail: string | null
+  assignedName: string | null
 }
 
 export type Milestone = {

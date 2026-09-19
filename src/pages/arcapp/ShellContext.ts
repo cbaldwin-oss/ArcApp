@@ -1,4 +1,5 @@
-import type { ScheduleRow, ScheduleState, Todo } from './types'
+import type { ScheduleRow, ScheduleState, Team, TeamMember, Todo } from './types'
+import type { TaskInput } from '../../lib/api'
 
 /**
  * Passed down via react-router's <Outlet context={...}> from AppShell to whichever page is
@@ -8,7 +9,20 @@ import type { ScheduleRow, ScheduleState, Todo } from './types'
  */
 export type ShellContext = {
   todos: Todo[]
-  onToggleTodo: (id: number) => void
+  onToggleTodo: (id: string) => void
+  tasksLoading: boolean
+  tasksError: string
+  onSaveTask: (input: TaskInput) => Promise<void>
+  onDeleteTask: (id: string) => Promise<void>
+
+  teams: Team[]
+  teamsLoading: boolean
+  teamsError: string
+  onSaveTeam: (input: { id?: string; name: string; members: TeamMember[] }) => Promise<void>
+  onDeleteTeam: (id: string) => Promise<void>
+
+  /** For "assigned to me" — null when nobody's signed in (task/team browsing still works). */
+  currentUserEmail: string | null
 
   scheduleState: ScheduleState
   rows: ScheduleRow[]

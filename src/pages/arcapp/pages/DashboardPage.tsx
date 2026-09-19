@@ -1,6 +1,7 @@
 import { useNavigate, useOutletContext } from 'react-router-dom'
 import type { ShellContext } from '../ShellContext'
 import { MILESTONES } from '../sampleData'
+import { isTodoMine } from '../utils'
 import KpiRow from '../components/KpiRow'
 import TodoPanel from '../components/TodoPanel'
 import MilestonesPanel from '../components/MilestonesPanel'
@@ -14,6 +15,12 @@ export default function DashboardPage() {
   const ctx = useOutletContext<ShellContext>()
   const navigate = useNavigate()
 
+  // "Your To-Dos" personalizes once someone's signed in (mine + my teams'); falls back to every
+  // open task when signed out, same as before this widget could know who "you" are.
+  const myTodos = ctx.currentUserEmail
+    ? ctx.todos.filter((t) => isTodoMine(t, ctx.currentUserEmail, ctx.teams))
+    : ctx.todos
+
   return (
     <>
       <div className="page-heading">
@@ -24,7 +31,7 @@ export default function DashboardPage() {
       <KpiRow />
 
       <div className="dash-grid">
-        <TodoPanel todos={ctx.todos} onToggle={ctx.onToggleTodo} onExpand={() => navigate('/todo')} />
+        <TodoPanel todos={myTodos} onToggle={ctx.onToggleTodo} onExpand={() => navigate('/todo')} />
         <MilestonesPanel milestones={MILESTONES} onExpand={() => navigate('/milestones')} />
       </div>
 

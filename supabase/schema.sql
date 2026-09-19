@@ -56,3 +56,57 @@ INSERT INTO arcapp_workflow_items (item_key, label, description, sort_order) VAL
   ('cmms_data_collection', 'CMMS Data Collection',       'Equipment ID, work order number, and CMMS notes.',                            70),
   ('scaaf_study',          'SCAAF Study Information',    'SCAAF study data captured against the activity.',                             80)
 ON CONFLICT (item_key) DO NOTHING;
+
+-- ---------------------------------------------------------------------------
+-- NOT YET APPLIED — Teams + Tasks (To-Do assignment tool, requested 2026-09-18).
+--
+-- `members` is a jsonb array of {"name": "...", "email": "..."} objects, same style as
+-- arcapp_workflows.items — a team's roster is small, so a join table would be overkill.
+--
+-- A task is assigned to at most one of: a team (assigned_team_id) or a specific person
+-- (assigned_email/assigned_name) — the app enforces that, not a DB constraint, since "neither"
+-- (unassigned) is also valid. Deleting a team the app-layer way just unassigns its tasks
+-- (ON DELETE SET NULL) rather than deleting them.
+-- ---------------------------------------------------------------------------
+
+CREATE TABLE IF NOT EXISTS arcapp_teams (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  name text NOT NULL,
+  members jsonb NOT NULL DEFAULT '[]'::jsonb,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  updated_at timestamptz NOT NULL DEFAULT now(),
+  updated_by text
+);
+
+CREATE TABLE IF NOT EXISTS arcapp_tasks (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  text text NOT NULL,
+  tag text NOT NULL DEFAULT 'norm', -- 'crit' | 'high' | 'norm'
+  sys text NOT NULL DEFAULT '',
+  due_date date,
+  done boolean NOT NULL DEFAULT false,
+  completed_at timestamptz,
+  assigned_team_id uuid REFERENCES arcapp_teams(id) ON DELETE SET NULL,
+  assigned_email text,
+  assigned_name text,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  updated_at timestamptz NOT NULL DEFAULT now(),
+  created_by text,
+  updated_by text
+);
+
+-- Seed: carry over the old hardcoded sample To-Dos as real rows, so the list isn't empty on
+-- first load. Only runs if arcapp_tasks is completely empty (no unique column to ON CONFLICT on
+-- otherwise), so it's safe to re-run without creating duplicates.
+INSERT INTO arcapp_tasks (text, tag, sys, due_date, done, completed_at)
+SELECT * FROM (VALUES
+  ('Approve turnover package — Chiller Plant Room 1',                'crit', 'CHW-01', CURRENT_DATE,     false, NULL::timestamptz),
+  ('Review LOTO permit request — MC-204 Switchgear',                 'high', 'MC-204', CURRENT_DATE,     false, NULL::timestamptz),
+  ('Walk punch list — Electrical Room 3',                            'norm', 'ER-03',  CURRENT_DATE + 1, false, NULL::timestamptz),
+  ('Sign off functional test — Fire Alarm Panel FP-2',               'high', 'FP-2',   CURRENT_DATE + 5, false, NULL::timestamptz),
+  ('Update RFSU tracker — BAS Integration',                          'norm', 'BAS-01', CURRENT_DATE + 8, false, NULL::timestamptz),
+  ('Coordinate vendor start-up — Generator Load Bank Test',          'crit', 'GEN-02', CURRENT_DATE + 9, false, NULL::timestamptz),
+  ('Close out punch items — Domestic Water Booster',                 'norm', 'DWB-01', CURRENT_DATE + 6, false, NULL::timestamptz),
+  ('File inspection request — Emergency Lighting circuit EL-14',     'norm', 'EL-14',  CURRENT_DATE - 4, true,  now())
+) AS seed(text, tag, sys, due_date, done, completed_at)
+WHERE NOT EXISTS (SELECT 1 FROM arcapp_tasks);

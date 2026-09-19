@@ -1,11 +1,15 @@
 import { useState, useEffect, useCallback } from 'react'
 import { Outlet } from 'react-router-dom'
 import { useCurrentUser } from '../../lib/useCurrentUser'
-import { useGetSchedule, useGetResultOptions, useCheckEditor, useSaveResult, useLogTamperSeals, useSubmitRtft, useGetSettings, useSaveSetting, useGetWorkflows, useGetWorkflowItems } from '../../lib/api'
+import {
+  useGetSchedule, useGetResultOptions, useCheckEditor, useSaveResult, useLogTamperSeals, useSubmitRtft,
+  useGetSettings, useSaveSetting, useGetWorkflows, useGetWorkflowItems,
+  useGetTasks, useSaveTask, useSetTaskDone, useDeleteTask, useGetTeams, useSaveTeam, useDeleteTeam,
+} from '../../lib/api'
+import type { TaskInput } from '../../lib/api'
 import type { WorkflowItem } from './workflowItems'
 import type { ShellContext } from './ShellContext'
-import type { ScheduleRow, ScheduleState, ActivityAnswer, Todo } from './types'
-import { TODOS } from './sampleData'
+import type { ScheduleRow, ScheduleState, ActivityAnswer, Todo, Team, TeamMember } from './types'
 import { localIsoDate, addDaysIso } from './utils'
 import Topbar from './components/Topbar'
 import Sidebar from './components/Sidebar'
@@ -36,13 +40,21 @@ export default function AppShell() {
   const saveSettingFn = useSaveSetting()
   const workflowsFn = useGetWorkflows()
   const workflowItemsFn = useGetWorkflowItems()
+  const tasksFn = useGetTasks()
+  const saveTaskFn = useSaveTask()
+  const setTaskDoneFn = useSetTaskDone()
+  const deleteTaskFn = useDeleteTask()
+  const teamsFn = useGetTeams()
+  const saveTeamFn = useSaveTeam()
+  const deleteTeamFn = useDeleteTeam()
 
   const [selectedDate, setSelectedDate] = useState<string>(localIsoDate())
   const [rows, setRows] = useState<ScheduleRow[]>([])
   const [lastSync, setLastSync] = useState<string | null>(null)
   const [refreshing, setRefreshing] = useState(false)
 
-  const [todos, setTodos] = useState<Todo[]>(TODOS)
+  const [todos, setTodos] = useState<Todo[]>([])
+  const [teams, setTeams] = useState<Team[]>([])
   const [selectedRowId, setSelectedRowId] = useState<string | number | null>(null)
   const [answers, setAnswers] = useState<Record<string, ActivityAnswer>>({})
 
@@ -68,8 +80,17 @@ export default function AppShell() {
     void settingsFn.trigger()
     void workflowsFn.trigger()
     void workflowItemsFn.trigger()
+    void tasksFn.trigger()
+    void teamsFn.trigger()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+
+  useEffect(() => {
+    if (tasksFn.data) setTodos(tasksFn.data as Todo[])
+  }, [tasksFn.data])
+  useEffect(() => {
+    if (teamsFn.data) setTeams(teamsFn.data as Team[])
+  }, [teamsFn.data])
 
   const scheduleState: ScheduleState = scheduleFn.error
     ? 'error'
@@ -127,9 +148,48 @@ export default function AppShell() {
       .finally(() => setTimeout(() => setRefreshing(false), 400))
   }
 
-  function toggleTodo(id: number) {
-    setTodos((prev) => prev.map((t) => (t.id === id ? { ...t, done: !t.done } : t)))
+  async function toggleTodo(id: string) {
+    const current = todos.find((t) => t.id === id)
+    if (!current) return
+    const done = !current.done
+    await setTaskDoneFn.trigger({ id, done }).result
+    setTodos((prev) =>
+      prev.map((t) => (t.id === id ? { ...t, done, completedAt: done ? new Date().toISOString() : null } : t)),
+    )
   }
+
+  const saveTaskRecord = useCallback(
+    async (input: TaskInput) => {
+      await saveTaskFn.trigger(input).result
+      void tasksFn.trigger()
+    },
+    [saveTaskFn, tasksFn],
+  )
+  const deleteTaskRecord = useCallback(
+    async (id: string) => {
+      await deleteTaskFn.trigger({ id }).result
+      setTodos((prev) => prev.filter((t) => t.id !== id))
+    },
+    [deleteTaskFn],
+  )
+
+  const saveTeamRecord = useCallback(
+    async (input: { id?: string; name: string; members: TeamMember[] }) => {
+      await saveTeamFn.trigger(input).result
+      void teamsFn.trigger()
+    },
+    [saveTeamFn, teamsFn],
+  )
+  const deleteTeamRecord = useCallback(
+    async (id: string) => {
+      await deleteTeamFn.trigger({ id }).result
+      setTeams((prev) => prev.filter((t) => t.id !== id))
+      // A deleted team's tasks fall back to unassigned server-side (ON DELETE SET NULL) — refetch
+      // so the task list reflects that instead of still showing the removed team.
+      void tasksFn.trigger()
+    },
+    [deleteTeamFn, tasksFn],
+  )
 
   const selectedRow = rows.find((r) => String(r.id) === String(selectedRowId)) ?? null
 
@@ -192,6 +252,18 @@ export default function AppShell() {
   const outletContext: ShellContext = {
     todos,
     onToggleTodo: toggleTodo,
+    tasksLoading: tasksFn.loading || !tasksFn.data,
+    tasksError: tasksFn.error ?? '',
+    onSaveTask: saveTaskRecord,
+    onDeleteTask: deleteTaskRecord,
+
+    teams,
+    teamsLoading: teamsFn.loading || !teamsFn.data,
+    teamsError: teamsFn.error ?? '',
+    onSaveTeam: saveTeamRecord,
+    onDeleteTeam: deleteTeamRecord,
+
+    currentUserEmail: user?.email ?? null,
 
     scheduleState,
     rows,
@@ -236,8 +308,8 @@ export default function AppShell() {
           <Outlet context={outletContext} />
 
           <footer>
-            ArcApp Commissioning · Phoenix Data Center 3 · To-dos &amp; milestones are sample data — Scheduled
-            Activities reads live from {SOURCE_LABEL}
+            ArcApp Commissioning · Phoenix Data Center 3 · Milestones are sample data — To-Dos read
+            live from arcapp_tasks and Scheduled Activities from {SOURCE_LABEL}
           </footer>
         </main>
       </div>

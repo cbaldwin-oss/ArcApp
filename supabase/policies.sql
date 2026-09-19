@@ -92,3 +92,23 @@ CREATE POLICY "workflow_items_write_editors" ON arcapp_workflow_items
 -- CREATE POLICY "submittals_write_editors" ON "STY4Submittals" FOR ALL TO authenticated
 --   USING (EXISTS (SELECT 1 FROM "STY4authorized_editors" e WHERE lower(e.email) = lower(auth.jwt() ->> 'email')))
 --   WITH CHECK (EXISTS (SELECT 1 FROM "STY4authorized_editors" e WHERE lower(e.email) = lower(auth.jwt() ->> 'email')));
+
+
+-- =============================================================================
+-- NOT YET APPLIED — arcapp_teams / arcapp_tasks (To-Do assignment tool). Wide open
+-- (anon + authenticated, no editor check) by request, same shape as arcapp_workflows —
+-- anyone can build teams and create/assign/complete/delete tasks without signing in.
+-- =============================================================================
+
+ALTER TABLE arcapp_teams ENABLE ROW LEVEL SECURITY;
+ALTER TABLE arcapp_tasks ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "teams_select_public" ON arcapp_teams
+  FOR SELECT TO anon, authenticated USING (true);
+CREATE POLICY "teams_write_public" ON arcapp_teams
+  FOR ALL TO anon, authenticated USING (true) WITH CHECK (true);
+
+CREATE POLICY "tasks_select_public" ON arcapp_tasks
+  FOR SELECT TO anon, authenticated USING (true);
+CREATE POLICY "tasks_write_public" ON arcapp_tasks
+  FOR ALL TO anon, authenticated USING (true) WITH CHECK (true);

@@ -1,5 +1,7 @@
 /* Date + formatting helpers ported from the original ArcApp dashboard. */
 
+import type { Team, Todo } from './types'
+
 // Local calendar date as YYYY-MM-DD — deliberately NOT toISOString(), which
 // converts to UTC and can roll to the next day in the evening for US time zones.
 export function localIsoDate(d: Date = new Date()): string {
@@ -74,4 +76,46 @@ export function parseSealNumberParts(value: string): { prefix: string; num: stri
   const match = String(value).trim().match(/^(\D*)(\d+)(\D*)$/)
   if (!match) return null
   return { prefix: match[1], num: match[2], suffix: match[3] }
+}
+
+/* ============ Tasks & Teams ============ */
+
+const TAG_LABELS: Record<Todo['tag'], string> = { crit: 'Critical', high: 'High', norm: 'Normal' }
+export function todoTagLabel(tag: Todo['tag']): string {
+  return TAG_LABELS[tag] ?? tag
+}
+
+/** Display text + "is it due today" for a task's due date — derived, not stored. */
+export function todoDueDisplay(todo: Pick<Todo, 'dueDate' | 'done' | 'completedAt'>): { text: string; today: boolean } {
+  if (todo.done) {
+    return { text: todo.completedAt ? `Completed ${fmtDate(todo.completedAt.slice(0, 10))}` : 'Completed', today: false }
+  }
+  if (!todo.dueDate) return { text: 'No due date', today: false }
+  const today = localIsoDate()
+  if (todo.dueDate === today) return { text: 'Due today', today: true }
+  if (todo.dueDate === addDaysIso(today, 1)) return { text: 'Due tomorrow', today: false }
+  if (todo.dueDate < today) return { text: `Overdue — ${fmtDate(todo.dueDate)}`, today: true }
+  return { text: `Due ${fmtDate(todo.dueDate)}`, today: false }
+}
+
+/** "Team: Electrical" / "Jane Smith" / "" (unassigned) — resolves the team name by id. */
+export function todoAssignmentLabel(todo: Pick<Todo, 'assignedTeamId' | 'assignedEmail' | 'assignedName'>, teams: Team[]): string {
+  if (todo.assignedTeamId) {
+    const team = teams.find((t) => t.id === todo.assignedTeamId)
+    return team ? `Team: ${team.name}` : 'Team (removed)'
+  }
+  if (todo.assignedName || todo.assignedEmail) return todo.assignedName || todo.assignedEmail || ''
+  return ''
+}
+
+/** True if `userEmail` is directly assigned, or is a member of the team the task is assigned to. */
+export function isTodoMine(todo: Todo, userEmail: string | null, teams: Team[]): boolean {
+  if (!userEmail) return false
+  const email = userEmail.toLowerCase()
+  if (todo.assignedEmail && todo.assignedEmail.toLowerCase() === email) return true
+  if (todo.assignedTeamId) {
+    const team = teams.find((t) => t.id === todo.assignedTeamId)
+    if (team && team.members.some((m) => m.email.toLowerCase() === email)) return true
+  }
+  return false
 }

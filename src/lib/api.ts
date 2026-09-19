@@ -20,6 +20,7 @@
 import { useApiFn } from './useApiFn'
 import { supabase } from './supabaseClient'
 import { FALLBACK_WORKFLOW_ITEMS, type WorkflowItem } from '../pages/arcapp/workflowItems'
+import type { Team, TeamMember, Todo, TaskTag } from '../pages/arcapp/types'
 
 // ---------------------------------------------------------------------------
 // shared helpers
@@ -773,4 +774,150 @@ async function saveWorkflows(params: { workflows: Workflow[] }): Promise<{ count
 }
 export function useSaveWorkflows() {
   return useApiFn(saveWorkflows)
+}
+
+// ---------------------------------------------------------------------------
+// teams — the roster used to assign To-Do tasks. New tables (arcapp_teams, arcapp_tasks); see
+// supabase/schema.sql. Open to anon + authenticated, same as arcapp_workflows (see policies.sql)
+// — no sign-in required to build teams or create/assign tasks, by request.
+// ---------------------------------------------------------------------------
+
+export type { Team, TeamMember }
+
+function toTeam(r: { id: string; name: string; members: unknown }): Team {
+  return {
+    id: r.id,
+    name: r.name,
+    members: Array.isArray(r.members) ? (r.members as TeamMember[]) : [],
+  }
+}
+async function getTeams(): Promise<Team[]> {
+  const res = await supabase.from('arcapp_teams').select('id, name, members').order('name', { ascending: true })
+  const rows = unwrap(res) as Array<{ id: string; name: string; members: unknown }>
+  return rows.map(toTeam)
+}
+export function useGetTeams() {
+  return useApiFn(getTeams)
+}
+
+export type TeamInput = { id?: string; name: string; members: TeamMember[] }
+async function saveTeam(params: TeamInput): Promise<{ id: string }> {
+  const name = params.name.trim()
+  if (!name) throw new Error('A team name is required.')
+  const members = params.members.map((m) => ({ name: m.name.trim(), email: m.email.trim() })).filter((m) => m.name)
+  const updatedBy = (await getCurrentUserEmail()) || 'anonymous'
+
+  const record = { name, members, updated_at: new Date().toISOString(), updated_by: updatedBy }
+  const res = params.id
+    ? await supabase.from('arcapp_teams').update(record).eq('id', params.id).select('id').single()
+    : await supabase.from('arcapp_teams').insert(record).select('id').single()
+  const row = unwrap(res) as { id: string }
+  return { id: row.id }
+}
+export function useSaveTeam() {
+  return useApiFn(saveTeam)
+}
+
+async function deleteTeam(params: { id: string }): Promise<{ id: string }> {
+  const res = await supabase.from('arcapp_teams').delete().eq('id', params.id)
+  if (res.error) throw new Error(res.error.message)
+  return { id: params.id }
+}
+export function useDeleteTeam() {
+  return useApiFn(deleteTeam)
+}
+
+// ---------------------------------------------------------------------------
+// tasks — the real, persisted To-Do list (arcapp_tasks). Replaces the old hardcoded sample data
+// in sampleData.ts. A task is assigned to at most one of: a team (assignedTeamId) or a specific
+// person (assignedEmail/assignedName) — never both.
+// ---------------------------------------------------------------------------
+
+function toTodo(r: Record<string, unknown>): Todo {
+  const tag = r.tag as string
+  return {
+    id: String(r.id),
+    text: (r.text as string) ?? '',
+    tag: tag === 'crit' || tag === 'high' ? (tag as TaskTag) : 'norm',
+    sys: (r.sys as string) ?? '',
+    dueDate: (r.due_date as string | null) ?? null,
+    done: !!r.done,
+    completedAt: (r.completed_at as string | null) ?? null,
+    assignedTeamId: (r.assigned_team_id as string | null) ?? null,
+    assignedEmail: (r.assigned_email as string | null) ?? null,
+    assignedName: (r.assigned_name as string | null) ?? null,
+  }
+}
+async function getTasks(): Promise<Todo[]> {
+  const res = await supabase
+    .from('arcapp_tasks')
+    .select('id, text, tag, sys, due_date, done, completed_at, assigned_team_id, assigned_email, assigned_name')
+    .order('done', { ascending: true })
+    .order('due_date', { ascending: true, nullsFirst: false })
+  const rows = unwrap(res) as Array<Record<string, unknown>>
+  return rows.map(toTodo)
+}
+export function useGetTasks() {
+  return useApiFn(getTasks)
+}
+
+export type TaskInput = {
+  id?: string
+  text: string
+  tag: TaskTag
+  sys: string
+  dueDate: string | null
+  assignedTeamId: string | null
+  assignedEmail: string | null
+  assignedName: string | null
+}
+async function saveTask(params: TaskInput): Promise<{ id: string }> {
+  const text = params.text.trim()
+  if (!text) throw new Error('Task text is required.')
+  const who = (await getCurrentUserEmail()) || 'anonymous'
+
+  const record: Record<string, unknown> = {
+    text,
+    tag: params.tag,
+    sys: params.sys.trim(),
+    due_date: params.dueDate || null,
+    assigned_team_id: params.assignedTeamId,
+    assigned_email: params.assignedEmail,
+    assigned_name: params.assignedName,
+    updated_at: new Date().toISOString(),
+    updated_by: who,
+  }
+  const res = params.id
+    ? await supabase.from('arcapp_tasks').update(record).eq('id', params.id).select('id').single()
+    : await supabase.from('arcapp_tasks').insert({ ...record, created_by: who }).select('id').single()
+  const row = unwrap(res) as { id: string }
+  return { id: row.id }
+}
+export function useSaveTask() {
+  return useApiFn(saveTask)
+}
+
+async function setTaskDone(params: { id: string; done: boolean }): Promise<{ id: string; done: boolean }> {
+  const res = await supabase
+    .from('arcapp_tasks')
+    .update({
+      done: params.done,
+      completed_at: params.done ? new Date().toISOString() : null,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', params.id)
+  if (res.error) throw new Error(res.error.message)
+  return { id: params.id, done: params.done }
+}
+export function useSetTaskDone() {
+  return useApiFn(setTaskDone)
+}
+
+async function deleteTask(params: { id: string }): Promise<{ id: string }> {
+  const res = await supabase.from('arcapp_tasks').delete().eq('id', params.id)
+  if (res.error) throw new Error(res.error.message)
+  return { id: params.id }
+}
+export function useDeleteTask() {
+  return useApiFn(deleteTask)
 }

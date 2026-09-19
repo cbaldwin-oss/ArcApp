@@ -61,6 +61,23 @@ directly:
   is CxAlloy's own project id, hardcoded in `src/lib/api.ts` (`CXALLOY_PROJECT_ID`) to match what
   the Apps Script itself already hardcodes.
 
+## To-Do — Teams & task assignment
+
+To-Dos are no longer hardcoded sample data — they're real, persisted rows (`arcapp_tasks`), and
+can be assigned to a **team** (`arcapp_teams`, a name + a `members` list of `{name, email}`) or to
+a specific person. Both tables are wide open (`anon` + `authenticated`, no editor check), same as
+Workflows — see `supabase/schema.sql`/`policies.sql`.
+
+- **Manage Teams** lives at the top of the To-Do page (`TeamsManager.tsx`) — create/rename/delete
+  teams, add/remove members. Deleting a team doesn't delete its tasks; they just fall back to
+  unassigned (`ON DELETE SET NULL`).
+- **My Tasks / All Tasks** toggle on the To-Do page, and the Dashboard's "Your To-Dos" widget,
+  filter by matching the signed-in user's email against a task's `assigned_email` or the member
+  list of its `assigned_team_id` (`isTodoMine()` in `utils.ts`). Signing in is only needed for
+  that personalized view — creating/editing/assigning/completing tasks and teams needs no sign-in.
+- The old sample-data To-Dos were carried over as real seed rows in `schema.sql` so the list isn't
+  empty on first load.
+
 ## Workflow items
 
 The Workflows builder reads its list of on-site modules from `arcapp_workflow_items`

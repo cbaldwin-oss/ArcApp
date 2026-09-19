@@ -286,6 +286,11 @@
 .arcapp .todo-due{ font-family:var(--font-mono); font-size:11px; color:var(--text-faint); }
 .arcapp .todo-due.today{ color:var(--amber); font-weight:600; }
 .arcapp .todo-sys{ font-family:var(--font-mono); font-size:11px; color:var(--text-faint); }
+.arcapp .todo-assigned{
+  font-family:var(--font-mono); font-size:10.5px; color:var(--green-soft);
+  background:var(--green-tint); border:1px solid var(--green-dim); border-radius:999px; padding:2px 9px;
+}
+.arcapp .todo-actions{ flex:0 0 auto; display:flex; gap:4px; align-self:flex-start; }
 
 /* ---------- milestones (orbit rings) ---------- */
 .arcapp .milestone-item{ display:flex; align-items:center; gap:16px; padding:15px 0; border-bottom:1px solid var(--border); }
