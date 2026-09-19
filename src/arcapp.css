@@ -32,9 +32,17 @@
   color:var(--text);
   font-family:var(--font-body);
   -webkit-font-smoothing:antialiased;
+  -webkit-tap-highlight-color:transparent;
 }
 
 .arcapp *{ box-sizing:border-box; }
+
+/* iPad Safari shows a gray flash on tap and adds a ~300ms delay before registering a second tap
+   (waiting to see if it's a double-tap-to-zoom) unless told these elements don't need that. */
+.arcapp a, .arcapp button, .arcapp input, .arcapp select, .arcapp [role="button"]{
+  -webkit-tap-highlight-color:transparent;
+  touch-action:manipulation;
+}
 
 @media (prefers-reduced-motion: reduce){
   .arcapp *{ animation:none !important; transition:none !important; }
@@ -163,7 +171,21 @@
     padding:8px 10px;
   }
   .arcapp-sidebar-nav{ flex-direction:row; gap:4px; }
-  .arcapp-sidebar-nav a{ flex:0 0 auto; white-space:nowrap; padding:9px 13px; }
+  .arcapp-sidebar-nav a{ flex:0 0 auto; white-space:nowrap; padding:12px 14px; min-height:44px; }
+}
+
+@media (max-width:860px){
+  /* iOS Safari zooms the whole page in on focus of any input/select/textarea under 16px — this
+     keeps forms usable on iPad without shrinking their size on desktop. */
+  .arcapp .seal-field input, .arcapp .seal-field select, .arcapp .seal-field textarea,
+  .arcapp .form-field input, .arcapp .form-field select, .arcapp .form-field textarea,
+  .arcapp .seal-preview-cell input, .arcapp .seal-preview-cell select{
+    font-size:16px;
+  }
+  .arcapp .topbar{ padding:0 16px; }
+  .arcapp .brand-tagline{ display:none; }
+  .arcapp .context-strip{ padding:10px 16px; }
+  .arcapp main{ padding:20px 16px 70px; }
 }
 
 .arcapp main{ flex:1; min-width:0; max-width:1200px; margin:0 auto; padding:30px 30px 90px; position:relative; z-index:1; }

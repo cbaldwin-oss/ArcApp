@@ -196,6 +196,28 @@ git push -u origin main
 
 (`.env` is already gitignored — don't commit real Supabase keys.)
 
+## iPad support & app icon
+
+The app is usable as a full-screen, installable iPad app, not just in Safari's browser chrome:
+
+- **`public/icon.svg`** is the source icon (the same arc mark as the in-app topbar logo, on a
+  dark rounded-square background). `public/apple-touch-icon.png`, `icon-192.png`, `icon-512.png`,
+  and `favicon-32.png` are rasterized from it — regenerate them with a headless-browser screenshot
+  (or any SVG-to-PNG tool) if `icon.svg` ever changes; there's no build step wired up to do this
+  automatically.
+- **`public/manifest.webmanifest`** + the `apple-mobile-web-app-*` meta tags in `index.html` mean
+  "Add to Home Screen" on iPad launches ArcApp full-screen (no Safari address bar), with the arc
+  icon and "ArcApp" as the name.
+- **`src/arcapp.css`** has a `max-width:860px` breakpoint (shared with the sidebar-to-top-nav
+  layout switch) that also: bumps form input/select font-size to 16px (Safari zooms the whole page
+  in on focus of anything smaller — this keeps desktop inputs at their normal, denser size while
+  avoiding that on iPad/phone widths), enlarges the nav-pill touch targets to ~44px, and hides the
+  topbar tagline so the header doesn't crowd on a portrait iPad. `touch-action:manipulation` and
+  `-webkit-tap-highlight-color:transparent` are set globally so taps register immediately instead
+  of waiting ~300ms for a possible double-tap-to-zoom, and without the gray tap-flash.
+- Below 860px wide the sidebar becomes a horizontally-scrollable top nav (portrait iPad); above it,
+  iPad landscape gets the same persistent left sidebar as desktop.
+
 ## Project layout
 
 ```
