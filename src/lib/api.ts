@@ -581,51 +581,114 @@ export function useSaveSetting() {
 }
 
 // ---------------------------------------------------------------------------
-// submittals — mirrors getSubmittals.ts / saveSubmittal.ts
+// submittals — replaces the old one-row-per-asset STY4Submittals model. A submittal is now its
+// own record (a title + an uploaded file) that applies to a whole SET of assets at once
+// (`assets`, a jsonb array) — editing its review_status/notes updates it for every one of those
+// assets simultaneously, since they all point at the same row instead of each having their own.
+// Files upload to the "submittals" Supabase Storage bucket (public bucket; only authorized
+// editors can write to it — see supabase/policies.sql).
 // ---------------------------------------------------------------------------
 
-export type SubmittalRow = {
-  asset_name: string
+export type Submittal = {
+  id: string
+  title: string
+  fileUrl: string
+  fileName: string
+  assets: string[]
+  reviewStatus: string
   notes: string
-  review_status: string
-  updated_by: string
-  updated_at: string
+  updatedBy: string
+  updatedAt: string
+  createdAt: string
 }
-async function getSubmittals(): Promise<SubmittalRow[]> {
-  const res = await supabase.from('STY4Submittals').select('asset_name, notes, review_status, updated_by, updated_at')
-  const rows = unwrap(res) as SubmittalRow[]
+async function getSubmittalsList(): Promise<Submittal[]> {
+  const res = await supabase
+    .from('arcapp_submittals')
+    .select('id, title, file_url, file_name, assets, review_status, notes, updated_by, updated_at, created_at')
+    .order('created_at', { ascending: false })
+  const rows = unwrap(res) as Array<{
+    id: string
+    title: string | null
+    file_url: string | null
+    file_name: string | null
+    assets: unknown
+    review_status: string | null
+    notes: string | null
+    updated_by: string | null
+    updated_at: string | null
+    created_at: string | null
+  }>
   return rows.map((r) => ({
-    asset_name: r.asset_name || '',
+    id: r.id,
+    title: r.title || '',
+    fileUrl: r.file_url || '',
+    fileName: r.file_name || '',
+    assets: Array.isArray(r.assets) ? (r.assets as string[]) : [],
+    reviewStatus: r.review_status || '',
     notes: r.notes || '',
-    review_status: r.review_status || '',
-    updated_by: r.updated_by || '',
-    updated_at: r.updated_at || '',
+    updatedBy: r.updated_by || '',
+    updatedAt: r.updated_at || '',
+    createdAt: r.created_at || '',
   }))
 }
-export function useGetSubmittals() {
-  return useApiFn(getSubmittals)
+export function useGetSubmittalsList() {
+  return useApiFn(getSubmittalsList)
 }
 
 const ALLOWED_SUBMITTAL_STATUSES = new Set(['', 'Not Started', 'In Review', 'Approved', 'Rejected'])
-async function saveSubmittal(params: { asset_name: string; notes: string; review_status: string }): Promise<{ asset_name: string }> {
-  if (!params.asset_name) throw new Error('asset_name is required')
-  if (!ALLOWED_SUBMITTAL_STATUSES.has(params.review_status)) throw new Error(`Invalid review status: ${params.review_status}`)
-  const updatedBy = await getCurrentUserEmail()
-  const res = await supabase.from('STY4Submittals').upsert(
-    {
-      asset_name: params.asset_name,
-      notes: params.notes || '',
-      review_status: params.review_status || '',
-      updated_by: updatedBy,
-      updated_at: new Date().toISOString(),
-    },
-    { onConflict: 'asset_name' },
-  )
+
+async function uploadSubmittalFile(params: { file: File }): Promise<{ url: string; name: string }> {
+  const ext = params.file.name.includes('.') ? params.file.name.split('.').pop() : ''
+  const path = `${Date.now()}_${Math.random().toString(16).slice(2)}${ext ? '.' + ext : ''}`
+  const res = await supabase.storage.from('submittals').upload(path, params.file)
   if (res.error) throw new Error(res.error.message)
-  return { asset_name: params.asset_name }
+  const { data } = supabase.storage.from('submittals').getPublicUrl(res.data.path)
+  return { url: data.publicUrl, name: params.file.name }
 }
-export function useSaveSubmittal() {
-  return useApiFn(saveSubmittal)
+export function useUploadSubmittalFile() {
+  return useApiFn(uploadSubmittalFile)
+}
+
+export type SubmittalInput = {
+  id?: string
+  title: string
+  fileUrl: string
+  fileName: string
+  assets: string[]
+  reviewStatus: string
+  notes: string
+}
+async function saveSubmittalRecord(params: SubmittalInput): Promise<{ id: string }> {
+  const title = params.title.trim()
+  if (!title) throw new Error('A title is required.')
+  if (!ALLOWED_SUBMITTAL_STATUSES.has(params.reviewStatus)) throw new Error(`Invalid review status: ${params.reviewStatus}`)
+  const updatedBy = (await getCurrentUserEmail()) || 'admin'
+  const record: Record<string, unknown> = {
+    title,
+    file_url: params.fileUrl,
+    file_name: params.fileName,
+    assets: params.assets,
+    review_status: params.reviewStatus,
+    notes: params.notes,
+    updated_by: updatedBy,
+    updated_at: new Date().toISOString(),
+  }
+  if (params.id) record.id = params.id
+  const res = await supabase.from('arcapp_submittals').upsert(record, { onConflict: 'id' }).select('id').single()
+  const row = unwrap(res) as { id: string }
+  return { id: row.id }
+}
+export function useSaveSubmittalRecord() {
+  return useApiFn(saveSubmittalRecord)
+}
+
+async function deleteSubmittalRecord(params: { id: string }): Promise<{ id: string }> {
+  const res = await supabase.from('arcapp_submittals').delete().eq('id', params.id)
+  if (res.error) throw new Error(res.error.message)
+  return { id: params.id }
+}
+export function useDeleteSubmittalRecord() {
+  return useApiFn(deleteSubmittalRecord)
 }
 
 // ---------------------------------------------------------------------------

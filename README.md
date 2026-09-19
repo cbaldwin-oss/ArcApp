@@ -16,8 +16,10 @@ client library — the UI (components, styling, behavior) is unchanged.
 | Access control via Retool's `checkEditor` backend function | Same logic (`STY4authorized_editors` lookup), now run client-side + enforced via RLS |
 
 Everything else — `STY4dropdownoptions`, `STY4BackEndData`, `STY4Assets`, `STY4RTFT`,
-`STY4Submittals`, `STY4authorized_editors` — is unchanged; this app reads/writes the exact same
-Supabase project and tables it already used inside Retool.
+`STY4authorized_editors` — is unchanged; this app reads/writes the exact same Supabase project and
+tables it already used inside Retool. The one exception is `STY4Submittals`: it's no longer used
+at all — Submittals were reworked onto a new `arcapp_submittals` table (see below) — but it still
+exists in your database untouched, in case something else reads it.
 
 ## Known gaps (things Retool was doing that this export doesn't replicate)
 
@@ -123,6 +125,12 @@ editable grid → "Confirm & Save" flow as always, writing to the same `STY4Asse
   pairing (that table's rows are correlated tuples: Places, Times, Activities, Assets,
   Trade_Partners, Results, Zone). Picking an asset looks up its place from that same table instead
   of asking for it — there's no separate Place input to fill in.
+- **Asset field is a type-to-filter combobox** (`AssetPicker` in `TamperSealLogPanel.tsx`), not a
+  plain `<select>` or a `<datalist>` — with 100+ assets a native select is unusable, and
+  `<datalist>`'s suggestions don't reliably show on iOS Safari, which matters since this runs on
+  iPad. It's a text input + a live-filtered click-to-pick list; typing without picking never
+  changes the actual selected asset (so Place/Confirm stay tied to the last real pick), and
+  clicking away reverts the typed text back to whatever's actually selected.
 - **Signoff**: already automatic and unrelated to this change — `logTamperSeals()` stamps
   `signoff` from the signed-in session's email server-side on every insert (activity-drawer or
   standalone), and the form's hint line under Generate Preview shows "Signed in as X" (or "not
@@ -130,6 +138,33 @@ editable grid → "Confirm & Save" flow as always, writing to the same `STY4Asse
 - `TamperSealSection` itself was generalized to take a plain `assetName`/`location` pair instead
   of requiring a whole `ScheduleRow` — the Activity Drawer usage just passes
   `activeRow.asset`/`activeRow.place` now.
+
+## Submittals — one record per document, applied to many assets
+
+Reworked from the ground up. The old model (`STY4Submittals`) was one row **per asset** — every
+asset had its own independent review status/notes, with no way to represent "this one document
+covers 12 assets" other than repeating the same review by hand 12 times. The new model
+(`SubmittalsManager.tsx`, backed by a new `arcapp_submittals` table) flips that: a submittal is its
+own record — a title, an uploaded file, and a `assets` array — and setting its review status/notes
+once applies to every asset in that array simultaneously, because they all point at the same row.
+There's no propagation logic to get right; it's just what "one row, many assets" already means.
+
+- **Uploading a file**: `useUploadSubmittalFile()` sends it straight to Supabase Storage (a new
+  public `submittals` bucket, created alongside the table), which is the one part of this that
+  needed net-new infrastructure — everything else in the app either reads Google Sheets (CxAlloy,
+  Joint Pack Photos) or writes to Postgres directly. The bucket is public for reads (so a
+  submittal's file link works for anyone with it) but writes are editor-gated, same as the table.
+- **Picking assets**: the same search-box-plus-checkbox-list-plus-chips picker `WorkflowsBuilder`
+  already uses for linking Activities to a Workflow (`Select all`/`Select all shown`/`Deselect
+  all`, matching whatever's currently filtered) — reused here for Assets instead, since the
+  interaction is identical: pick a subset of a long list, see it as removable chips.
+- **RLS**: viewable without signing in (`submittals_select_public`, matching Checklists/Issues/
+  Joint Pack Photos — status is useful to anyone on-site), but creating/editing/deleting a
+  submittal (and uploading/replacing/removing its file in Storage) requires being an authorized
+  editor — this was already true client-side via the old panel's `canEdit` gate, now it's also
+  enforced by real RLS policies instead of trusting the UI alone.
+- `STY4Submittals` itself is untouched and still exists in the database — nothing currently reads
+  it, so it's safe to leave alone (or drop later) unless something else depends on it.
 
 ## To-Do — Teams & task assignment
 
@@ -231,9 +266,11 @@ and we don't know what it expects. Before going live:
    `STY4authorized_editors` in the Supabase dashboard (Auth → Policies) — confirm they allow what
    this app needs (`authenticated` read on all four; `authenticated` + editor-only write on
    `STY4Assets`/`STY4BackEndData`).
-2. Decide what to do about `STY4RTFT` and `STY4Submittals` having RLS **disabled** — right now
-   that means anyone with the anon key can read/write them with no restriction. Commented-out
-   policies matching the pattern used elsewhere are in `supabase/policies.sql` — coordinate with
+2. Decide what to do about `STY4RTFT` having RLS **disabled** — right now that means anyone with
+   the anon key can read/write it with no restriction. (`STY4Submittals` has the same problem, but
+   this app no longer reads or writes it at all — see above — so it's only a concern if something
+   else still depends on it.) Commented-out policies matching the pattern used elsewhere are in
+   `supabase/policies.sql` — coordinate with
    whoever owns the LaunchPad app before flipping this on, since enabling RLS with no matching
    policy will break existing access.
 3. Supabase Auth: this app assumes `auth.jwt() ->> 'email'` matches an email in

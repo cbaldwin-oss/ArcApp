@@ -135,3 +135,45 @@ CREATE POLICY "authorized_users_write_editors" ON arcapp_authorized_users
   FOR ALL TO authenticated
   USING (EXISTS (SELECT 1 FROM "STY4authorized_editors" e WHERE lower(e.email) = lower(auth.jwt() ->> 'email')))
   WITH CHECK (EXISTS (SELECT 1 FROM "STY4authorized_editors" e WHERE lower(e.email) = lower(auth.jwt() ->> 'email')));
+
+
+-- =============================================================================
+-- NOT YET APPLIED — arcapp_submittals (requested 2026-09-19). Viewable without signing in
+-- (matches Checklists/Issues/Joint Pack Photos — status is useful to anyone on-site), writes
+-- editor-gated (matches the old STY4Submittals reviewer's canEdit gate in the UI, now enforced
+-- for real instead of just client-side).
+-- =============================================================================
+
+ALTER TABLE arcapp_submittals ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "submittals_select_public" ON arcapp_submittals
+  FOR SELECT TO anon, authenticated USING (true);
+
+CREATE POLICY "submittals_write_editors" ON arcapp_submittals
+  FOR ALL TO authenticated
+  USING (EXISTS (SELECT 1 FROM "STY4authorized_editors" e WHERE lower(e.email) = lower(auth.jwt() ->> 'email')))
+  WITH CHECK (EXISTS (SELECT 1 FROM "STY4authorized_editors" e WHERE lower(e.email) = lower(auth.jwt() ->> 'email')));
+
+-- Storage: the "submittals" bucket (created in schema.sql) is a PUBLIC bucket, so reading an
+-- uploaded file's public URL needs no policy at all — but writes to storage.objects always need
+-- one regardless of bucket visibility, or every upload gets rejected.
+CREATE POLICY "submittals_bucket_insert_editors" ON storage.objects
+  FOR INSERT TO authenticated
+  WITH CHECK (
+    bucket_id = 'submittals'
+    AND EXISTS (SELECT 1 FROM "STY4authorized_editors" e WHERE lower(e.email) = lower(auth.jwt() ->> 'email'))
+  );
+
+CREATE POLICY "submittals_bucket_update_editors" ON storage.objects
+  FOR UPDATE TO authenticated
+  USING (
+    bucket_id = 'submittals'
+    AND EXISTS (SELECT 1 FROM "STY4authorized_editors" e WHERE lower(e.email) = lower(auth.jwt() ->> 'email'))
+  );
+
+CREATE POLICY "submittals_bucket_delete_editors" ON storage.objects
+  FOR DELETE TO authenticated
+  USING (
+    bucket_id = 'submittals'
+    AND EXISTS (SELECT 1 FROM "STY4authorized_editors" e WHERE lower(e.email) = lower(auth.jwt() ->> 'email'))
+  );

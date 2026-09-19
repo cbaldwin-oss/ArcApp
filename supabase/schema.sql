@@ -139,3 +139,33 @@ SELECT DISTINCT lower(email), 'migration (seeded from STY4authorized_editors)'
 FROM "STY4authorized_editors"
 WHERE email IS NOT NULL AND email <> ''
 ON CONFLICT (email) DO NOTHING;
+
+-- ---------------------------------------------------------------------------
+-- NOT YET APPLIED — arcapp_submittals (requested 2026-09-19).
+--
+-- Replaces the old STY4Submittals-backed reviewer, which was one row per ASSET. A submittal is
+-- now its own record — a title + an uploaded file — that applies to a whole SET of assets at
+-- once (`assets`, a jsonb array of asset names). Its `review_status`/`notes` apply to every asset
+-- in that array simultaneously, since they all share this one row instead of each having their
+-- own — that's the whole point, not extra logic layered on top.
+--
+-- Files upload to the "submittals" Supabase Storage bucket (created below, public read so links
+-- work for anyone; writes are editor-gated — see supabase/policies.sql).
+-- ---------------------------------------------------------------------------
+
+CREATE TABLE IF NOT EXISTS arcapp_submittals (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  title text NOT NULL,
+  file_url text,
+  file_name text,
+  assets jsonb NOT NULL DEFAULT '[]'::jsonb,
+  review_status text NOT NULL DEFAULT '',
+  notes text NOT NULL DEFAULT '',
+  updated_by text,
+  updated_at timestamptz NOT NULL DEFAULT now(),
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+
+INSERT INTO storage.buckets (id, name, public)
+SELECT 'submittals', 'submittals', true
+WHERE NOT EXISTS (SELECT 1 FROM storage.buckets WHERE id = 'submittals');
