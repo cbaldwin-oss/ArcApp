@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { Save } from 'lucide-react'
 import WorkflowsBuilder from './WorkflowsBuilder'
 import CxAlloyStatusPicker from './CxAlloyStatusPicker'
+import AuthorizedUsersManager from './AuthorizedUsersManager'
 
 type Props = {
   jointPackFolder: string
@@ -122,6 +123,8 @@ export default function SettingsPanel({
         />
 
         <WorkflowsBuilder canEdit={canManageWorkflows} canEditItems={canEdit} />
+
+        <AuthorizedUsersManager canEdit={canEdit} />
       </div>
     </section>
   )

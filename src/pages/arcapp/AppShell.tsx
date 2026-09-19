@@ -15,6 +15,7 @@ import Topbar from './components/Topbar'
 import Sidebar from './components/Sidebar'
 import ContextStrip from './components/ContextStrip'
 import ActivityDrawer from './components/ActivityDrawer'
+import SignInModal from './components/SignInModal'
 import type { SealPayloadRow } from './components/TamperSealSection'
 import type { RtftPayload } from './components/RtftSection'
 
@@ -28,7 +29,8 @@ const SOURCE_LABEL = 'STY4BackEndData'
  * footer) and the Activity Drawer, which can be opened from more than one page.
  */
 export default function AppShell() {
-  const { user, signInWithEmail, signOut } = useCurrentUser()
+  const { user, authError, signInWithGoogle, signInWithEmail, signOut, clearAuthError } = useCurrentUser()
+  const [signInOpen, setSignInOpen] = useState(false)
 
   const scheduleFn = useGetSchedule()
   const optionsFn = useGetResultOptions()
@@ -118,27 +120,25 @@ export default function AppShell() {
   const issueReviewStatuses = settingsData?.issueReviewStatuses ?? []
   const driveReady = false // turns on once the "ArcApp Connections" Google Drive resource is connected
 
-  const userName = user?.email ?? null
+  const userName = user?.name ?? null
   const initials = user
-    ? `${user.firstName?.[0] ?? ''}${user.lastName?.[0] ?? ''}`.toUpperCase() ||
-      (user.email?.slice(0, 2).toUpperCase() ?? '?')
+    ? (() => {
+        const parts = user.name.trim().split(/\s+/).filter(Boolean)
+        const fromName = parts.length >= 2 ? `${parts[0][0]}${parts[parts.length - 1][0]}` : parts[0]?.slice(0, 2) ?? ''
+        return (fromName || user.email.slice(0, 2)).toUpperCase()
+      })()
     : '?'
 
   function goToDate(iso: string) {
     setSelectedDate(iso)
   }
 
-  // Minimal magic-link auth control. Retool used to handle sign-in automatically; replace this
-  // with a proper login form/modal when you're ready for something nicer.
-  async function handleAuthClick() {
+  function handleAuthClick() {
     if (user) {
-      await signOut()
+      void signOut()
       return
     }
-    const email = window.prompt('Enter your work email to sign in:')
-    if (!email) return
-    const { error } = await signInWithEmail(email.trim())
-    window.alert(error ? `Sign-in failed: ${error}` : `Check ${email} for a sign-in link.`)
+    setSignInOpen(true)
   }
 
   function handleRefresh() {
@@ -299,6 +299,14 @@ export default function AppShell() {
       <div className="starfield" />
 
       <Topbar userName={userName} userInitials={initials} onAuthClick={handleAuthClick} />
+      {authError && (
+        <div className="auth-error-banner">
+          <span>{authError}</span>
+          <button onClick={clearAuthError} aria-label="Dismiss">
+            &times;
+          </button>
+        </div>
+      )}
       <ContextStrip />
 
       <div className="arcapp-layout">
@@ -329,6 +337,14 @@ export default function AppShell() {
           onSaveSeals={saveSeals}
           onSubmitRTFT={submitRTFT}
           onOpenPhotos={openPhotos}
+        />
+      )}
+
+      {signInOpen && (
+        <SignInModal
+          onClose={() => setSignInOpen(false)}
+          onGoogle={signInWithGoogle}
+          onEmail={signInWithEmail}
         />
       )}
     </div>

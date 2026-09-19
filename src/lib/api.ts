@@ -921,3 +921,47 @@ async function deleteTask(params: { id: string }): Promise<{ id: string }> {
 export function useDeleteTask() {
   return useApiFn(deleteTask)
 }
+
+// ---------------------------------------------------------------------------
+// authorized users — who may sign in to ArcApp at all (arcapp_authorized_users). Separate from
+// STY4authorized_editors (edit rights) by request. The actual sign-in gate (checking a freshly
+// signed-in email against this table and signing back out if absent) lives in
+// src/lib/useCurrentUser.ts, not here — this section is just the admin management CRUD, editor-
+// gated the same way as everything else in Settings.
+// ---------------------------------------------------------------------------
+
+export type AuthorizedUser = { id: string; email: string; name: string }
+
+async function getAuthorizedUsers(): Promise<AuthorizedUser[]> {
+  const res = await supabase.from('arcapp_authorized_users').select('id, email, name').order('email', { ascending: true })
+  const rows = unwrap(res) as Array<{ id: string; email: string; name: string | null }>
+  return rows.map((r) => ({ id: r.id, email: r.email, name: r.name ?? '' }))
+}
+export function useGetAuthorizedUsers() {
+  return useApiFn(getAuthorizedUsers)
+}
+
+async function saveAuthorizedUser(params: { id?: string; email: string; name: string }): Promise<{ id: string }> {
+  const email = params.email.trim().toLowerCase()
+  if (!email) throw new Error('An email is required.')
+  const who = (await getCurrentUserEmail()) || 'admin'
+
+  const record = { email, name: params.name.trim(), added_by: who }
+  const res = params.id
+    ? await supabase.from('arcapp_authorized_users').update(record).eq('id', params.id).select('id').single()
+    : await supabase.from('arcapp_authorized_users').insert(record).select('id').single()
+  const row = unwrap(res) as { id: string }
+  return { id: row.id }
+}
+export function useSaveAuthorizedUser() {
+  return useApiFn(saveAuthorizedUser)
+}
+
+async function deleteAuthorizedUser(params: { id: string }): Promise<{ id: string }> {
+  const res = await supabase.from('arcapp_authorized_users').delete().eq('id', params.id)
+  if (res.error) throw new Error(res.error.message)
+  return { id: params.id }
+}
+export function useDeleteAuthorizedUser() {
+  return useApiFn(deleteAuthorizedUser)
+}

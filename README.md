@@ -78,6 +78,28 @@ Workflows — see `supabase/schema.sql`/`policies.sql`.
 - The old sample-data To-Dos were carried over as real seed rows in `schema.sql` so the list isn't
   empty on first load.
 
+## Sign-in — Google OAuth + an authorized-users allowlist
+
+Sign-in is now a real modal (`SignInModal.tsx`, replacing the old `window.prompt()` hack) with
+**Google as the primary option** and the original magic-link email as a fallback. Either way, the
+result is gated: `src/lib/useCurrentUser.ts` checks the signed-in email against a new
+`arcapp_authorized_users` table (not `STY4authorized_editors` — a deliberately separate list, since
+sign-in eligibility and edit rights are different questions) and immediately signs back out anyone
+not on it, surfacing why in a banner. Manage the list from Settings → Authorized Users
+(editor-gated); it was seeded from `STY4authorized_editors` so turning this on doesn't lock out
+everyone who currently has edit rights — prune/extend it from there.
+
+**Google sign-in needs one-time setup this repo can't do for you** — `supabase.auth.signInWithOAuth({ provider: 'google' })`
+is called from the app, but nothing happens until:
+1. **Google Cloud Console** → create an OAuth 2.0 Client ID (Web application). Authorized redirect
+   URI: `https://rcnxetcomdrlxvlarqoc.supabase.co/auth/v1/callback`. Authorized JavaScript origins:
+   your dev URL (`http://localhost:5173`) and whatever production domain this ends up on.
+2. **Supabase Dashboard** → Authentication → Providers → Google → paste that Client ID/Secret,
+   enable the provider.
+
+Until that's done, clicking "Sign in with Google" will fail with an error from Supabase (shown in
+the modal) — the magic-link fallback keeps working in the meantime, so sign-in isn't blocked on it.
+
 ## Workflow items
 
 The Workflows builder reads its list of on-site modules from `arcapp_workflow_items`

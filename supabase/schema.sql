@@ -110,3 +110,32 @@ SELECT * FROM (VALUES
   ('File inspection request — Emergency Lighting circuit EL-14',     'norm', 'EL-14',  CURRENT_DATE - 4, true,  now())
 ) AS seed(text, tag, sys, due_date, done, completed_at)
 WHERE NOT EXISTS (SELECT 1 FROM arcapp_tasks);
+
+-- ---------------------------------------------------------------------------
+-- NOT YET APPLIED — arcapp_authorized_users (requested 2026-09-18).
+--
+-- A dedicated, separate allowlist for who may actually SIGN IN to ArcApp at all — deliberately
+-- not the same table as STY4authorized_editors (which governs edit rights and is shared with
+-- other apps). Someone can be an authorized_user without being an editor, or vice versa.
+--
+-- The sign-in gate itself lives in src/lib/useCurrentUser.ts: after any successful auth (Google
+-- or magic-link), it checks the signed-in email against this table and immediately signs back out
+-- anyone not on it.
+-- ---------------------------------------------------------------------------
+
+CREATE TABLE IF NOT EXISTS arcapp_authorized_users (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  email text NOT NULL UNIQUE,
+  name text NOT NULL DEFAULT '',
+  created_at timestamptz NOT NULL DEFAULT now(),
+  added_by text
+);
+
+-- Seed from STY4authorized_editors so turning this gate on doesn't lock out everyone who
+-- currently has edit rights — review/prune the list from Settings afterward. ON CONFLICT DO
+-- NOTHING makes this safe to re-run.
+INSERT INTO arcapp_authorized_users (email, added_by)
+SELECT DISTINCT lower(email), 'migration (seeded from STY4authorized_editors)'
+FROM "STY4authorized_editors"
+WHERE email IS NOT NULL AND email <> ''
+ON CONFLICT (email) DO NOTHING;

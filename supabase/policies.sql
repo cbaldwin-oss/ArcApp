@@ -112,3 +112,26 @@ CREATE POLICY "tasks_select_public" ON arcapp_tasks
   FOR SELECT TO anon, authenticated USING (true);
 CREATE POLICY "tasks_write_public" ON arcapp_tasks
   FOR ALL TO anon, authenticated USING (true) WITH CHECK (true);
+
+
+-- =============================================================================
+-- NOT YET APPLIED — arcapp_authorized_users (sign-in gate). Deliberately NOT wide open like
+-- the tables above — this IS the access control list.
+--
+-- Read is scoped to your OWN row only (lower(email) = your JWT's email) — the app only ever
+-- needs to check "is *I* on this list", never enumerate who else is, so no anon read at all and
+-- no way for a signed-in user to see the whole roster. Editors additionally get full read+write
+-- (for the management UI in Settings) via the second, ALL-scoped policy — Postgres RLS ORs
+-- multiple permissive policies for the same command together, so both apply at once.
+-- =============================================================================
+
+ALTER TABLE arcapp_authorized_users ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "authorized_users_select_own" ON arcapp_authorized_users
+  FOR SELECT TO authenticated
+  USING (lower(email) = lower(auth.jwt() ->> 'email'));
+
+CREATE POLICY "authorized_users_write_editors" ON arcapp_authorized_users
+  FOR ALL TO authenticated
+  USING (EXISTS (SELECT 1 FROM "STY4authorized_editors" e WHERE lower(e.email) = lower(auth.jwt() ->> 'email')))
+  WITH CHECK (EXISTS (SELECT 1 FROM "STY4authorized_editors" e WHERE lower(e.email) = lower(auth.jwt() ->> 'email')));
