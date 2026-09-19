@@ -3,6 +3,7 @@ import { Camera, FolderOpen, Plus, RefreshCw } from 'lucide-react'
 import { useGetJointPackData, useLogJointPackPhotos } from '../../../lib/api'
 import type { JointPackRow, JointPackSide } from '../../../lib/api'
 import { compressImageFile } from '../utils'
+import CameraCaptureModal from './CameraCaptureModal'
 
 type Props = {
   /** Google Drive folder ID from Settings — see the label there for how to find one. */
@@ -304,23 +305,38 @@ function JointPackRowItem({
   onLogged: () => void
 }) {
   const logFn = useLogJointPackPhotos()
-  const [files, setFiles] = useState<Partial<Record<JointPackSide, File>>>({})
+  // Always a compressed data URL, whichever source it came from (camera or file picker) — so
+  // save() has one shape to send regardless of how the photo got taken.
+  const [pending, setPending] = useState<Partial<Record<JointPackSide, string>>>({})
+  const [cameraOpen, setCameraOpen] = useState(false)
   const [error, setError] = useState('')
   const [saving, setSaving] = useState(false)
 
   const urls = sideUrls(row)
 
-  function pickFile(side: JointPackSide, file: File | null) {
-    setFiles((f) => {
-      const next = { ...f }
-      if (file) next[side] = file
+  function setPendingSide(side: JointPackSide, dataUrl: string | null) {
+    setPending((p) => {
+      const next = { ...p }
+      if (dataUrl) next[side] = dataUrl
       else delete next[side]
       return next
     })
   }
 
+  async function pickFile(side: JointPackSide, file: File | null) {
+    if (!file) {
+      setPendingSide(side, null)
+      return
+    }
+    try {
+      setPendingSide(side, await compressImageFile(file))
+    } catch (err) {
+      setError('Could not read that photo: ' + (err instanceof Error ? err.message : String(err)))
+    }
+  }
+
   async function save() {
-    const entries = Object.entries(files) as Array<[JointPackSide, File]>
+    const entries = Object.entries(pending) as Array<[JointPackSide, string]>
     if (!entries.length) {
       setError('Attach at least one photo.')
       return
@@ -332,11 +348,9 @@ function JointPackRowItem({
     setSaving(true)
     setError('')
     try {
-      const photos = await Promise.all(
-        entries.map(async ([side, file]) => ({ side, dataUrl: await compressImageFile(file) })),
-      )
+      const photos = entries.map(([side, dataUrl]) => ({ side, dataUrl }))
       await logFn.trigger({ building, asset, jointPackNumber: row.jointPackNumber, photos }).result
-      setFiles({})
+      setPending({})
       onLogged()
     } catch (err) {
       setError('Failed to save: ' + (err instanceof Error ? err.message : String(err)))
@@ -351,7 +365,7 @@ function JointPackRowItem({
         <span className="wf-order-label" style={{ fontFamily: 'var(--font-mono)' }}>
           {row.jointPackNumber}
         </span>
-        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
           {SIDES.map((side) =>
             urls[side] ? (
               <a
@@ -364,6 +378,11 @@ function JointPackRowItem({
               >
                 {side} ✓
               </a>
+            ) : pending[side] ? (
+              <span key={side} className="status-chip go" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                <img src={pending[side]} className="camera-queued-thumb" alt="" />
+                {side} queued
+              </span>
             ) : (
               <span key={side} className="status-chip caution">
                 {side} needed
@@ -378,14 +397,24 @@ function JointPackRowItem({
 
       {open && (
         <>
+          <button
+            type="button"
+            className="camera-open-btn"
+            style={{ alignSelf: 'flex-start' }}
+            onClick={() => setCameraOpen(true)}
+          >
+            <Camera style={{ width: 15, height: 15 }} />
+            Open Camera
+          </button>
+
           <div className="seal-row3" style={{ gridTemplateColumns: 'repeat(3, 1fr)' }}>
             {SIDES.map((side) => (
               <div className="form-field" key={side} style={{ marginBottom: 0 }}>
                 <label>
                   {side}
-                  {urls[side] ? ' (replace)' : ''}
+                  {urls[side] ? ' (replace)' : ''} — or pick a file
                 </label>
-                <input type="file" accept="image/*" onChange={(e) => pickFile(side, e.target.files?.[0] ?? null)} />
+                <input type="file" accept="image/*" onChange={(e) => void pickFile(side, e.target.files?.[0] ?? null)} />
               </div>
             ))}
           </div>
@@ -401,6 +430,17 @@ function JointPackRowItem({
             </button>
             {error && <span className="q-hint err">{error}</span>}
           </div>
+
+          {cameraOpen && (
+            <CameraCaptureModal
+              title={`${asset} · ${row.jointPackNumber}`}
+              sides={SIDES}
+              existing={urls}
+              pending={pending}
+              onCapture={(side, dataUrl) => setPendingSide(side, dataUrl)}
+              onClose={() => setCameraOpen(false)}
+            />
+          )}
         </>
       )}
     </div>

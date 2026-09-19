@@ -87,6 +87,15 @@ different spreadsheet from CxAlloy's. `useGetJointPackData`/`useLogJointPackPhot
   **Extensions → Apps Script** on the "Joint Pack Photo - STY4A" spreadsheet and deployed as a web
   app (**Execute as: Me**, **Who has access: Anyone**) — its Drive permission is whatever Google
   account owns that deployment, so that account needs write access to the destination folder.
+- **In-page camera** (`CameraCaptureModal.tsx`): "Open Camera" on a Joint Pack # row opens a live
+  `getUserMedia` feed inside the app (rear camera preferred via `facingMode: environment`) with Top/
+  Side/Bottom tabs above it — tap a tab, tap the shutter, it auto-advances to whichever side still
+  needs a shot, all in one continuous session instead of bouncing out to the OS camera app three
+  times. Each shot is drawn to a canvas and compressed the same way as a picked file (1600px/0.82
+  JPEG) before being queued; closing the camera returns to the row with those shots already staged
+  as thumbnails, ready for **Save Photos**. A plain `<input type=file>` per side stays underneath as
+  a fallback (e.g. picking an existing photo from the library, or browsers without camera support).
+  Requires a secure context (HTTPS or localhost) and camera permission — Chrome/Safari will prompt.
 - Logging photos doesn't require signing in (same as Tamper Seal/RTFT logging) — only changing the
   destination folder in Settings is editor-gated.
 
