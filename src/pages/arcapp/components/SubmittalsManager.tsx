@@ -1,15 +1,20 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Plus, Pencil, Trash2, X, RefreshCw, Paperclip, ExternalLink } from 'lucide-react'
+import JSZip from 'jszip'
+import { Plus, Pencil, Trash2, RefreshCw, Paperclip, ExternalLink, Download, AlertTriangle } from 'lucide-react'
 import {
   useGetAssetOptions,
+  useGetSettings,
   useGetSubmittalsList,
   useSaveSubmittalRecord,
   useDeleteSubmittalRecord,
   useUploadSubmittalFile,
+  SUBMITTAL_STATUSES,
 } from '../../../lib/api'
 import type { Submittal } from '../../../lib/api'
+import { localIsoDate } from '../utils'
+import MultiSelectPicker from './MultiSelectPicker'
 
-const STATUSES = ['', 'Not Started', 'In Review', 'Approved', 'Rejected']
+const ALL_STATUSES = 'All statuses'
 
 function statusClass(s: string): string {
   const t = (s || '').toLowerCase()
@@ -20,11 +25,12 @@ function statusClass(s: string): string {
 }
 
 type FormState = { title: string; reviewStatus: string; notes: string; assets: string[] }
-const EMPTY_FORM: FormState = { title: '', reviewStatus: '', notes: '', assets: [] }
+const EMPTY_FORM: FormState = { title: '', reviewStatus: SUBMITTAL_STATUSES[0], notes: '', assets: [] }
 
 export default function SubmittalsManager({ canEdit }: { canEdit: boolean }) {
   const assetsFn = useGetAssetOptions()
   const listFn = useGetSubmittalsList()
+  const settingsFn = useGetSettings()
   const saveFn = useSaveSubmittalRecord()
   const deleteFn = useDeleteSubmittalRecord()
   const uploadFn = useUploadSubmittalFile()
@@ -32,6 +38,7 @@ export default function SubmittalsManager({ canEdit }: { canEdit: boolean }) {
   function load() {
     void assetsFn.trigger()
     void listFn.trigger()
+    void settingsFn.trigger()
   }
   useEffect(() => {
     load()
@@ -40,39 +47,49 @@ export default function SubmittalsManager({ canEdit }: { canEdit: boolean }) {
 
   const assets = (assetsFn.data as string[] | undefined) ?? []
   const submittals = listFn.data ?? []
-  const state = assetsFn.error || listFn.error ? 'error' : !assetsFn.data || !listFn.data ? 'loading' : 'ready'
-  const loading = assetsFn.loading || listFn.loading
+  const exemptAssets = settingsFn.data?.submittalExemptAssets ?? []
+  const state = assetsFn.error || listFn.error || settingsFn.error ? 'error' : !assetsFn.data || !listFn.data || !settingsFn.data ? 'loading' : 'ready'
+  const loading = assetsFn.loading || listFn.loading || settingsFn.loading
+
+  // Assets that don't need a submittal at all (marked exempt in Settings) never count against
+  // the total, so "missing" only ever flags assets that genuinely still need one.
+  const missingAssets = useMemo(() => {
+    const exemptSet = new Set(exemptAssets)
+    const covered = new Set(submittals.flatMap((s) => s.assets))
+    return assets.filter((a) => !exemptSet.has(a) && !covered.has(a))
+  }, [assets, exemptAssets, submittals])
+
+  const [statusFilter, setStatusFilter] = useState(ALL_STATUSES)
+  const filteredSubmittals = useMemo(
+    () => (statusFilter === ALL_STATUSES ? submittals : submittals.filter((s) => s.reviewStatus === statusFilter)),
+    [submittals, statusFilter],
+  )
 
   const [formOpen, setFormOpen] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [form, setForm] = useState<FormState>(EMPTY_FORM)
   const [existingFile, setExistingFile] = useState<{ url: string; name: string } | null>(null)
   const [pickedFile, setPickedFile] = useState<File | null>(null)
-  const [assetSearch, setAssetSearch] = useState('')
   const [formError, setFormError] = useState('')
   const [saving, setSaving] = useState(false)
   const [deleteId, setDeleteId] = useState<string | null>(null)
-
-  const availableAssets = useMemo(() => {
-    const q = assetSearch.trim().toLowerCase()
-    return q ? assets.filter((a) => a.toLowerCase().includes(q)) : assets
-  }, [assets, assetSearch])
+  const [statusBusyId, setStatusBusyId] = useState<string | null>(null)
+  const [exporting, setExporting] = useState(false)
+  const [exportError, setExportError] = useState('')
 
   function openNew() {
     setEditingId(null)
     setForm(EMPTY_FORM)
     setExistingFile(null)
     setPickedFile(null)
-    setAssetSearch('')
     setFormError('')
     setFormOpen(true)
   }
   function openEdit(s: Submittal) {
     setEditingId(s.id)
-    setForm({ title: s.title, reviewStatus: s.reviewStatus, notes: s.notes, assets: [...s.assets] })
+    setForm({ title: s.title, reviewStatus: s.reviewStatus || SUBMITTAL_STATUSES[0], notes: s.notes, assets: [...s.assets] })
     setExistingFile(s.fileUrl ? { url: s.fileUrl, name: s.fileName || s.fileUrl } : null)
     setPickedFile(null)
-    setAssetSearch('')
     setFormError('')
     setFormOpen(true)
   }
@@ -80,19 +97,6 @@ export default function SubmittalsManager({ canEdit }: { canEdit: boolean }) {
     setFormOpen(false)
     setEditingId(null)
     setFormError('')
-  }
-
-  function toggleAsset(asset: string, checked: boolean) {
-    setForm((f) => ({
-      ...f,
-      assets: checked ? [...f.assets.filter((a) => a !== asset), asset] : f.assets.filter((a) => a !== asset),
-    }))
-  }
-  function selectAllAssets() {
-    setForm((f) => ({ ...f, assets: Array.from(new Set([...f.assets, ...availableAssets])) }))
-  }
-  function deselectAllAssets() {
-    setForm((f) => ({ ...f, assets: [] }))
   }
 
   async function save() {
@@ -132,6 +136,24 @@ export default function SubmittalsManager({ canEdit }: { canEdit: boolean }) {
     }
   }
 
+  async function changeStatus(s: Submittal, reviewStatus: string) {
+    setStatusBusyId(s.id)
+    try {
+      await saveFn.trigger({
+        id: s.id,
+        title: s.title,
+        fileUrl: s.fileUrl,
+        fileName: s.fileName,
+        assets: s.assets,
+        reviewStatus,
+        notes: s.notes,
+      }).result
+      load()
+    } finally {
+      setStatusBusyId(null)
+    }
+  }
+
   async function confirmDelete(id: string) {
     setSaving(true)
     try {
@@ -145,12 +167,69 @@ export default function SubmittalsManager({ canEdit }: { canEdit: boolean }) {
     }
   }
 
+  async function exportFiltered() {
+    const withFiles = filteredSubmittals.filter((s) => s.fileUrl)
+    if (!withFiles.length) {
+      setExportError('None of the currently filtered submittals have a file attached.')
+      return
+    }
+    setExporting(true)
+    setExportError('')
+    try {
+      const zip = new JSZip()
+      const usedNames = new Set<string>()
+      for (const s of withFiles) {
+        const res = await fetch(s.fileUrl)
+        if (!res.ok) throw new Error(`Couldn't download "${s.title}" (HTTP ${res.status})`)
+        const blob = await res.blob()
+        const base = s.fileName || `${s.title}.bin`
+        let name = base
+        let n = 1
+        while (usedNames.has(name)) {
+          const dot = base.lastIndexOf('.')
+          name = dot > 0 ? `${base.slice(0, dot)} (${n})${base.slice(dot)}` : `${base} (${n})`
+          n += 1
+        }
+        usedNames.add(name)
+        zip.file(name, blob)
+      }
+      const archive = await zip.generateAsync({ type: 'blob' })
+      const url = URL.createObjectURL(archive)
+      const suffix = statusFilter === ALL_STATUSES ? 'all' : statusFilter.toLowerCase().replace(/\s+/g, '-')
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `submittals-${suffix}-${localIsoDate()}.zip`
+      document.body.appendChild(a)
+      a.click()
+      a.remove()
+      URL.revokeObjectURL(url)
+    } catch (err) {
+      setExportError('Export failed: ' + (err instanceof Error ? err.message : String(err)))
+    } finally {
+      setExporting(false)
+    }
+  }
+
   return (
     <section className="panel" id="submittals">
       <div className="panel-header">
         <div className="panel-header-left">
           <h2 className="panel-title">Submittals</h2>
           <span className="panel-count">{state === 'ready' ? `${submittals.length} submittals` : '—'}</span>
+          {state === 'ready' && (
+            <span
+              className={missingAssets.length > 0 ? 'status-chip caution' : 'status-chip go'}
+              title={
+                missingAssets.length > 0
+                  ? `Assets with no submittal yet: ${missingAssets.join(', ')}`
+                  : 'Every reviewable asset has at least one submittal.'
+              }
+              style={{ display: 'flex', alignItems: 'center', gap: 6 }}
+            >
+              <AlertTriangle style={{ width: 12, height: 12 }} />
+              {missingAssets.length} asset{missingAssets.length === 1 ? '' : 's'} missing a submittal
+            </span>
+          )}
         </div>
         <div className="panel-header-right" style={{ gap: 10 }}>
           {canEdit && !formOpen && (
@@ -174,7 +253,7 @@ export default function SubmittalsManager({ canEdit }: { canEdit: boolean }) {
         {state === 'loading' && <div className="q-hint">Loading…</div>}
         {state === 'error' && (
           <div className="table-error" style={{ padding: '16px 0' }}>
-            Couldn&apos;t load submittals or assets.
+            Couldn&apos;t load submittals, assets, or settings.
             <br />
             <button className="retry-btn" onClick={load}>
               Retry
@@ -199,9 +278,9 @@ export default function SubmittalsManager({ canEdit }: { canEdit: boolean }) {
                   <div className="form-field">
                     <label>Review status</label>
                     <select value={form.reviewStatus} onChange={(e) => setForm((f) => ({ ...f, reviewStatus: e.target.value }))}>
-                      {STATUSES.map((s) => (
+                      {SUBMITTAL_STATUSES.map((s) => (
                         <option key={s} value={s}>
-                          {s || '—'}
+                          {s}
                         </option>
                       ))}
                     </select>
@@ -229,60 +308,13 @@ export default function SubmittalsManager({ canEdit }: { canEdit: boolean }) {
                   />
                 </div>
 
-                <div className="form-field">
-                  <div className="wf-field-head">
-                    <label>Assets this submittal applies to (select one or more)</label>
-                    <div className="wf-bulk">
-                      <button
-                        type="button"
-                        className="wf-link-btn"
-                        disabled={availableAssets.length === 0 || availableAssets.every((a) => form.assets.includes(a))}
-                        onClick={selectAllAssets}
-                      >
-                        Select all{assetSearch.trim() ? ' shown' : ''}
-                      </button>
-                      <span className="wf-bulk-sep">·</span>
-                      <button type="button" className="wf-link-btn" disabled={form.assets.length === 0} onClick={deselectAllAssets}>
-                        Deselect all
-                      </button>
-                    </div>
-                  </div>
-                  {form.assets.length > 0 && (
-                    <div className="wf-chips" style={{ marginBottom: 8 }}>
-                      {form.assets.map((a) => (
-                        <span className="wf-chip" key={a}>
-                          {a}
-                          <button className="wf-remove" style={{ marginLeft: 2 }} title="Remove" onClick={() => toggleAsset(a, false)}>
-                            <X style={{ width: 12, height: 12 }} />
-                          </button>
-                        </span>
-                      ))}
-                    </div>
-                  )}
-                  <input type="text" placeholder="Search assets…" value={assetSearch} onChange={(e) => setAssetSearch(e.target.value)} />
-                  <div
-                    style={{
-                      marginTop: 6,
-                      maxHeight: 220,
-                      overflowY: 'auto',
-                      border: '1px solid var(--border-strong)',
-                      borderRadius: 'var(--radius-sm)',
-                      background: 'var(--bg-elev)',
-                      padding: '4px 10px',
-                    }}
-                  >
-                    {availableAssets.length === 0 ? (
-                      <div className="wf-order-empty">No matching assets.</div>
-                    ) : (
-                      availableAssets.map((a) => (
-                        <label key={a} className="wf-check-row">
-                          <input type="checkbox" checked={form.assets.includes(a)} onChange={(e) => toggleAsset(a, e.target.checked)} />
-                          {a}
-                        </label>
-                      ))
-                    )}
-                  </div>
-                </div>
+                <MultiSelectPicker
+                  label="Assets this submittal applies to (select one or more)"
+                  options={assets}
+                  selected={form.assets}
+                  onChange={(next) => setForm((f) => ({ ...f, assets: next }))}
+                  placeholder="Search assets…"
+                />
 
                 {formError && <div className="q-hint err">{formError}</div>}
 
@@ -297,13 +329,44 @@ export default function SubmittalsManager({ canEdit }: { canEdit: boolean }) {
               </div>
             )}
 
-            {submittals.length === 0 && !formOpen ? (
+            <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap', marginBottom: 16 }}>
+              <div className="form-field" style={{ marginBottom: 0, minWidth: 200 }}>
+                <label>Filter by status</label>
+                <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
+                  <option value={ALL_STATUSES}>{ALL_STATUSES}</option>
+                  {SUBMITTAL_STATUSES.map((s) => (
+                    <option key={s} value={s}>
+                      {s}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <button
+                type="button"
+                className="wf-btn"
+                style={{ display: 'flex', alignItems: 'center', gap: 6, alignSelf: 'flex-end', marginBottom: 1 }}
+                disabled={exporting || filteredSubmittals.length === 0}
+                onClick={exportFiltered}
+              >
+                <Download style={{ width: 13, height: 13 }} />
+                {exporting ? 'Exporting…' : `Export ${filteredSubmittals.length} as .zip`}
+              </button>
+            </div>
+            {exportError && (
+              <div className="q-hint err" style={{ marginTop: -8, marginBottom: 12 }}>
+                {exportError}
+              </div>
+            )}
+
+            {filteredSubmittals.length === 0 && !formOpen ? (
               <div className="q-hint" style={{ padding: '8px 0' }}>
-                No submittals yet.{canEdit ? ' Upload one to get started.' : ''}
+                {submittals.length === 0
+                  ? `No submittals yet.${canEdit ? ' Upload one to get started.' : ''}`
+                  : 'No submittals match this status filter.'}
               </div>
             ) : (
               <div className="wf-list">
-                {submittals.map((s) => (
+                {filteredSubmittals.map((s) => (
                   <div className="wf-card" key={s.id}>
                     <div className="wf-card-head" style={{ alignItems: 'flex-start' }}>
                       <div>
@@ -311,7 +374,23 @@ export default function SubmittalsManager({ canEdit }: { canEdit: boolean }) {
                           <span className="wf-order-label" style={{ fontSize: 14 }}>
                             {s.title}
                           </span>
-                          <span className={`status-chip ${statusClass(s.reviewStatus)}`}>{s.reviewStatus || 'No status'}</span>
+                          {canEdit ? (
+                            <select
+                              className="result-input"
+                              style={{ padding: '4px 8px', fontSize: 12 }}
+                              value={s.reviewStatus || SUBMITTAL_STATUSES[0]}
+                              disabled={statusBusyId === s.id}
+                              onChange={(e) => void changeStatus(s, e.target.value)}
+                            >
+                              {SUBMITTAL_STATUSES.map((st) => (
+                                <option key={st} value={st}>
+                                  {st}
+                                </option>
+                              ))}
+                            </select>
+                          ) : (
+                            <span className={`status-chip ${statusClass(s.reviewStatus)}`}>{s.reviewStatus || 'Not Started'}</span>
+                          )}
                         </div>
                         {s.fileUrl && (
                           <a

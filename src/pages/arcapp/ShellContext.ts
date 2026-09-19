@@ -49,6 +49,7 @@ export type ShellContext = {
 
   checklistReadyStatuses: string[]
   issueReviewStatuses: string[]
+  submittalExemptAssets: string[]
   settingsLoading: boolean
   onSaveSetting: (key: string, value: string) => Promise<void>
 }

@@ -113,11 +113,17 @@ export default function AppShell() {
   const workflowItems = (workflowItemsFn.data as WorkflowItem[] | undefined) ?? []
 
   const settingsData = settingsFn.data as
-    | { jointPackPhotosFolder?: string; checklistReadyStatuses?: string[]; issueReviewStatuses?: string[] }
+    | {
+        jointPackPhotosFolder?: string
+        checklistReadyStatuses?: string[]
+        issueReviewStatuses?: string[]
+        submittalExemptAssets?: string[]
+      }
     | undefined
   const jointPackFolder = settingsData?.jointPackPhotosFolder ?? ''
   const checklistReadyStatuses = settingsData?.checklistReadyStatuses ?? []
   const issueReviewStatuses = settingsData?.issueReviewStatuses ?? []
+  const submittalExemptAssets = settingsData?.submittalExemptAssets ?? []
 
   const userName = user?.name ?? null
   const initials = user
@@ -281,6 +287,7 @@ export default function AppShell() {
 
     checklistReadyStatuses,
     issueReviewStatuses,
+    submittalExemptAssets,
     settingsLoading: settingsFn.loading,
     onSaveSetting: saveSetting,
   }

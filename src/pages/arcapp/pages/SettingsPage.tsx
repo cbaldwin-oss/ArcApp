@@ -9,6 +9,7 @@ export default function SettingsPage() {
       jointPackFolder={ctx.jointPackFolder}
       checklistReadyStatuses={ctx.checklistReadyStatuses}
       issueReviewStatuses={ctx.issueReviewStatuses}
+      submittalExemptAssets={ctx.submittalExemptAssets}
       canEdit={ctx.canEdit}
       canManageWorkflows={ctx.canManageWorkflows}
       loading={ctx.settingsLoading}

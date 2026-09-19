@@ -8,6 +8,16 @@ ALTER TABLE arcapp_workflows ENABLE ROW LEVEL SECURITY;
 ALTER TABLE arcapp_settings ENABLE ROW LEVEL SECURITY;
 
 -- Any signed-in user can read app config (settings).
+--
+-- BUG (found 2026-09-19, NOT YET FIXED): this is `authenticated` only, no `anon` — meaning
+-- anyone not signed in currently gets NOTHING back from arcapp_settings (silently, not an
+-- error), which breaks Joint Pack Photos' Drive-folder/script-URL lookup, the Checklists/Issues
+-- ready-status filters, and the Submittals missing-count/exempt-assets list for every
+-- not-signed-in user — all of which are meant to work without signing in. Fix:
+--   DROP POLICY "settings_select_authenticated" ON arcapp_settings;
+--   CREATE POLICY "settings_select_public" ON arcapp_settings
+--     FOR SELECT TO anon, authenticated USING (true);
+-- Not applied automatically — changing a live RLS policy needs an explicit go-ahead.
 CREATE POLICY "settings_select_authenticated" ON arcapp_settings
   FOR SELECT TO authenticated USING (true);
 

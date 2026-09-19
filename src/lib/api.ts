@@ -539,10 +539,14 @@ export type AppSettings = {
   jointPackPhotosFolder: string
   checklistReadyStatuses: string[]
   issueReviewStatuses: string[]
+  /** Assets marked "not reviewable" — excluded entirely from the Submittals page's missing-
+   * coverage count (they'll never need a submittal, so they shouldn't count against the total). */
+  submittalExemptAssets: string[]
 }
 const SETTINGS_DEFAULTS = {
   checklistReadyStatuses: ['Finished'],
   issueReviewStatuses: ['Pending Verification'],
+  submittalExemptAssets: [] as string[],
 }
 function splitCsv(v: string | undefined, fallback: string[]): string[] {
   if (v === undefined || v === null) return fallback
@@ -557,13 +561,19 @@ async function getSettings(): Promise<AppSettings> {
     jointPackPhotosFolder: map.get('joint_pack_photos_folder') ?? '',
     checklistReadyStatuses: splitCsv(map.get('checklist_ready_statuses'), SETTINGS_DEFAULTS.checklistReadyStatuses),
     issueReviewStatuses: splitCsv(map.get('issue_review_statuses'), SETTINGS_DEFAULTS.issueReviewStatuses),
+    submittalExemptAssets: splitCsv(map.get('submittal_exempt_assets'), SETTINGS_DEFAULTS.submittalExemptAssets),
   }
 }
 export function useGetSettings() {
   return useApiFn(getSettings)
 }
 
-const ALLOWED_SETTING_KEYS = new Set(['joint_pack_photos_folder', 'checklist_ready_statuses', 'issue_review_statuses'])
+const ALLOWED_SETTING_KEYS = new Set([
+  'joint_pack_photos_folder',
+  'checklist_ready_statuses',
+  'issue_review_statuses',
+  'submittal_exempt_assets',
+])
 async function saveSetting(params: { key: string; value: string }): Promise<{ key: string; value: string }> {
   if (!ALLOWED_SETTING_KEYS.has(params.key)) throw new Error(`Unknown setting key: ${params.key}`)
   const updatedBy = (await getCurrentUserEmail()) || 'admin'
@@ -635,7 +645,10 @@ export function useGetSubmittalsList() {
   return useApiFn(getSubmittalsList)
 }
 
-const ALLOWED_SUBMITTAL_STATUSES = new Set(['', 'Not Started', 'In Review', 'Approved', 'Rejected'])
+// Every submittal always has a real status starting at "Not Started" — there's no blank/unset
+// state once one's been uploaded, so the UI never needs to render a "no status" option.
+export const SUBMITTAL_STATUSES = ['Not Started', 'In Review', 'Approved', 'Rejected'] as const
+const ALLOWED_SUBMITTAL_STATUSES = new Set<string>(SUBMITTAL_STATUSES)
 
 async function uploadSubmittalFile(params: { file: File }): Promise<{ url: string; name: string }> {
   const ext = params.file.name.includes('.') ? params.file.name.split('.').pop() : ''

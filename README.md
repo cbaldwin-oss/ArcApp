@@ -154,10 +154,25 @@ There's no propagation logic to get right; it's just what "one row, many assets"
   needed net-new infrastructure — everything else in the app either reads Google Sheets (CxAlloy,
   Joint Pack Photos) or writes to Postgres directly. The bucket is public for reads (so a
   submittal's file link works for anyone with it) but writes are editor-gated, same as the table.
-- **Picking assets**: the same search-box-plus-checkbox-list-plus-chips picker `WorkflowsBuilder`
-  already uses for linking Activities to a Workflow (`Select all`/`Select all shown`/`Deselect
-  all`, matching whatever's currently filtered) — reused here for Assets instead, since the
-  interaction is identical: pick a subset of a long list, see it as removable chips.
+- **Picking assets**: `MultiSelectPicker.tsx` — a search box + checkbox list + removable chips +
+  `Select all`/`Select all shown`/`Deselect all`, extracted from the picker `WorkflowsBuilder`
+  already had for linking Activities to a Workflow (same interaction: pick a subset of a long
+  list). Also used by the new exempt-assets picker in Settings (below).
+- **Status**: every submittal starts at **Not Started** (`SUBMITTAL_STATUSES` in `src/lib/api.ts`
+  — there's no blank/unset state anymore) and can be changed two ways: from the create/edit form,
+  or inline right on its card (a small `<select>` next to the title that saves immediately on
+  change) — both editor-gated. **Filter by status** above the list narrows to one status at a time.
+- **Missing-submittal count**: the header badge is every tracked asset (`STY4dropdownoptions.
+  Assets`) that isn't covered by any submittal's `assets` array — hover it to see which ones.
+  **Settings → Assets Exempt From Submittal Review** (`SubmittalExemptAssetsManager.tsx`, a new
+  `submittal_exempt_assets` setting) lets you mark assets that will never need one (e.g. nothing
+  commissionable in that space) so they're excluded from the count entirely, rather than sitting
+  there permanently flagged as "missing."
+- **Export**: the button next to the status filter zips every *currently filtered* submittal's
+  file (client-side, via `jszip` — fetches each file, bundles them, triggers one download named
+  `submittals-<status>-<date>.zip`) so you can pull, say, every Approved submittal's paperwork in
+  one go. Submittals with no file attached are skipped; if none of the filtered ones have a file,
+  it tells you that instead of downloading an empty zip.
 - **RLS**: viewable without signing in (`submittals_select_public`, matching Checklists/Issues/
   Joint Pack Photos — status is useful to anyone on-site), but creating/editing/deleting a
   submittal (and uploading/replacing/removing its file in Storage) requires being an authorized
@@ -165,6 +180,16 @@ There's no propagation logic to get right; it's just what "one row, many assets"
   enforced by real RLS policies instead of trusting the UI alone.
 - `STY4Submittals` itself is untouched and still exists in the database — nothing currently reads
   it, so it's safe to leave alone (or drop later) unless something else depends on it.
+
+⚠️ **Known issue surfaced while building this, not yet fixed**: `arcapp_settings`' SELECT policy
+is `TO authenticated` only — **anonymous (not-signed-in) users currently can't read settings at
+all**, silently getting empty defaults back instead of an error. This isn't specific to
+Submittals — it equally affects Joint Pack Photos' Drive-folder/script-URL lookup and the
+Checklists/Issues ready-status filters for anyone not signed in, since they all read through the
+same `getSettings()`. The fix is a one-line policy swap (`settings_select_authenticated` →
+`TO anon, authenticated`, matching every other "viewable without signing in" table in this file),
+but changing a live RLS policy needs your explicit go-ahead rather than being applied
+automatically — ask for it to be applied when you're ready.
 
 ## To-Do — Teams & task assignment
 

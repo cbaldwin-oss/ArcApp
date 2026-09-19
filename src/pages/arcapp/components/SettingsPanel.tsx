@@ -3,11 +3,13 @@ import { Save } from 'lucide-react'
 import WorkflowsBuilder from './WorkflowsBuilder'
 import CxAlloyStatusPicker from './CxAlloyStatusPicker'
 import AuthorizedUsersManager from './AuthorizedUsersManager'
+import SubmittalExemptAssetsManager from './SubmittalExemptAssetsManager'
 
 type Props = {
   jointPackFolder: string
   checklistReadyStatuses: string[]
   issueReviewStatuses: string[]
+  submittalExemptAssets: string[]
   canEdit: boolean
   /** Separate, looser gate for Workflows specifically — see Dashboard.tsx for why. */
   canManageWorkflows: boolean
@@ -81,6 +83,7 @@ export default function SettingsPanel({
   jointPackFolder,
   checklistReadyStatuses,
   issueReviewStatuses,
+  submittalExemptAssets,
   canEdit,
   canManageWorkflows,
   loading,
@@ -123,6 +126,13 @@ export default function SettingsPanel({
         />
 
         <WorkflowsBuilder canEdit={canManageWorkflows} canEditItems={canEdit} />
+
+        <SubmittalExemptAssetsManager
+          value={submittalExemptAssets}
+          canEdit={canEdit}
+          loading={loading}
+          onSave={(values) => onSaveSetting('submittal_exempt_assets', values.join(', '))}
+        />
 
         <AuthorizedUsersManager canEdit={canEdit} />
       </div>
