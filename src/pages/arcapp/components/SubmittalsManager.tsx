@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import JSZip from 'jszip'
-import { Plus, Pencil, Trash2, RefreshCw, Paperclip, ExternalLink, Download, AlertTriangle } from 'lucide-react'
+import { Plus, Pencil, Trash2, RefreshCw, Paperclip, ExternalLink, Download, AlertTriangle, ChevronDown, ChevronUp } from 'lucide-react'
 import {
   useGetAssetOptions,
   useGetSettings,
@@ -8,6 +8,7 @@ import {
   useSaveSubmittalRecord,
   useDeleteSubmittalRecord,
   useUploadSubmittalFile,
+  useAddSubmittalNote,
   SUBMITTAL_STATUSES,
 } from '../../../lib/api'
 import type { Submittal } from '../../../lib/api'
@@ -24,8 +25,88 @@ function statusClass(s: string): string {
   return 'muted'
 }
 
-type FormState = { title: string; reviewStatus: string; notes: string; assets: string[] }
-const EMPTY_FORM: FormState = { title: '', reviewStatus: SUBMITTAL_STATUSES[0], notes: '', assets: [] }
+type FormState = { title: string; reviewStatus: string; assets: string[] }
+const EMPTY_FORM: FormState = { title: '', reviewStatus: SUBMITTAL_STATUSES[0], assets: [] }
+
+/**
+ * "Notes" is an append-only log now, not a single overwritable field — opening this shows every
+ * note ever left on the submittal (newest first), with an "Add Note" box for editors at the top.
+ */
+function SubmittalNotesLog({ submittal, canEdit, onChanged }: { submittal: Submittal; canEdit: boolean; onChanged: () => void }) {
+  const addFn = useAddSubmittalNote()
+  const [open, setOpen] = useState(false)
+  const [draft, setDraft] = useState('')
+  const [error, setError] = useState('')
+
+  async function addNote() {
+    const text = draft.trim()
+    if (!text) return
+    setError('')
+    try {
+      await addFn.trigger({ id: submittal.id, text }).result
+      setDraft('')
+      onChanged()
+    } catch (err) {
+      setError('Failed to add note: ' + (err instanceof Error ? err.message : String(err)))
+    }
+  }
+
+  const count = submittal.notesLog.length
+
+  return (
+    <div style={{ marginTop: 8 }}>
+      <button
+        type="button"
+        className="wf-link-btn"
+        style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}
+        onClick={() => setOpen((v) => !v)}
+      >
+        Notes ({count})
+        {open ? <ChevronUp style={{ width: 13, height: 13 }} /> : <ChevronDown style={{ width: 13, height: 13 }} />}
+      </button>
+
+      {open && (
+        <div className="wf-form" style={{ marginTop: 8 }}>
+          {canEdit && (
+            <div style={{ display: 'flex', gap: 8, marginBottom: 10, alignItems: 'flex-start' }}>
+              <textarea
+                placeholder="Add a note…"
+                value={draft}
+                onChange={(e) => setDraft(e.target.value)}
+                style={{ flex: 1, minHeight: 40 }}
+              />
+              <button
+                type="button"
+                className="seal-add-btn"
+                style={{ width: 'auto', margin: 0 }}
+                disabled={addFn.loading || !draft.trim()}
+                onClick={addNote}
+              >
+                {addFn.loading ? 'Adding…' : 'Add Note'}
+              </button>
+            </div>
+          )}
+          {error && <div className="q-hint err">{error}</div>}
+
+          {count === 0 ? (
+            <div className="wf-order-empty">No notes yet.</div>
+          ) : (
+            <div className="wf-order-list">
+              {[...submittal.notesLog].reverse().map((n, i) => (
+                <div className="wf-order-item" key={i} style={{ flexDirection: 'column', alignItems: 'flex-start', gap: 4 }}>
+                  <div style={{ fontSize: 13 }}>{n.text}</div>
+                  <div className="q-hint" style={{ margin: 0 }}>
+                    {n.author || 'Unknown'} · {n.at ? new Date(n.at).toLocaleString() : '—'}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
 
 export default function SubmittalsManager({ canEdit }: { canEdit: boolean }) {
   const assetsFn = useGetAssetOptions()
@@ -87,7 +168,7 @@ export default function SubmittalsManager({ canEdit }: { canEdit: boolean }) {
   }
   function openEdit(s: Submittal) {
     setEditingId(s.id)
-    setForm({ title: s.title, reviewStatus: s.reviewStatus || SUBMITTAL_STATUSES[0], notes: s.notes, assets: [...s.assets] })
+    setForm({ title: s.title, reviewStatus: s.reviewStatus || SUBMITTAL_STATUSES[0], assets: [...s.assets] })
     setExistingFile(s.fileUrl ? { url: s.fileUrl, name: s.fileName || s.fileUrl } : null)
     setPickedFile(null)
     setFormError('')
@@ -125,7 +206,6 @@ export default function SubmittalsManager({ canEdit }: { canEdit: boolean }) {
         fileName,
         assets: form.assets,
         reviewStatus: form.reviewStatus,
-        notes: form.notes,
       }).result
       load()
       closeForm()
@@ -146,7 +226,6 @@ export default function SubmittalsManager({ canEdit }: { canEdit: boolean }) {
         fileName: s.fileName,
         assets: s.assets,
         reviewStatus,
-        notes: s.notes,
       }).result
       load()
     } finally {
@@ -299,15 +378,6 @@ export default function SubmittalsManager({ canEdit }: { canEdit: boolean }) {
                   </div>
                 </div>
 
-                <div className="form-field">
-                  <label>Notes</label>
-                  <textarea
-                    placeholder="Anything worth noting about this review"
-                    value={form.notes}
-                    onChange={(e) => setForm((f) => ({ ...f, notes: e.target.value }))}
-                  />
-                </div>
-
                 <MultiSelectPicker
                   label="Assets this submittal applies to (select one or more)"
                   options={assets}
@@ -405,11 +475,7 @@ export default function SubmittalsManager({ canEdit }: { canEdit: boolean }) {
                             <ExternalLink style={{ width: 11, height: 11 }} />
                           </a>
                         )}
-                        {s.notes && (
-                          <div className="q-hint" style={{ margin: '6px 0 0' }}>
-                            {s.notes}
-                          </div>
-                        )}
+                        <SubmittalNotesLog submittal={s} canEdit={canEdit} onChanged={load} />
                       </div>
                       {canEdit && (
                         <div className="wf-actions">

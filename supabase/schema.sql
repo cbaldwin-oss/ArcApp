@@ -166,6 +166,13 @@ CREATE TABLE IF NOT EXISTS arcapp_submittals (
   created_at timestamptz NOT NULL DEFAULT now()
 );
 
+-- NOT YET APPLIED — notes_log (requested 2026-09-19). The single overwritable `notes` column
+-- above is retired in favor of an append-only log: every "Add Note" adds one entry here instead
+-- of replacing the whole field, and the Submittals page shows the full history when its Notes
+-- dropdown is opened. `notes` itself is left in place (unused, never dropped — nothing was in it
+-- worth migrating).
+ALTER TABLE arcapp_submittals ADD COLUMN IF NOT EXISTS notes_log jsonb NOT NULL DEFAULT '[]'::jsonb;
+
 INSERT INTO storage.buckets (id, name, public)
 SELECT 'submittals', 'submittals', true
 WHERE NOT EXISTS (SELECT 1 FROM storage.buckets WHERE id = 'submittals');

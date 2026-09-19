@@ -599,6 +599,8 @@ export function useSaveSetting() {
 // editors can write to it — see supabase/policies.sql).
 // ---------------------------------------------------------------------------
 
+export type SubmittalNote = { text: string; author: string; at: string }
+
 export type Submittal = {
   id: string
   title: string
@@ -606,15 +608,24 @@ export type Submittal = {
   fileName: string
   assets: string[]
   reviewStatus: string
-  notes: string
+  /** Append-only — see addSubmittalNote(). The old single overwritable `notes` text column still
+   * exists in the table but is no longer read or written; nothing needed to migrate since there
+   * was no real data in it yet. */
+  notesLog: SubmittalNote[]
   updatedBy: string
   updatedAt: string
   createdAt: string
 }
+function parseNotesLog(raw: unknown): SubmittalNote[] {
+  if (!Array.isArray(raw)) return []
+  return raw
+    .filter((n): n is Record<string, unknown> => !!n && typeof n === 'object')
+    .map((n) => ({ text: String(n.text ?? ''), author: String(n.author ?? ''), at: String(n.at ?? '') }))
+}
 async function getSubmittalsList(): Promise<Submittal[]> {
   const res = await supabase
     .from('arcapp_submittals')
-    .select('id, title, file_url, file_name, assets, review_status, notes, updated_by, updated_at, created_at')
+    .select('id, title, file_url, file_name, assets, review_status, notes_log, updated_by, updated_at, created_at')
     .order('created_at', { ascending: false })
   const rows = unwrap(res) as Array<{
     id: string
@@ -623,7 +634,7 @@ async function getSubmittalsList(): Promise<Submittal[]> {
     file_name: string | null
     assets: unknown
     review_status: string | null
-    notes: string | null
+    notes_log: unknown
     updated_by: string | null
     updated_at: string | null
     created_at: string | null
@@ -635,7 +646,7 @@ async function getSubmittalsList(): Promise<Submittal[]> {
     fileName: r.file_name || '',
     assets: Array.isArray(r.assets) ? (r.assets as string[]) : [],
     reviewStatus: r.review_status || '',
-    notes: r.notes || '',
+    notesLog: parseNotesLog(r.notes_log),
     updatedBy: r.updated_by || '',
     updatedAt: r.updated_at || '',
     createdAt: r.created_at || '',
@@ -643,6 +654,22 @@ async function getSubmittalsList(): Promise<Submittal[]> {
 }
 export function useGetSubmittalsList() {
   return useApiFn(getSubmittalsList)
+}
+
+async function addSubmittalNote(params: { id: string; text: string }): Promise<SubmittalNote[]> {
+  const text = params.text.trim()
+  if (!text) throw new Error('Note text is required.')
+  const current = await supabase.from('arcapp_submittals').select('notes_log').eq('id', params.id).single()
+  if (current.error) throw new Error(current.error.message)
+  const existing = parseNotesLog((current.data as { notes_log: unknown } | null)?.notes_log)
+  const author = (await getCurrentUserEmail()) || 'anonymous'
+  const nextLog: SubmittalNote[] = [...existing, { text, author, at: new Date().toISOString() }]
+  const res = await supabase.from('arcapp_submittals').update({ notes_log: nextLog }).eq('id', params.id).select('notes_log').single()
+  if (res.error) throw new Error(res.error.message)
+  return parseNotesLog((res.data as { notes_log: unknown }).notes_log)
+}
+export function useAddSubmittalNote() {
+  return useApiFn(addSubmittalNote)
 }
 
 // Every submittal always has a real status starting at "Not Started" — there's no blank/unset
@@ -669,7 +696,6 @@ export type SubmittalInput = {
   fileName: string
   assets: string[]
   reviewStatus: string
-  notes: string
 }
 async function saveSubmittalRecord(params: SubmittalInput): Promise<{ id: string }> {
   const title = params.title.trim()
@@ -682,7 +708,6 @@ async function saveSubmittalRecord(params: SubmittalInput): Promise<{ id: string
     file_name: params.fileName,
     assets: params.assets,
     review_status: params.reviewStatus,
-    notes: params.notes,
     updated_by: updatedBy,
     updated_at: new Date().toISOString(),
   }

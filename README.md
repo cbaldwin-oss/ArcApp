@@ -162,6 +162,12 @@ There's no propagation logic to get right; it's just what "one row, many assets"
   — there's no blank/unset state anymore) and can be changed two ways: from the create/edit form,
   or inline right on its card (a small `<select>` next to the title that saves immediately on
   change) — both editor-gated. **Filter by status** above the list narrows to one status at a time.
+- **Notes are an append-only log, not a single field**: the old `notes` text column (one
+  overwritable string) is retired in favor of `notes_log` (jsonb array of `{text, author, at}`,
+  never touched by the general edit-submittal save). Each card has a **Notes (N)** dropdown —
+  opening it shows the full history newest-first with who left each note and when, plus an
+  **Add Note** box at the top for editors. `notes` itself is left in the table, unused (there was
+  nothing in it worth migrating).
 - **Missing-submittal count**: the header badge is every tracked asset (`STY4dropdownoptions.
   Assets`) that isn't covered by any submittal's `assets` array — hover it to see which ones.
   **Settings → Assets Exempt From Submittal Review** (`SubmittalExemptAssetsManager.tsx`, a new
