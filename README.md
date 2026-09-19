@@ -93,12 +93,28 @@ everyone who currently has edit rights — prune/extend it from there.
 is called from the app, but nothing happens until:
 1. **Google Cloud Console** → create an OAuth 2.0 Client ID (Web application). Authorized redirect
    URI: `https://rcnxetcomdrlxvlarqoc.supabase.co/auth/v1/callback`. Authorized JavaScript origins:
-   your dev URL (`http://localhost:5173`) and whatever production domain this ends up on.
+   `http://localhost:5173` and `https://arc-app-umber.vercel.app` (the deployed app — add any
+   Vercel preview-deployment URLs too if you ever sign in from one of those).
 2. **Supabase Dashboard** → Authentication → Providers → Google → paste that Client ID/Secret,
    enable the provider.
 
 Until that's done, clicking "Sign in with Google" will fail with an error from Supabase (shown in
 the modal) — the magic-link fallback keeps working in the meantime, so sign-in isn't blocked on it.
+
+**This Supabase project is shared with LaunchPad**, so its Auth redirect allow-list defaults to
+LaunchPad's URL — without ArcApp's own URL added there too, either sign-in method bounces back to
+LaunchPad instead of ArcApp after completing. Add these to **Authentication → URL Configuration →
+Redirect URLs** (alongside LaunchPad's existing entry, not replacing it):
+
+```
+https://arc-app-umber.vercel.app
+https://arc-app-umber.vercel.app/**
+http://localhost:5173
+http://localhost:5173/**
+```
+
+Leave **Site URL** as LaunchPad's — it's just the fallback when a `redirectTo` isn't on the allow-
+list above, and both sign-in paths here already pass their own (`window.location.origin`).
 
 ## Workflow items
 

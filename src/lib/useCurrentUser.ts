@@ -115,7 +115,14 @@ export function useCurrentUser(): {
 
   const signInWithEmail = useCallback(async (email: string) => {
     setAuthError(null)
-    const { error } = await supabase.auth.signInWithOtp({ email })
+    // Without emailRedirectTo this fell back to the shared Supabase project's default Site URL
+    // — which is LaunchPad's, since this project is shared with it — landing the magic-link
+    // click there instead of back in ArcApp. Google sign-in already passed its own redirectTo
+    // (see signInWithGoogle above); this was the one place it was missing.
+    const { error } = await supabase.auth.signInWithOtp({
+      email,
+      options: { emailRedirectTo: window.location.origin },
+    })
     return { error: error?.message ?? null }
   }, [])
 
