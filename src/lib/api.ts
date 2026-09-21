@@ -382,6 +382,140 @@ export async function ocrAssetImage(params: {
 }
 
 // ---------------------------------------------------------------------------
+// Equipment Status Tracker — read-only view of LaunchPad's own L2/L3/L4 phase-tracking grid.
+// Unlike everything above, this doesn't go through Apps Script at all: LaunchPad periodically
+// syncs the underlying Google Sheet into `launchpad_equipment_tracker_data` (a GitHub Action, not
+// this app) and keeps its own editable config in `launchpad_equipment_tracker_config` — both
+// already anon-readable, shared with LaunchPad, keyed by project_key (same value as
+// CXALLOY_TABLE_PREFIX for this deployment). ArcApp only reads them; the Settings/config editor,
+// Phase Rules Engine, and status-color admin UI stay LaunchPad's to own and are not ported here.
+// ---------------------------------------------------------------------------
+
+export type EquipmentTrackerRow = Record<string, string>
+
+export type EqPhaseRule = {
+  active?: string
+  phase?: string
+  prevStatus?: string
+  maxGate?: string
+  maxSupport?: string
+  maxSupportPendingCx?: string
+  maxGatingIssues?: string
+  maxNonGatingIssues?: string
+  resultingStatus?: string
+  includeOpenCHKs?: string
+  includeOpenGatingIssues?: string
+  color?: string
+}
+
+export type EqStatusColor = { name: string; color: string }
+
+export type EqCustomHeaders = {
+  areaPrefix: string
+  l2Phase: string
+  l2Gate: string
+  l2Status: string
+  l3Phase: string
+  l3Gate: string
+  l3Status: string
+  l4Phase: string
+  l4Gate: string
+  l4Status: string
+  issPhase: string
+  issStatus: string
+}
+
+export type EquipmentTrackerConfig = {
+  showL2Gate: boolean
+  showL3Gate: boolean
+  showL4Gate: boolean
+  showL2Supp: boolean
+  showL3Supp: boolean
+  showL4Supp: boolean
+  openStatuses: EqStatusColor[]
+  closedStatuses: EqStatusColor[]
+  cxCompleteStatuses: EqStatusColor[]
+  testOpenStatuses: EqStatusColor[]
+  testClosedStatuses: EqStatusColor[]
+  issueOpenStatuses: EqStatusColor[]
+  issueClosedStatuses: EqStatusColor[]
+  gatingIssues: EqStatusColor[]
+  nonGatingIssues: EqStatusColor[]
+  fallbackColor: string
+  customHeaders: EqCustomHeaders
+}
+
+export type EquipmentTrackerData = {
+  rows: EquipmentTrackerRow[]
+  phaseRules: EqPhaseRule[]
+  syncedAt: string | null
+  config: EquipmentTrackerConfig
+}
+
+const EQ_TRACKER_DEFAULT_CONFIG: EquipmentTrackerConfig = {
+  showL2Gate: true,
+  showL3Gate: true,
+  showL4Gate: true,
+  showL2Supp: true,
+  showL3Supp: true,
+  showL4Supp: true,
+  openStatuses: [],
+  closedStatuses: [],
+  cxCompleteStatuses: [],
+  testOpenStatuses: [],
+  testClosedStatuses: [],
+  issueOpenStatuses: [],
+  issueClosedStatuses: [],
+  gatingIssues: [],
+  nonGatingIssues: [],
+  fallbackColor: '#f5f5f5',
+  customHeaders: {
+    areaPrefix: 'Area',
+    l2Phase: 'L2 Verification',
+    l2Gate: 'Gate CL',
+    l2Status: 'Status',
+    l3Phase: 'L3 Functional',
+    l3Gate: 'Gate CL',
+    l3Status: 'Status',
+    l4Phase: 'L4 Integrated',
+    l4Gate: 'Gate CL',
+    l4Status: 'Status',
+    issPhase: 'Asset Issues',
+    issStatus: 'Open Issues',
+  },
+}
+
+async function getEquipmentTrackerData(): Promise<EquipmentTrackerData> {
+  const [dataRes, configRes] = await Promise.all([
+    supabase
+      .from('launchpad_equipment_tracker_data')
+      .select('data, phase_rules, synced_at')
+      .eq('project_key', CXALLOY_TABLE_PREFIX)
+      .maybeSingle(),
+    supabase.from('launchpad_equipment_tracker_config').select('config').eq('project_key', CXALLOY_TABLE_PREFIX).maybeSingle(),
+  ])
+  if (dataRes.error) throw new Error(dataRes.error.message)
+  if (configRes.error) throw new Error(configRes.error.message)
+
+  const row = dataRes.data as { data: EquipmentTrackerRow[] | null; phase_rules: EqPhaseRule[] | null; synced_at: string | null } | null
+  const savedConfig = ((configRes.data as { config: Partial<EquipmentTrackerConfig> | null } | null)?.config ?? {}) as Partial<EquipmentTrackerConfig>
+
+  return {
+    rows: row?.data ?? [],
+    phaseRules: row?.phase_rules ?? [],
+    syncedAt: row?.synced_at ?? null,
+    config: {
+      ...EQ_TRACKER_DEFAULT_CONFIG,
+      ...savedConfig,
+      customHeaders: { ...EQ_TRACKER_DEFAULT_CONFIG.customHeaders, ...(savedConfig.customHeaders ?? {}) },
+    },
+  }
+}
+export function useGetEquipmentTrackerData() {
+  return useApiFn(getEquipmentTrackerData)
+}
+
+// ---------------------------------------------------------------------------
 // Joint Pack Photos — read from the "Joint Pack Photo - STY4A" Google Sheet (tabs: "Joint Packs",
 // "Settings") via its own Apps Script web app — a separate spreadsheet from CxAlloy's, so it has
 // its own script and its own URL, stored in arcapp_settings (not launchpad_projects — that row's

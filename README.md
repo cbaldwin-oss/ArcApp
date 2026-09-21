@@ -274,6 +274,46 @@ just gives ArcApp its own window into data LaunchPad's version already reads and
   processed or saved against production** during verification, to avoid writing test data/photos
   under a real asset's name.
 
+## Equipment Status Tracker (read-only, LaunchPad's own data)
+
+A read-only ArcApp view of LaunchPad's Equipment Status Tracker grid — the L2 Verification /
+L3 Functional / L4 Integrated phase-tracking board, ported from LaunchPad's
+`equipment-tracker-view.js` shadow-DOM component (`EquipmentTrackerPanel.tsx`,
+`EquipmentTrackerPdfModal.tsx`, `lib/equipmentTracker.ts`) and restyled to fit ArcApp's dark theme
+instead of copying LaunchPad's light-green one.
+
+- **No new backend.** Unlike the CxAlloy/Joint Pack/Asset Attributes features above, this doesn't
+  call Apps Script at all — it reads `launchpad_equipment_tracker_data` and
+  `launchpad_equipment_tracker_config` directly from Supabase, the same tables LaunchPad's own
+  tracker reads. LaunchPad periodically syncs the underlying Google Sheet into the `data` table
+  itself (a GitHub Action, not this app); both tables were already anon-readable and shared, so
+  this page needed zero schema/RLS changes.
+- **Grid**: sticky-header, horizontally + vertically scrolling table — frozen Asset/Area columns,
+  then L2/L3/L4 phase groups (Gate CL column(s) + a colored Overall Status summary, each
+  expandable to show every individual Support CL), then an Asset Issues group (colored open-issue
+  summary, expandable to every individual issue). Cell colors come from the synced Phase Rules
+  (matched against the status text) first, then the configured open/closed/cx-complete status
+  lists — both read from Supabase, neither editable here.
+- **Filtering**: click the ▼ on any of the 9 filterable columns (Asset, Area, each phase's Gate CL
+  1 / Overall Status, Open Issues) for a searchable checkbox dropdown — cascading, so one column's
+  available values narrow based on every other active filter, same as the reference.
+- **Search**: a debounced global search box scans every field on every visible row, with a
+  match counter and ▲/▼ navigation that scrolls to and highlights the current match (amber, not
+  green — green is already used everywhere for phase-rule status colors) and auto-expands whatever
+  phase/issues column the match was found in.
+- **Export PDF**: a column-picker modal opens a plain print window built straight from the
+  currently-filtered row data (not by scraping the rendered grid's DOM, unlike the reference) and
+  calls the browser's print dialog.
+- **Not ported** — stays LaunchPad's to own/edit, per the scoping call made before building this:
+  the System Config modal (phase name/toggle setup, status-color list editor) and the Phase Rules
+  Engine table editor. This page only reads whatever LaunchPad has configured; there's no write
+  path here at all.
+- Verified live against real production data — 1,297 real assets loaded, phase-rule coloring
+  correct, expand/collapse, cascading column filters (1,297 → 114 rows on an Area filter, cleared
+  back to 1,297), global search (found and navigated 34 real matches, correct row highlighted),
+  and a full PDF export exercised end-to-end (114-row filtered popup with correct headers/grouped
+  CHK and issue ids). Being read-only, no data could be modified during verification either way.
+
 ## To-Do — Teams & task assignment
 
 To-Dos are no longer hardcoded sample data — they're real, persisted rows (`arcapp_tasks`), and
