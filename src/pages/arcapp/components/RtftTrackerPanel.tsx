@@ -63,6 +63,9 @@ export default function RtftTrackerPanel() {
   async function submitEntry(payload: RtftInput) {
     await submitFn.trigger(payload).result
     load()
+    // That asset just came off the "still needs one" list — clear the picker so the next pick
+    // starts fresh instead of sitting on an asset that's no longer in its own options list.
+    setAsset('')
   }
 
   return (
@@ -106,10 +109,11 @@ export default function RtftTrackerPanel() {
             <div className="form-field" style={{ marginBottom: 0 }}>
               <label>Asset</label>
               <AssetPicker
-                options={assets}
+                options={missingAssets}
                 value={asset}
                 onChange={setAsset}
                 loading={assetsFn.loading && !assetsFn.data}
+                placeholder="Type to search assets that still need one…"
               />
             </div>
             <div className="form-field" style={{ marginBottom: 0 }}>
@@ -118,10 +122,15 @@ export default function RtftTrackerPanel() {
             </div>
           </div>
 
-          {asset ? (
+          {missingAssets.length === 0 ? (
+            <div className="q-hint ok">Every tracked asset already has an RTFT entry logged.</div>
+          ) : asset ? (
             <RtftSection equipment={asset} authUser={currentUserEmail} selectedDate={date} onSubmit={submitEntry} />
           ) : (
-            <div className="q-hint">Select an asset above to log an RTFT entry.</div>
+            <div className="q-hint">
+              Select an asset above to log an RTFT entry — assets that already have one aren&apos;t
+              listed.
+            </div>
           )}
         </div>
       )}

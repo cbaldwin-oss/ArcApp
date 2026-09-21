@@ -214,6 +214,17 @@ Same two additions as Tamper Seals got, applied to RTFT (`RtftTrackerPanel.tsx`)
   `STY4RTFT` row yet (hover it to see which ones), same pattern as Submittals' missing-coverage
   badge. There's no exempt-assets list for this one (wasn't asked for) — every tracked asset
   counts.
+- **Once logged, an asset drops off the standalone picker's list** — the `AssetPicker` in the
+  standalone form only ever offers assets from that same missing-coverage set, so it naturally
+  shrinks as entries get logged (and clears back to empty after each submit, so the next pick
+  starts fresh). Submitting the very last one collapses the picker into "Every tracked asset
+  already has an RTFT entry logged."
+- **The Activity Drawer's RTFT tab denotes — doesn't block — a pre-existing entry**:
+  `RtftSection` fetches the RTFT list itself (same `useGetRtft()` the Tracker page uses) and shows
+  a banner ("An RTFT entry already exists for … — see the RTFT Tracker page") whenever the
+  activity's own asset already has one logged elsewhere, while still leaving the form usable —
+  a legitimate re-inspection after a failed one still needs a new entry, so this only informs, it
+  never disables submission.
 
 ## To-Do — Teams & task assignment
 

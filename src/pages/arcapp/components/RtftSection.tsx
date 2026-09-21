@@ -1,4 +1,7 @@
 import { useState, useEffect } from 'react'
+import { CheckCircle2 } from 'lucide-react'
+import { useGetRtft } from '../../../lib/api'
+import type { RtftRow } from '../../../lib/api'
 
 export type RtftPayload = {
   date: string
@@ -29,6 +32,16 @@ type Props = {
 const YN = ['', 'Yes', 'No']
 
 export default function RtftSection({ equipment, authUser, selectedDate, onSubmit }: Props) {
+  // Just to denote "this asset already has one" — doesn't block re-submitting (a legitimate
+  // re-inspection after a failed one still needs a new entry), so no extra prop plumbing from
+  // whichever parent (Activity Drawer or the standalone RTFT Tracker form) is fetched instead.
+  const existingFn = useGetRtft()
+  useEffect(() => {
+    void existingFn.trigger()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+  const alreadyLogged = ((existingFn.data as RtftRow[] | undefined) ?? []).some((r) => r.equipment === equipment)
+
   const [equipmentType, setEquipmentType] = useState('')
   const [inspector, setInspector] = useState(authUser || '')
   const [ofe, setOfe] = useState(false)
@@ -93,6 +106,7 @@ export default function RtftSection({ equipment, authUser, selectedDate, onSubmi
     setMsg({ text: 'Saving RTFT entry…', cls: 'q-hint' })
     try {
       await onSubmit(payload)
+      void existingFn.trigger()
       setMsg({ text: `Saved RTFT entry for "${equipment}".`, cls: 'q-hint ok' })
       setEquipmentType('')
       setOfe(false)
@@ -117,6 +131,14 @@ export default function RtftSection({ equipment, authUser, selectedDate, onSubmi
   return (
     <div className="q-block">
       <label className="q-label">Right the First Time (RTFT)</label>
+
+      {alreadyLogged && (
+        <div className="q-hint ok" style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 10 }}>
+          <CheckCircle2 style={{ width: 14, height: 14, flex: '0 0 auto' }} />
+          An RTFT entry already exists for &quot;{equipment}&quot; — see the RTFT Tracker page.
+          Submitting below adds another one rather than replacing it.
+        </div>
+      )}
 
       <div className="form-field">
         <label>Equipment</label>
