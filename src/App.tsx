@@ -8,6 +8,7 @@ import MilestonesPage from './pages/arcapp/pages/MilestonesPage'
 import SchedulePage from './pages/arcapp/pages/SchedulePage'
 import JointPacksPage from './pages/arcapp/pages/JointPacksPage'
 import SubmittalsPage from './pages/arcapp/pages/SubmittalsPage'
+import AssetAttributesPage from './pages/arcapp/pages/AssetAttributesPage'
 import SettingsPage from './pages/arcapp/pages/SettingsPage'
 import ChecklistReadyPanel from './pages/arcapp/components/ChecklistReadyPanel'
 import IssuesReviewPanel from './pages/arcapp/components/IssuesReviewPanel'
@@ -67,6 +68,7 @@ export default function App() {
         <Route path="jointpacks" element={<JointPacksPage />} />
         <Route path="tamperseals" element={<TamperSealLogPanel />} />
         <Route path="rtft" element={<RtftTrackerPanel />} />
+        <Route path="attributes" element={<AssetAttributesPage />} />
         <Route path="settings" element={<SettingsPage />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Route>

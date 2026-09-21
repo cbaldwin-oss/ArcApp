@@ -226,6 +226,54 @@ Same two additions as Tamper Seals got, applied to RTFT (`RtftTrackerPanel.tsx`)
   a legitimate re-inspection after a failed one still needs a new entry, so this only informs, it
   never disables submission.
 
+## Asset Attributes (via LaunchPad's existing Google Sheet + Apps Script)
+
+Ported from an older reference implementation of this same feature in **LaunchPad** — the sibling
+app this Supabase project is shared with (see the sign-in section above). LaunchPad already has a
+working "Asset Attributes" page backed by a Google Sheet full of nameplate/spec data per asset
+(Manufacturer, Model, Serial #, delivery dates, etc.), read/written through `getEquipmentAttributes`/
+`saveAttributes` actions on **the same shared Apps Script** ArcApp already calls for CxAlloy
+Checklists/Issues (`getCxAlloyScriptUrl()` in `src/lib/api.ts` isn't actually CxAlloy-specific — it's
+just "the STY4 project's shared script," stored in `launchpad_projects` and reused by LaunchPad for
+a dozen other things too). That meant no new script or table was needed — `AssetAttributesManager.tsx`
+just gives ArcApp its own window into data LaunchPad's version already reads and writes.
+
+- **Grouping**: each column header in the sheet is either a bare attribute name (falls under
+  "General") or `"Group: Attribute Name"` (e.g. `"Nameplate: Manufacturer"`) — `groupAttributes()`
+  splits on the first `:` and renders one section per group, matching LaunchPad's own convention
+  exactly so the two apps' views of the same data look the same.
+- **TBD highlighting**: a blank value or the literal text `TBD` renders with a red border, matching
+  LaunchPad's "still needs a value" visual cue.
+- **Saving**: only changed fields are sent (`{attribute, newValue}` pairs) via `saveAttributes`, and
+  the Apps Script response's `debug` log array (used elsewhere in LaunchPad to report per-attribute
+  write failures) is checked for `❌`/`ERROR` before treating a save as successful — mirrors how
+  LaunchPad's own save handler decides whether to alert the user.
+- **Multi-box photo-crop OCR** (`MultiBoxOcrModal.tsx`, opened via **Scan Photo** on each attribute
+  group's header): take one photo of a nameplate (native camera via `capture="environment"`,
+  same reasoning as the reference — "guarantees the best focus"), select an attribute from that
+  group's button toolbar, draw a box around where it appears on the photo, repeat for as many
+  attributes as the nameplate shows, then **Process N Boxes**. That:
+  1. Draws one annotated copy of the full photo (every box outlined + labeled, with the same
+     collision-avoiding label-placement logic as the reference so labels never overlap each other
+     or the boxes) and uploads it via `saveImageOnly` as a Drive reference image.
+  2. Crops + pads + white-backgrounds + contrast-boosts each individual box region into its own
+     image and OCRs it separately via `ocrImage`, passing that upload's filename along so the
+     script can associate the crops with their source photo.
+  3. Drops each box's recognized text straight into its matching attribute field (not saved to
+     the sheet until you hit the page's own **Save Changes**) — a box that comes back empty just
+     doesn't fill anything in, it doesn't fail the whole batch.
+  Uses Pointer Events (not separate mouse/touch listeners like the reference) for one code path
+  that works with mouse, touch, and pen alike.
+- **QR-code scanning** (html5-qrcode + a field-mapping UI) is still deferred — the photo-crop OCR
+  flow was the piece asked for. It'd call the same shared script (no new action needed there,
+  either) if it gets ported later.
+- Verified live against the real script — 1,518 real assets loaded, a real asset's grouped
+  attributes rendered correctly including a live TBD field, and the full box-draw → process →
+  apply flow was exercised end-to-end with the write-side calls (`saveImageOnly`/`ocrImage`)
+  mocked, confirming a drawn box correctly fills its attribute field. **No real photo was
+  processed or saved against production** during verification, to avoid writing test data/photos
+  under a real asset's name.
+
 ## To-Do — Teams & task assignment
 
 To-Dos are no longer hardcoded sample data — they're real, persisted rows (`arcapp_tasks`), and

@@ -606,6 +606,68 @@ html, body, #root{ margin:0; padding:0; min-height:100%; background:#05070d; }
 .arcapp .asset-picker-item:hover, .arcapp .asset-picker-item.active{ background:var(--green-tint); color:var(--green); }
 .arcapp .asset-picker-empty{ padding:12px; color:var(--text-faint); font-size:12.5px; }
 
+/* ---------- Asset Attributes: directory + grouped detail panel ---------- */
+.arcapp .attr-layout{ display:flex; gap:0; align-items:stretch; min-height:480px; border:1px solid var(--border); border-radius:var(--radius); overflow:hidden; }
+.arcapp .attr-sidebar{
+  flex:0 0 260px; border-right:1px solid var(--border); background:var(--bg-elev);
+  display:flex; flex-direction:column; max-height:640px;
+}
+.arcapp .attr-sidebar-search{ padding:12px; border-bottom:1px solid var(--border); }
+.arcapp .attr-sidebar-list{ flex:1; overflow-y:auto; padding:6px; }
+.arcapp .attr-asset-btn{
+  display:flex; align-items:center; justify-content:space-between; gap:8px; width:100%; text-align:left;
+  background:none; border:none; border-radius:var(--radius-sm); cursor:pointer;
+  color:var(--text-muted); font-family:var(--font-mono); font-size:12.5px; padding:9px 10px; margin-bottom:2px;
+}
+.arcapp .attr-asset-btn:hover{ background:var(--bg-elev-2); color:var(--text); }
+.arcapp .attr-asset-btn.active{ background:var(--green-tint); color:var(--green); }
+.arcapp .attr-detail{ flex:1; min-width:0; padding:22px 26px; overflow-y:auto; max-height:640px; }
+.arcapp .attr-detail-empty{ display:flex; align-items:center; justify-content:center; height:100%; color:var(--text-faint); font-size:14px; }
+.arcapp .attr-group{ margin-bottom:26px; }
+.arcapp .attr-group-title{
+  font-family:var(--font-display); font-size:12.5px; font-weight:700; letter-spacing:0.5px; text-transform:uppercase;
+  color:var(--text-muted); border-bottom:1px solid var(--border); padding-bottom:7px; margin-bottom:14px;
+}
+.arcapp .attr-grid{ display:grid; grid-template-columns:repeat(auto-fill, minmax(240px, 1fr)); gap:14px; }
+.arcapp .attr-field{ display:flex; flex-direction:column; gap:5px; }
+.arcapp .attr-field label{ font-family:var(--font-mono); font-size:10.5px; letter-spacing:0.4px; text-transform:uppercase; color:var(--text-faint); }
+.arcapp .attr-field input{
+  background:var(--bg-elev-2); border:1px solid var(--border-strong); border-radius:var(--radius-sm);
+  color:var(--text); font-size:13.5px; padding:8px 10px;
+}
+.arcapp .attr-field input:focus{ outline:none; border-color:var(--green); }
+.arcapp .attr-field.tbd input{ border-color:var(--red); color:var(--red); background:var(--red-tint); }
+.arcapp .attr-field.tbd label{ color:var(--red); }
+
+/* ---------- Multi-box photo-crop OCR (Asset Attributes "Scan Photo") ---------- */
+.arcapp .ocr-capture-card{
+  padding:30px; text-align:center; background:var(--amber-tint); border:1px solid var(--amber); border-radius:var(--radius);
+}
+.arcapp .ocr-capture-title{ margin-top:0; color:var(--amber); font-weight:700; font-size:15px; }
+.arcapp .ocr-capture-btn{
+  display:inline-flex; align-items:center; gap:8px; background:var(--amber); color:#241a00;
+  padding:13px 22px; border-radius:var(--radius-sm); cursor:pointer; font-weight:700; font-size:14px;
+}
+.arcapp .ocr-toolbar{ display:flex; flex-wrap:wrap; gap:6px; padding:10px; background:var(--bg-elev); border:1px solid var(--border); border-radius:var(--radius-sm); margin-bottom:6px; max-height:130px; overflow-y:auto; }
+.arcapp .ocr-attr-btn{
+  background:var(--bg-elev-2); border:1px solid var(--border-strong); color:var(--text-muted);
+  padding:6px 12px; border-radius:999px; cursor:pointer; font-size:12px; font-weight:600; white-space:nowrap;
+}
+.arcapp .ocr-attr-btn.active{ background:var(--green); color:#04170d; border-color:var(--green); }
+.arcapp .ocr-attr-btn.done{ border-color:var(--green-dim); color:var(--green-soft); }
+.arcapp .ocr-crop-container{
+  position:relative; width:100%; max-height:60vh; overflow:auto; background:#000;
+  border-radius:var(--radius); display:flex; justify-content:center;
+}
+.arcapp .ocr-crop-img{ display:block; max-width:100%; height:auto; pointer-events:none; user-select:none; }
+.arcapp .ocr-box{ position:absolute; border:2px solid #00e676; background:rgba(0,230,118,0.18); }
+.arcapp .ocr-box-label{
+  position:absolute; bottom:100%; left:-2px; display:flex; align-items:center; gap:4px;
+  background:#00e676; color:#04170d; font-size:10px; font-weight:700; padding:2px 4px; white-space:nowrap;
+}
+.arcapp .ocr-box-remove{ background:none; border:none; padding:0; cursor:pointer; color:#04170d; display:flex; }
+.arcapp .ocr-draft-box{ position:absolute; border:2px dashed #ff9800; background:rgba(255,152,0,0.2); pointer-events:none; }
+
 .arcapp .rtft-checkbox-label{
   display:flex; align-items:center; gap:9px; font-size:13px; color:var(--text);
   text-transform:none; margin-bottom:14px; cursor:pointer;

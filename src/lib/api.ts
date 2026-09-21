@@ -284,6 +284,104 @@ export function useGetIssues() {
 }
 
 // ---------------------------------------------------------------------------
+// Asset Attributes — nameplate/spec data per asset (Manufacturer, Model, Serial, voltage, etc.),
+// grouped by category via a "Group: Attribute Name" key convention (ungrouped keys fall under
+// "General"). This is LaunchPad's own long-running feature, not something new added for
+// ArcApp — `getCxAlloyScriptUrl()` isn't actually CxAlloy-specific, it's just "the STY4 project's
+// shared Apps Script" (stored in launchpad_projects, shared with LaunchPad), and
+// getEquipmentAttributes/saveAttributes already exist there because LaunchPad's Asset Attributes
+// page already calls them — this just gives ArcApp its own window into the same data. QR/photo-OCR
+// scanning (LaunchPad has both) is intentionally not ported here — deferred to a follow-up.
+// ---------------------------------------------------------------------------
+
+export type AssetAttributeRow = Record<string, string>
+
+async function getEquipmentAttributes(): Promise<AssetAttributeRow[]> {
+  const scriptUrl = await getCxAlloyScriptUrl()
+  const url = new URL(scriptUrl)
+  url.searchParams.set('action', 'getEquipmentAttributes')
+  const res = await fetch(url.toString())
+  if (!res.ok) throw new Error(`Asset Attributes request failed (HTTP ${res.status})`)
+  const json = (await res.json()) as { status?: string; error?: string; data?: Array<Record<string, unknown>> }
+  if (json.error || json.status === 'error') throw new Error(json.error || 'Asset Attributes request failed')
+  return (json.data ?? []).map((row) => {
+    const out: AssetAttributeRow = {}
+    for (const [k, v] of Object.entries(row)) out[k] = v == null ? '' : String(v)
+    return out
+  })
+}
+export function useGetEquipmentAttributes() {
+  return useApiFn(getEquipmentAttributes)
+}
+
+export type AttributeChange = { attribute: string; newValue: string }
+async function saveAssetAttributes(params: { assetName: string; changes: AttributeChange[] }): Promise<{ success: boolean }> {
+  if (!params.changes.length) return { success: true }
+  const scriptUrl = await getCxAlloyScriptUrl()
+  const res = await fetch(scriptUrl, {
+    method: 'POST',
+    // text/plain avoids a CORS preflight, same reasoning as Joint Pack Photos' upload — Apps
+    // Script web apps don't answer OPTIONS requests.
+    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+    body: JSON.stringify({ action: 'saveAttributes', assetName: params.assetName, changes: params.changes }),
+  })
+  if (!res.ok) throw new Error(`Save failed (HTTP ${res.status})`)
+  const json = (await res.json()) as { success?: boolean; error?: string; debug?: string[] }
+  if (json.debug?.length) {
+    const hasError = json.debug.some((l) => l.includes('❌') || l.toUpperCase().includes('ERROR'))
+    if (hasError) throw new Error(json.debug.join('\n'))
+  }
+  if (!json.success) throw new Error(json.error || 'Save failed.')
+  return { success: true }
+}
+export function useSaveAssetAttributes() {
+  return useApiFn(saveAssetAttributes)
+}
+
+// Multi-box photo-crop OCR — draw boxes on a nameplate photo, each box gets OCR'd separately and
+// mapped to one attribute. Exported as plain functions (not useApiFn hooks) because the caller
+// fires several of these concurrently via Promise.all and needs its own combined status/progress
+// state, not one hook's single loading/error pair.
+export async function uploadAssetPhoto(params: { assetName: string; scanType: string; imageBase64: string }): Promise<{ fileName: string }> {
+  const scriptUrl = await getCxAlloyScriptUrl()
+  const res = await fetch(scriptUrl, {
+    method: 'POST',
+    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+    body: JSON.stringify({ action: 'saveImageOnly', image: params.imageBase64, assetName: params.assetName, scanType: params.scanType }),
+  })
+  if (!res.ok) throw new Error(`Photo upload failed (HTTP ${res.status})`)
+  const json = (await res.json()) as { success?: boolean; fileName?: string; error?: string }
+  if (!json.success) throw new Error(json.error || 'Photo upload failed.')
+  return { fileName: json.fileName || '' }
+}
+
+export async function ocrAssetImage(params: {
+  assetName: string
+  attributeName: string
+  photoName: string
+  imageBase64: string
+}): Promise<{ text: string }> {
+  const scriptUrl = await getCxAlloyScriptUrl()
+  const res = await fetch(scriptUrl, {
+    method: 'POST',
+    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+    body: JSON.stringify({
+      action: 'ocrImage',
+      image: params.imageBase64,
+      assetName: params.assetName,
+      attributeName: params.attributeName,
+      photoName: params.photoName,
+    }),
+  })
+  if (!res.ok) throw new Error(`OCR request failed (HTTP ${res.status})`)
+  const json = (await res.json()) as { success?: boolean; text?: string; error?: string }
+  // A failed/empty OCR read isn't fatal to the batch — same as the reference, a box that comes
+  // back empty just doesn't fill in its attribute, the others still apply.
+  if (!json.success || !json.text) return { text: '' }
+  return { text: json.text.replace(/\n+/g, ' ').replace(/[|[\]{}]/g, '').trim() }
+}
+
+// ---------------------------------------------------------------------------
 // Joint Pack Photos — read from the "Joint Pack Photo - STY4A" Google Sheet (tabs: "Joint Packs",
 // "Settings") via its own Apps Script web app — a separate spreadsheet from CxAlloy's, so it has
 // its own script and its own URL, stored in arcapp_settings (not launchpad_projects — that row's

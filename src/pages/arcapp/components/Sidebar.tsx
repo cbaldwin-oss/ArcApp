@@ -10,6 +10,7 @@ import {
   Camera,
   ShieldAlert,
   ClipboardCheck,
+  Tag,
   Settings as SettingsIcon,
 } from 'lucide-react'
 
@@ -24,6 +25,7 @@ const NAV: Array<{ to: string; label: string; icon: typeof LayoutDashboard }> = 
   { to: '/jointpacks', label: 'Joint Packs', icon: Camera },
   { to: '/tamperseals', label: 'Tamper Seals', icon: ShieldAlert },
   { to: '/rtft', label: 'RTFT', icon: ClipboardCheck },
+  { to: '/attributes', label: 'Asset Attributes', icon: Tag },
   { to: '/settings', label: 'Settings', icon: SettingsIcon },
 ]
 
