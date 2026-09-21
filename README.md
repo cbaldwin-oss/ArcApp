@@ -331,6 +331,45 @@ Workflows — see `supabase/schema.sql`/`policies.sql`.
 - The old sample-data To-Dos were carried over as real seed rows in `schema.sql` so the list isn't
   empty on first load.
 
+### Checklist & Issue To-Do — auto-surfaced from CxAlloy, assignable like a task
+
+Still-open Checklists/Issues (read-only CxAlloy sheet data) now show up on the To-Do page as their
+own assignable sections, instead of only being manually copied into a task by hand.
+
+- **Two independent toggles in Settings** (`checklist_todo_enabled`/`issue_todo_enabled`) turn on
+  an "Open Checklists"/"Open Issues" section on the To-Do page. Each has its own status picker
+  (`checklist_open_statuses`/`issue_open_statuses`, pulled live from the CxAlloy Settings tab, same
+  picker component as Checklist Ready/Issues for Review above) — deliberately a **separate** status
+  list from those, since "still open" and "ready for review" are opposite framings of the same
+  data. Nothing shows on the To-Do page until at least one status is checked.
+- Each section header shows a live count and is collapsed by default; expanding it lists every
+  matching instance with a link back to CxAlloy, its asset/type/discipline, its raw status, and
+  (for context only) whatever CxAlloy itself already has in its own free-text `assigned_name`
+  field — unrelated to ArcApp's own assignment below.
+- **Assignment** is ArcApp's own, stored in a new table (`arcapp_item_assignments`, keyed by
+  CxAlloy id — the sheet data itself can't be written back to) since Checklists/Issues are
+  read-only. Click any item's assignment chip to reassign it to a team or a specific person via a
+  popover (same team-select/name+email fields as a regular task's assign-to form); check several
+  items and use **Assign selected** to bulk-apply the same target to all of them at once (one
+  round trip, not one request per item).
+- **Scale**: an open-status pick can realistically match thousands of rows (e.g. "Not Started"
+  across a whole project — confirmed live at ~9,400 open checklists). Each section has its own
+  search box (matches title/asset/status/CxAlloy-assigned-name) and paginates what actually
+  renders (100 rows at a time, "Show more" to extend) — "Select all" still operates on the full
+  filtered set even if it's larger than what's currently rendered, so bulk-assigning e.g. every
+  matching row doesn't require scrolling through all of them first. An "Unassigned only" checkbox
+  narrows to what still needs a first assignment.
+- `arcapp_item_assignments` is wide open (`anon` + `authenticated`, no editor check) — same
+  pattern as `arcapp_tasks`/`arcapp_teams`, since this is the same assignment system extended to
+  cover CxAlloy items instead of freeform tasks.
+- Verified live: real CxAlloy status vocabulary (`Not Started`/`In Progress`/etc.) picked in
+  Settings, ~9,400 real open checklists and ~270 real open issues loaded, search narrowing
+  confirmed against real titles, pagination confirmed (100 → 200 rows on "Show more"), and the
+  full assign flow exercised end-to-end — both a 2-item bulk-assign to a team and a single-row
+  reassign to a person, each correctly upserting one row per item keyed by CxAlloy id. The
+  read/write calls involved in that last check were intercepted rather than run against the live
+  (currently empty) table, so no test data was left behind in production.
+
 ## Sign-in — Google OAuth + an authorized-users allowlist
 
 Sign-in is now a real modal (`SignInModal.tsx`, replacing the old `window.prompt()` hack) with

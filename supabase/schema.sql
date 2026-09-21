@@ -176,3 +176,26 @@ ALTER TABLE arcapp_submittals ADD COLUMN IF NOT EXISTS notes_log jsonb NOT NULL 
 INSERT INTO storage.buckets (id, name, public)
 SELECT 'submittals', 'submittals', true
 WHERE NOT EXISTS (SELECT 1 FROM storage.buckets WHERE id = 'submittals');
+
+-- ---------------------------------------------------------------------------
+-- NOT YET APPLIED — arcapp_item_assignments (Checklist/Issue To-Do, requested 2026-09-21).
+--
+-- Checklists and Issues themselves live in the read-only CxAlloy Google Sheet (via Apps
+-- Script) — this table is ArcApp's own place to record who's responsible for chasing down a
+-- specific open checklist/issue, keyed by its CxAlloy id (`item_id`) plus which sheet it came
+-- from (`item_type`). Same "at most one of team or person, enforced app-side, unassigned is
+-- valid" convention as arcapp_tasks above; the UNIQUE constraint is what makes
+-- saveItemAssignments()'s upsert (one row per item, same target) idempotent per item.
+-- ---------------------------------------------------------------------------
+
+CREATE TABLE IF NOT EXISTS arcapp_item_assignments (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  item_type text NOT NULL, -- 'checklist' | 'issue'
+  item_id text NOT NULL,   -- CxAlloy checklist_id / issue_id
+  assigned_team_id uuid REFERENCES arcapp_teams(id) ON DELETE SET NULL,
+  assigned_email text,
+  assigned_name text,
+  updated_at timestamptz NOT NULL DEFAULT now(),
+  updated_by text,
+  UNIQUE (item_type, item_id)
+);

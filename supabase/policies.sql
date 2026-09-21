@@ -187,3 +187,18 @@ CREATE POLICY "submittals_bucket_delete_editors" ON storage.objects
     bucket_id = 'submittals'
     AND EXISTS (SELECT 1 FROM "STY4authorized_editors" e WHERE lower(e.email) = lower(auth.jwt() ->> 'email'))
   );
+
+
+-- =============================================================================
+-- NOT YET APPLIED — arcapp_item_assignments (Checklist/Issue To-Do, requested 2026-09-21).
+-- Same wide-open pattern as arcapp_teams/arcapp_tasks above — this is the same assignment
+-- system extended to cover CxAlloy checklist/issue items instead of freeform tasks, so it gets
+-- the same "anyone on-site can reassign, no sign-in required" access.
+-- =============================================================================
+
+ALTER TABLE arcapp_item_assignments ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "item_assignments_select_public" ON arcapp_item_assignments
+  FOR SELECT TO anon, authenticated USING (true);
+CREATE POLICY "item_assignments_write_public" ON arcapp_item_assignments
+  FOR ALL TO anon, authenticated USING (true) WITH CHECK (true);

@@ -7,6 +7,7 @@ import type { Todo, TaskTag } from '../types'
 import { isTodoMine } from '../utils'
 import { TodoList } from '../components/TodoPanel'
 import TeamsManager from '../components/TeamsManager'
+import OpenItemsTodoPanel from '../components/OpenItemsTodoPanel'
 
 type AssignMode = 'none' | 'team' | 'person'
 type FormState = {
@@ -120,6 +121,8 @@ export default function TodoPage() {
   return (
     <>
       <TeamsManager teams={teams} tasks={todos} onSave={ctx.onSaveTeam} onDelete={ctx.onDeleteTeam} />
+
+      <OpenItemsTodoPanel />
 
       <section className="panel" id="todo">
         <div className="panel-header">

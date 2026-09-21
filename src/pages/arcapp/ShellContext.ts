@@ -50,6 +50,10 @@ export type ShellContext = {
   checklistReadyStatuses: string[]
   issueReviewStatuses: string[]
   submittalExemptAssets: string[]
+  checklistTodoEnabled: boolean
+  issueTodoEnabled: boolean
+  checklistOpenStatuses: string[]
+  issueOpenStatuses: string[]
   settingsLoading: boolean
   onSaveSetting: (key: string, value: string) => Promise<void>
 }

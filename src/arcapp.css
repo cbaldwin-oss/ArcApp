@@ -837,6 +837,44 @@ html, body, #root{ margin:0; padding:0; min-height:100%; background:#05070d; }
 .arcapp main.main-full .eq-panel .sync-note{ padding:0; margin:10px 0 14px; }
 .arcapp main.main-full .eq-scroll{ max-height:calc(100vh - 225px); }
 @media (max-width:1024px){ .arcapp main.main-full .eq-scroll{ max-height:calc(100vh - 240px); } }
+
+/* ---------- Checklist/Issue To-Do (Open Checklists / Open Issues) ---------- */
+.arcapp .oi-clickable{ cursor:pointer; user-select:none; }
+.arcapp .oi-clickable .panel-header-left{ gap:8px; }
+.arcapp .oi-filters{ display:flex; align-items:center; gap:16px; padding-bottom:12px; flex-wrap:wrap; }
+.arcapp .oi-search{
+  flex:1; min-width:220px; max-width:420px; background:var(--bg-elev-2); border:1px solid var(--border-strong);
+  border-radius:var(--radius-sm); color:var(--text); font-family:var(--font-mono); font-size:12.5px; padding:9px 13px;
+}
+.arcapp .oi-search::placeholder{ color:var(--text-faint); }
+.arcapp .oi-toolbar{ display:flex; align-items:center; gap:14px; padding:2px 0 14px; border-bottom:1px solid var(--border); margin-bottom:10px; flex-wrap:wrap; }
+.arcapp .oi-rows{ display:flex; flex-direction:column; }
+.arcapp .oi-row{ display:flex; align-items:flex-start; gap:12px; padding:11px 0; border-bottom:1px solid var(--border); }
+.arcapp .oi-row:last-child{ border-bottom:none; }
+.arcapp .oi-row > input[type="checkbox"]{ margin-top:4px; width:16px; height:16px; accent-color:var(--green); flex:0 0 auto; }
+.arcapp .oi-main{ flex:1; min-width:0; }
+.arcapp .oi-title{ display:block; font-size:13.5px; color:var(--text); text-decoration:none; border-bottom:1px dotted var(--green-dim); width:fit-content; }
+.arcapp .oi-title:hover{ color:var(--green-soft); border-bottom-color:var(--green); }
+.arcapp .oi-meta{ display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin-top:6px; font-family:var(--font-mono); font-size:11px; color:var(--text-faint); }
+.arcapp .oi-assign-chip{
+  flex:0 0 auto; font-family:var(--font-mono); font-size:10.5px; color:var(--green-soft);
+  background:var(--green-tint); border:1px solid var(--green-dim); border-radius:999px; padding:5px 12px; cursor:pointer;
+  white-space:nowrap;
+}
+.arcapp .oi-assign-chip:hover{ border-color:var(--green); color:var(--green); }
+.arcapp .oi-assign-chip:disabled{ opacity:0.5; cursor:not-allowed; }
+
+.arcapp .oi-popover{
+  position:fixed; background:var(--bg-elev); border:1px solid var(--border-strong); box-shadow:var(--shadow-md);
+  padding:14px; z-index:400; border-radius:var(--radius-sm); color:var(--text); font-size:13px; width:260px;
+}
+.arcapp .oi-popover-title{ font-family:var(--font-mono); font-size:10.5px; text-transform:uppercase; letter-spacing:0.4px; color:var(--text-muted); margin-bottom:10px; }
+.arcapp .oi-popover select, .arcapp .oi-popover input{
+  width:100%; background:var(--bg-elev-2); border:1px solid var(--border-strong); border-radius:var(--radius-sm);
+  color:var(--text); font-family:var(--font-body); font-size:13px; padding:8px 10px;
+}
+.arcapp .oi-popover-actions{ display:flex; gap:8px; margin-top:12px; }
+.arcapp .oi-popover-actions .eq-filter-btn{ flex:1; }
 .arcapp .eq-header-sticky{ position:sticky; top:0; z-index:6; width:max-content; min-width:100%; }
 .arcapp .eq-group-bar, .arcapp .eq-col-header-row, .arcapp .eq-row{ display:flex; align-items:stretch; width:max-content; min-width:100%; }
 .arcapp .eq-group-bar{ background:var(--green-dim); height:28px; }

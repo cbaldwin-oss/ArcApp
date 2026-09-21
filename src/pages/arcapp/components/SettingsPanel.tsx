@@ -10,6 +10,10 @@ type Props = {
   checklistReadyStatuses: string[]
   issueReviewStatuses: string[]
   submittalExemptAssets: string[]
+  checklistTodoEnabled: boolean
+  issueTodoEnabled: boolean
+  checklistOpenStatuses: string[]
+  issueOpenStatuses: string[]
   canEdit: boolean
   /** Separate, looser gate for Workflows specifically — see Dashboard.tsx for why. */
   canManageWorkflows: boolean
@@ -79,11 +83,69 @@ function Field({
   )
 }
 
+function ToggleField({
+  label,
+  hint,
+  initial,
+  canEdit,
+  loading,
+  onSave,
+}: {
+  label: string
+  hint: string
+  initial: boolean
+  canEdit: boolean
+  loading: boolean
+  onSave: (value: boolean) => Promise<void>
+}) {
+  const [value, setValue] = useState(initial)
+  const [msg, setMsg] = useState<{ text: string; cls: string }>({ text: '', cls: 'q-hint' })
+  const [busy, setBusy] = useState(false)
+
+  useEffect(() => {
+    setValue(initial)
+  }, [initial])
+
+  const disabled = !canEdit || busy || loading
+
+  async function toggle() {
+    if (disabled) return
+    const next = !value
+    setValue(next)
+    setBusy(true)
+    setMsg({ text: 'Saving…', cls: 'q-hint' })
+    try {
+      await onSave(next)
+      setMsg({ text: 'Saved app-wide.', cls: 'q-hint ok' })
+    } catch (err) {
+      setValue(!next)
+      setMsg({ text: 'Failed: ' + (err instanceof Error ? err.message : String(err)), cls: 'q-hint err' })
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <div style={{ marginBottom: 14 }}>
+      <label className="wf-check-row" style={{ cursor: disabled ? 'default' : 'pointer' }}>
+        <input type="checkbox" checked={value} disabled={disabled} onChange={toggle} />
+        {label}
+      </label>
+      <div className="q-hint">{hint}</div>
+      {msg.text && <div className={msg.cls}>{msg.text}</div>}
+    </div>
+  )
+}
+
 export default function SettingsPanel({
   jointPackFolder,
   checklistReadyStatuses,
   issueReviewStatuses,
   submittalExemptAssets,
+  checklistTodoEnabled,
+  issueTodoEnabled,
+  checklistOpenStatuses,
+  issueOpenStatuses,
   canEdit,
   canManageWorkflows,
   loading,
@@ -124,6 +186,51 @@ export default function SettingsPanel({
           loading={loading}
           onSave={(values) => onSaveSetting('issue_review_statuses', values.join(', '))}
         />
+
+        <div style={{ marginBottom: 22, maxWidth: 560 }}>
+          <label style={{ display: 'block', marginBottom: 4, fontFamily: 'var(--font-display)', fontSize: 13, fontWeight: 700, letterSpacing: '0.4px', textTransform: 'uppercase', color: 'var(--text)' }}>
+            Checklist &amp; Issue To-Do
+          </label>
+          <div className="q-hint" style={{ marginBottom: 12 }}>
+            Surfaces still-open Checklists/Issues on the To-Do page as assignable instances — each
+            can be handed to a team or a specific person, individually or via multi-select, same as
+            a regular task.
+          </div>
+          <ToggleField
+            label="Checklist To-Do"
+            hint="Shows an Open Checklists section on the To-Do page."
+            initial={checklistTodoEnabled}
+            canEdit={canEdit}
+            loading={loading}
+            onSave={(v) => onSaveSetting('checklist_todo_enabled', v ? 'true' : '')}
+          />
+          <CxAlloyStatusPicker
+            label="Checklist To-Do — status(es) that count as still open"
+            hint="Pulled live from the CxAlloy Settings tab. Different from Checklist Ready above — this is 'still outstanding', not 'ready for CxA review'. Nothing shows on the To-Do page until at least one status is checked here."
+            column="checklistStatuses"
+            value={checklistOpenStatuses}
+            canEdit={canEdit}
+            loading={loading}
+            onSave={(values) => onSaveSetting('checklist_open_statuses', values.join(', '))}
+          />
+          <ToggleField
+            label="Issues To-Do"
+            hint="Shows an Open Issues section on the To-Do page."
+            initial={issueTodoEnabled}
+            canEdit={canEdit}
+            loading={loading}
+            onSave={(v) => onSaveSetting('issue_todo_enabled', v ? 'true' : '')}
+          />
+          <CxAlloyStatusPicker
+            label="Issues To-Do — status(es) that count as still open"
+            hint="Pulled live from the CxAlloy Settings tab. Different from Issues for Review above — this is 'still outstanding', not 'ready for review'. Nothing shows on the To-Do page until at least one status is checked here."
+            column="issueStatuses"
+            value={issueOpenStatuses}
+            canEdit={canEdit}
+            loading={loading}
+            onSave={(values) => onSaveSetting('issue_open_statuses', values.join(', '))}
+          />
+        </div>
 
         <WorkflowsBuilder canEdit={canManageWorkflows} canEditItems={canEdit} />
 

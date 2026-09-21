@@ -226,10 +226,8 @@ export type ChecklistRow = {
   assigned_name: string
   date_created: string
 }
-async function getChecklists(): Promise<{ rows: ChecklistRow[]; readyStatuses: string[] }> {
-  const { checklistReadyStatuses: readyStatuses } = await getSettings()
-  const raw = await fetchCxAlloySheet('getChecklists', { status: readyStatuses.join(',') })
-  const rows: ChecklistRow[] = raw.map((r) => ({
+function mapChecklistRows(raw: Array<Record<string, string>>): ChecklistRow[] {
+  return raw.map((r) => ({
     checklist_id: (r.checklist_id ?? '').toString(),
     number: (r.number ?? '').toString(),
     name: (r.name ?? '').toString(),
@@ -240,10 +238,29 @@ async function getChecklists(): Promise<{ rows: ChecklistRow[]; readyStatuses: s
     assigned_name: (r.assigned_name ?? '').toString(),
     date_created: (r.date_created ?? '').toString(),
   }))
-  return { rows, readyStatuses }
+}
+async function getChecklists(): Promise<{ rows: ChecklistRow[]; readyStatuses: string[] }> {
+  const { checklistReadyStatuses: readyStatuses } = await getSettings()
+  const raw = await fetchCxAlloySheet('getChecklists', { status: readyStatuses.join(',') })
+  return { rows: mapChecklistRows(raw), readyStatuses }
 }
 export function useGetChecklists() {
   return useApiFn(getChecklists)
+}
+
+// Same sheet/action, filtered by a separate "open" status list (Settings → Checklist To-Do) —
+// distinct from checklistReadyStatuses above, which means "ready for CxA review", not "still
+// outstanding". Returns nothing (no request at all) until that list is configured, since the
+// Apps Script needs an explicit status filter — see fetchCxAlloySheet's header comment on why
+// Checklists/Issues never fetch unfiltered (15-20k+ rows each).
+async function getOpenChecklists(): Promise<{ rows: ChecklistRow[]; openStatuses: string[] }> {
+  const { checklistOpenStatuses: openStatuses } = await getSettings()
+  if (!openStatuses.length) return { rows: [], openStatuses }
+  const raw = await fetchCxAlloySheet('getChecklists', { status: openStatuses.join(',') })
+  return { rows: mapChecklistRows(raw), openStatuses }
+}
+export function useGetOpenChecklists() {
+  return useApiFn(getOpenChecklists)
 }
 
 // ---- Issues ----
@@ -261,10 +278,8 @@ export type IssueRow = {
   due_date: string
   date_created: string
 }
-async function getIssues(): Promise<{ rows: IssueRow[]; reviewStatuses: string[] }> {
-  const { issueReviewStatuses: reviewStatuses } = await getSettings()
-  const raw = await fetchCxAlloySheet('getIssues', { status: reviewStatuses.join(',') })
-  const rows: IssueRow[] = raw.map((r) => ({
+function mapIssueRows(raw: Array<Record<string, string>>): IssueRow[] {
+  return raw.map((r) => ({
     issue_id: (r.issue_id ?? '').toString(),
     name: (r.name ?? '').toString(),
     description: (r.description ?? '').toString(),
@@ -277,10 +292,92 @@ async function getIssues(): Promise<{ rows: IssueRow[]; reviewStatuses: string[]
     due_date: (r.due_date ?? '').toString(),
     date_created: (r.date_created ?? '').toString(),
   }))
-  return { rows, reviewStatuses }
+}
+async function getIssues(): Promise<{ rows: IssueRow[]; reviewStatuses: string[] }> {
+  const { issueReviewStatuses: reviewStatuses } = await getSettings()
+  const raw = await fetchCxAlloySheet('getIssues', { status: reviewStatuses.join(',') })
+  return { rows: mapIssueRows(raw), reviewStatuses }
 }
 export function useGetIssues() {
   return useApiFn(getIssues)
+}
+
+// Same idea as getOpenChecklists above — a separate "open" status list (Settings → Issues
+// To-Do), distinct from issueReviewStatuses ("ready for review").
+async function getOpenIssues(): Promise<{ rows: IssueRow[]; openStatuses: string[] }> {
+  const { issueOpenStatuses: openStatuses } = await getSettings()
+  if (!openStatuses.length) return { rows: [], openStatuses }
+  const raw = await fetchCxAlloySheet('getIssues', { status: openStatuses.join(',') })
+  return { rows: mapIssueRows(raw), openStatuses }
+}
+export function useGetOpenIssues() {
+  return useApiFn(getOpenIssues)
+}
+
+// ---------------------------------------------------------------------------
+// Checklist/Issue To-Do — who's responsible for chasing down a specific open checklist/issue.
+// Checklists/Issues themselves are read-only Sheet data (see above), so this is ArcApp's own
+// table, keyed by the CxAlloy id, following arcapp_tasks' "at most one of team or person,
+// enforced app-side" assignment convention (todoAssignmentLabel() in utils.ts works on this
+// shape unchanged since the field names match Todo's).
+// ---------------------------------------------------------------------------
+
+export type ItemType = 'checklist' | 'issue'
+export type ItemAssignment = {
+  itemType: ItemType
+  itemId: string
+  assignedTeamId: string | null
+  assignedEmail: string | null
+  assignedName: string | null
+}
+
+async function getItemAssignments(): Promise<ItemAssignment[]> {
+  const res = await supabase.from('arcapp_item_assignments').select('item_type, item_id, assigned_team_id, assigned_email, assigned_name')
+  const rows = unwrap(res) as Array<{
+    item_type: string
+    item_id: string
+    assigned_team_id: string | null
+    assigned_email: string | null
+    assigned_name: string | null
+  }>
+  return rows.map((r) => ({
+    itemType: r.item_type as ItemType,
+    itemId: r.item_id,
+    assignedTeamId: r.assigned_team_id,
+    assignedEmail: r.assigned_email,
+    assignedName: r.assigned_name,
+  }))
+}
+export function useGetItemAssignments() {
+  return useApiFn(getItemAssignments)
+}
+
+// Bulk-capable by design — the same target (team, or person) gets applied to every item in
+// `items` in one round trip, which is what both the per-row "reassign" control and the
+// multi-select toolbar's "Assign selected" button call, just with a 1- or N-item list.
+async function saveItemAssignments(params: {
+  items: Array<{ itemType: ItemType; itemId: string }>
+  assignedTeamId: string | null
+  assignedEmail: string | null
+  assignedName: string | null
+}): Promise<{ count: number }> {
+  if (!params.items.length) return { count: 0 }
+  const updatedBy = (await getCurrentUserEmail()) || 'admin'
+  const records = params.items.map((item) => ({
+    item_type: item.itemType,
+    item_id: item.itemId,
+    assigned_team_id: params.assignedTeamId,
+    assigned_email: params.assignedEmail,
+    assigned_name: params.assignedName,
+    updated_by: updatedBy,
+    updated_at: new Date().toISOString(),
+  }))
+  const res = await supabase.from('arcapp_item_assignments').upsert(records, { onConflict: 'item_type,item_id' })
+  if (res.error) throw new Error(res.error.message)
+  return { count: records.length }
+}
+export function useSaveItemAssignments() {
+  return useApiFn(saveItemAssignments)
 }
 
 // ---------------------------------------------------------------------------
@@ -774,11 +871,20 @@ export type AppSettings = {
   /** Assets marked "not reviewable" — excluded entirely from the Submittals page's missing-
    * coverage count (they'll never need a submittal, so they shouldn't count against the total). */
   submittalExemptAssets: string[]
+  /** Checklist/Issue To-Do (see arcapp_item_assignments) — off by default, and the open-status
+   * pickers default to empty so nothing shows until an editor explicitly configures which raw
+   * CxAlloy statuses should count as "still open" for assignment purposes. */
+  checklistTodoEnabled: boolean
+  issueTodoEnabled: boolean
+  checklistOpenStatuses: string[]
+  issueOpenStatuses: string[]
 }
 const SETTINGS_DEFAULTS = {
   checklistReadyStatuses: ['Finished'],
   issueReviewStatuses: ['Pending Verification'],
   submittalExemptAssets: [] as string[],
+  checklistOpenStatuses: [] as string[],
+  issueOpenStatuses: [] as string[],
 }
 function splitCsv(v: string | undefined, fallback: string[]): string[] {
   if (v === undefined || v === null) return fallback
@@ -794,6 +900,10 @@ async function getSettings(): Promise<AppSettings> {
     checklistReadyStatuses: splitCsv(map.get('checklist_ready_statuses'), SETTINGS_DEFAULTS.checklistReadyStatuses),
     issueReviewStatuses: splitCsv(map.get('issue_review_statuses'), SETTINGS_DEFAULTS.issueReviewStatuses),
     submittalExemptAssets: splitCsv(map.get('submittal_exempt_assets'), SETTINGS_DEFAULTS.submittalExemptAssets),
+    checklistTodoEnabled: map.get('checklist_todo_enabled') === 'true',
+    issueTodoEnabled: map.get('issue_todo_enabled') === 'true',
+    checklistOpenStatuses: splitCsv(map.get('checklist_open_statuses'), SETTINGS_DEFAULTS.checklistOpenStatuses),
+    issueOpenStatuses: splitCsv(map.get('issue_open_statuses'), SETTINGS_DEFAULTS.issueOpenStatuses),
   }
 }
 export function useGetSettings() {
@@ -805,6 +915,10 @@ const ALLOWED_SETTING_KEYS = new Set([
   'checklist_ready_statuses',
   'issue_review_statuses',
   'submittal_exempt_assets',
+  'checklist_todo_enabled',
+  'issue_todo_enabled',
+  'checklist_open_statuses',
+  'issue_open_statuses',
 ])
 async function saveSetting(params: { key: string; value: string }): Promise<{ key: string; value: string }> {
   if (!ALLOWED_SETTING_KEYS.has(params.key)) throw new Error(`Unknown setting key: ${params.key}`)

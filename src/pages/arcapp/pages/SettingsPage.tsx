@@ -10,6 +10,10 @@ export default function SettingsPage() {
       checklistReadyStatuses={ctx.checklistReadyStatuses}
       issueReviewStatuses={ctx.issueReviewStatuses}
       submittalExemptAssets={ctx.submittalExemptAssets}
+      checklistTodoEnabled={ctx.checklistTodoEnabled}
+      issueTodoEnabled={ctx.issueTodoEnabled}
+      checklistOpenStatuses={ctx.checklistOpenStatuses}
+      issueOpenStatuses={ctx.issueOpenStatuses}
       canEdit={ctx.canEdit}
       canManageWorkflows={ctx.canManageWorkflows}
       loading={ctx.settingsLoading}

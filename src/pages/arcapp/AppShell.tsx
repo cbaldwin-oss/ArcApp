@@ -123,12 +123,20 @@ export default function AppShell() {
         checklistReadyStatuses?: string[]
         issueReviewStatuses?: string[]
         submittalExemptAssets?: string[]
+        checklistTodoEnabled?: boolean
+        issueTodoEnabled?: boolean
+        checklistOpenStatuses?: string[]
+        issueOpenStatuses?: string[]
       }
     | undefined
   const jointPackFolder = settingsData?.jointPackPhotosFolder ?? ''
   const checklistReadyStatuses = settingsData?.checklistReadyStatuses ?? []
   const issueReviewStatuses = settingsData?.issueReviewStatuses ?? []
   const submittalExemptAssets = settingsData?.submittalExemptAssets ?? []
+  const checklistTodoEnabled = settingsData?.checklistTodoEnabled ?? false
+  const issueTodoEnabled = settingsData?.issueTodoEnabled ?? false
+  const checklistOpenStatuses = settingsData?.checklistOpenStatuses ?? []
+  const issueOpenStatuses = settingsData?.issueOpenStatuses ?? []
 
   const userName = user?.name ?? null
   const initials = user
@@ -293,6 +301,10 @@ export default function AppShell() {
     checklistReadyStatuses,
     issueReviewStatuses,
     submittalExemptAssets,
+    checklistTodoEnabled,
+    issueTodoEnabled,
+    checklistOpenStatuses,
+    issueOpenStatuses,
     settingsLoading: settingsFn.loading,
     onSaveSetting: saveSetting,
   }
