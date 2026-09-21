@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
-import { Outlet } from 'react-router-dom'
+import { Outlet, useLocation } from 'react-router-dom'
 import { useCurrentUser } from '../../lib/useCurrentUser'
 import {
   useGetSchedule, useGetResultOptions, useCheckEditor, useSaveResult, useLogTamperSeals, useSubmitRtft,
@@ -31,6 +31,11 @@ const SOURCE_LABEL = 'STY4BackEndData'
 export default function AppShell() {
   const { user, authError, signInWithGoogle, signInWithEmail, signOut, clearAuthError } = useCurrentUser()
   const [signInOpen, setSignInOpen] = useState(false)
+  const location = useLocation()
+  // The tracker is a wide, data-dense grid — it gets the whole page (no 1200px content cap, no
+  // card chrome, no footer) instead of living in the standard boxed-panel content column every
+  // other page uses.
+  const isFullBleed = location.pathname.startsWith('/equipmenttracker')
 
   const scheduleFn = useGetSchedule()
   const optionsFn = useGetResultOptions()
@@ -310,13 +315,15 @@ export default function AppShell() {
       <div className="arcapp-layout">
         <Sidebar />
 
-        <main>
+        <main className={isFullBleed ? 'main-full' : undefined}>
           <Outlet context={outletContext} />
 
-          <footer>
-            ArcApp Commissioning · Phoenix Data Center 3 · Milestones are sample data — To-Dos read
-            live from arcapp_tasks and Scheduled Activities from {SOURCE_LABEL}
-          </footer>
+          {!isFullBleed && (
+            <footer>
+              ArcApp Commissioning · Phoenix Data Center 3 · Milestones are sample data — To-Dos
+              read live from arcapp_tasks and Scheduled Activities from {SOURCE_LABEL}
+            </footer>
+          )}
         </main>
       </div>
 
