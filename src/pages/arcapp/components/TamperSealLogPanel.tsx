@@ -5,6 +5,7 @@ import { useGetAssetPlaceOptions, useGetTamperSeals, useLogTamperSeals } from '.
 import type { SealInput } from '../../../lib/api'
 import { fmtDate, localIsoDate } from '../utils'
 import TamperSealSection from './TamperSealSection'
+import AssetPicker from './AssetPicker'
 import type { ShellContext } from '../ShellContext'
 
 type SealRow = {
@@ -24,83 +25,6 @@ function sealStatusClass(status: string): string {
   if (t.includes('broke') || t.includes('missing') || t.includes('tamper')) return 'hold'
   if (t.includes('intact')) return 'go'
   return 'muted'
-}
-
-/**
- * A plain <select> is unusable once STY4dropdownoptions has 100+ assets — no way to type to
- * narrow it down (and <datalist>'s suggestions don't reliably show on iOS Safari, which matters
- * given this app runs on iPad). This filters a click-to-pick list live as you type instead.
- */
-function AssetPicker({
-  options,
-  value,
-  onChange,
-  loading,
-}: {
-  options: Array<{ asset: string; place: string }>
-  value: string
-  onChange: (asset: string) => void
-  loading: boolean
-}) {
-  const [query, setQuery] = useState(value)
-  const [open, setOpen] = useState(false)
-
-  useEffect(() => {
-    setQuery(value)
-  }, [value])
-
-  const filtered = useMemo(() => {
-    const q = query.trim().toLowerCase()
-    const list = q ? options.filter((o) => o.asset.toLowerCase().includes(q)) : options
-    return list.slice(0, 60)
-  }, [options, query])
-
-  function pick(asset: string) {
-    onChange(asset)
-    setQuery(asset)
-    setOpen(false)
-  }
-
-  return (
-    <div className="asset-picker">
-      <input
-        type="text"
-        placeholder={loading ? 'Loading assets…' : 'Type to search assets...'}
-        value={query}
-        disabled={loading}
-        onFocus={() => setOpen(true)}
-        onChange={(e) => {
-          setQuery(e.target.value)
-          setOpen(true)
-          if (!e.target.value.trim()) onChange('')
-        }}
-        onBlur={() => {
-          setOpen(false)
-          setQuery(value)
-        }}
-      />
-      {open && !loading && (
-        <div className="asset-picker-list">
-          {filtered.length === 0 && <div className="asset-picker-empty">No matching assets.</div>}
-          {filtered.map((o) => (
-            <button
-              type="button"
-              key={o.asset}
-              className={`asset-picker-item${o.asset === value ? ' active' : ''}`}
-              // mousedown (not click) fires before the input's blur, so the pick registers
-              // before onBlur would otherwise revert the query text and close the list first.
-              onMouseDown={(e) => {
-                e.preventDefault()
-                pick(o.asset)
-              }}
-            >
-              {o.asset}
-            </button>
-          ))}
-        </div>
-      )}
-    </div>
-  )
 }
 
 export default function TamperSealLogPanel() {
@@ -159,7 +83,7 @@ export default function TamperSealLogPanel() {
             <div className="form-field" style={{ marginBottom: 0 }}>
               <label>Asset</label>
               <AssetPicker
-                options={assetPlaceOptions}
+                options={assetPlaceOptions.map((o) => o.asset)}
                 value={asset}
                 onChange={setAsset}
                 loading={assetPlaceFn.loading && !assetPlaceFn.data}

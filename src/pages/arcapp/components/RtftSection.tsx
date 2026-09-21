@@ -1,5 +1,4 @@
 import { useState, useEffect } from 'react'
-import type { ScheduleRow } from '../types'
 
 export type RtftPayload = {
   date: string
@@ -19,7 +18,9 @@ export type RtftPayload = {
 }
 
 type Props = {
-  row: ScheduleRow
+  /** The asset/equipment this entry is logged against — a scheduled activity's row.asset when
+   * run from the Activity Drawer, or whatever's picked in the standalone RTFT Tracker form. */
+  equipment: string
   authUser: string | null
   selectedDate: string
   onSubmit: (payload: RtftPayload) => Promise<void>
@@ -27,7 +28,7 @@ type Props = {
 
 const YN = ['', 'Yes', 'No']
 
-export default function RtftSection({ row, authUser, selectedDate, onSubmit }: Props) {
+export default function RtftSection({ equipment, authUser, selectedDate, onSubmit }: Props) {
   const [equipmentType, setEquipmentType] = useState('')
   const [inspector, setInspector] = useState(authUser || '')
   const [ofe, setOfe] = useState(false)
@@ -43,7 +44,7 @@ export default function RtftSection({ row, authUser, selectedDate, onSubmit }: P
   const [msg, setMsg] = useState<{ text: string; cls: string }>({ text: '', cls: 'q-hint' })
   const [busy, setBusy] = useState(false)
 
-  // Reset when the activity row changes.
+  // Reset whenever the asset being logged against changes.
   useEffect(() => {
     setEquipmentType('')
     setInspector(authUser || '')
@@ -58,7 +59,7 @@ export default function RtftSection({ row, authUser, selectedDate, onSubmit }: P
     setBimNumber('')
     setL2Pass('')
     setMsg({ text: '', cls: 'q-hint' })
-  }, [row.id, authUser])
+  }, [equipment, authUser])
 
   // No sign-in required to submit an RTFT entry yet — the inspector field is still pre-filled
   // from authUser when available, just not required. Revisit once real auth is in place.
@@ -73,7 +74,7 @@ export default function RtftSection({ row, authUser, selectedDate, onSubmit }: P
     }
     const payload: RtftPayload = {
       date: selectedDate,
-      equipment: row.asset || '',
+      equipment: equipment || '',
       equipmentType: equipmentType.trim(),
       ofe,
       inspector: inspector.trim(),
@@ -92,7 +93,7 @@ export default function RtftSection({ row, authUser, selectedDate, onSubmit }: P
     setMsg({ text: 'Saving RTFT entry…', cls: 'q-hint' })
     try {
       await onSubmit(payload)
-      setMsg({ text: `Saved RTFT entry for "${row.asset}".`, cls: 'q-hint ok' })
+      setMsg({ text: `Saved RTFT entry for "${equipment}".`, cls: 'q-hint ok' })
       setEquipmentType('')
       setOfe(false)
       setOpsPresent('')
@@ -118,8 +119,8 @@ export default function RtftSection({ row, authUser, selectedDate, onSubmit }: P
       <label className="q-label">Right the First Time (RTFT)</label>
 
       <div className="form-field">
-        <label>Equipment (auto-filled from this activity)</label>
-        <input type="text" value={row.asset || ''} disabled />
+        <label>Equipment</label>
+        <input type="text" value={equipment || ''} disabled />
       </div>
 
       <div className="seal-row3" style={{ gridTemplateColumns: '1fr 1fr' }}>

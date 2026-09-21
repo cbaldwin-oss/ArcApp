@@ -201,7 +201,7 @@ export default function ActivityDrawer(props: Props) {
         )
       case 'rtft':
         return (
-          <RtftSection key={key} row={activeRow} authUser={authUser} selectedDate={selectedDate} onSubmit={props.onSubmitRTFT} />
+          <RtftSection key={key} equipment={activeRow.asset} authUser={authUser} selectedDate={selectedDate} onSubmit={props.onSubmitRTFT} />
         )
       case 'cmms_data_collection':
         return (

@@ -1,7 +1,12 @@
-import { useEffect } from 'react'
-import { RefreshCw } from 'lucide-react'
-import { useGetRtft } from '../../../lib/api'
-import { fmtDate } from '../utils'
+import { useEffect, useMemo, useState } from 'react'
+import { useOutletContext } from 'react-router-dom'
+import { Plus, RefreshCw, AlertTriangle } from 'lucide-react'
+import { useGetAssetOptions, useGetRtft, useSubmitRtft } from '../../../lib/api'
+import type { RtftInput } from '../../../lib/api'
+import { fmtDate, localIsoDate } from '../utils'
+import RtftSection from './RtftSection'
+import AssetPicker from './AssetPicker'
+import type { ShellContext } from '../ShellContext'
 
 type RtftRow = {
   id: number
@@ -25,15 +30,40 @@ function ynClass(v: string): string {
 }
 
 export default function RtftTrackerPanel() {
+  const { currentUserEmail } = useOutletContext<ShellContext>()
   const fn = useGetRtft()
+  const assetsFn = useGetAssetOptions()
+  const submitFn = useSubmitRtft()
 
-  useEffect(() => {
+  function load() {
     void fn.trigger()
+    void assetsFn.trigger()
+  }
+  useEffect(() => {
+    load()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   const rows = (fn.data as RtftRow[] | undefined) ?? []
-  const state = fn.error ? 'error' : fn.loading || !fn.data ? 'loading' : 'ready'
+  const assets = (assetsFn.data as string[] | undefined) ?? []
+  const state = fn.error || assetsFn.error ? 'error' : !fn.data || !assetsFn.data ? 'loading' : 'ready'
+  const loading = fn.loading || assetsFn.loading
+
+  // Every asset should have at least one RTFT entry logged against it — this is everything from
+  // STY4dropdownoptions.Assets that doesn't show up as an `equipment` value on any row yet.
+  const missingAssets = useMemo(() => {
+    const covered = new Set(rows.map((r) => r.equipment).filter(Boolean))
+    return assets.filter((a) => !covered.has(a))
+  }, [assets, rows])
+
+  const [logOpen, setLogOpen] = useState(false)
+  const [asset, setAsset] = useState('')
+  const [date, setDate] = useState(localIsoDate())
+
+  async function submitEntry(payload: RtftInput) {
+    await submitFn.trigger(payload).result
+    load()
+  }
 
   return (
     <section className="panel" id="rtft">
@@ -41,16 +71,61 @@ export default function RtftTrackerPanel() {
         <div className="panel-header-left">
           <h2 className="panel-title">RTFT Tracker</h2>
           <span className="panel-count">{state === 'ready' ? `${rows.length} entries` : '— entries'}</span>
+          {state === 'ready' && (
+            <span
+              className={missingAssets.length > 0 ? 'status-chip caution' : 'status-chip go'}
+              title={
+                missingAssets.length > 0
+                  ? `Assets with no RTFT entry yet: ${missingAssets.join(', ')}`
+                  : 'Every tracked asset has at least one RTFT entry.'
+              }
+              style={{ display: 'flex', alignItems: 'center', gap: 6 }}
+            >
+              <AlertTriangle style={{ width: 12, height: 12 }} />
+              {missingAssets.length} asset{missingAssets.length === 1 ? '' : 's'} missing an RTFT entry
+            </span>
+          )}
           <span className={state === 'ready' ? 'conn-pill ready' : state === 'error' ? 'conn-pill error' : 'conn-pill loading'}>
             <span className={state === 'error' ? 'led red' : 'led'} /> {state === 'ready' ? 'Live' : state === 'error' ? 'Offline' : 'Syncing'}
           </span>
         </div>
-        <div className="panel-header-right">
-          <button className={fn.loading ? 'icon-btn spin' : 'icon-btn'} title="Refresh" onClick={() => void fn.trigger()} aria-label="Refresh RTFT">
+        <div className="panel-header-right" style={{ gap: 10 }}>
+          <button type="button" className="panel-action-btn" onClick={() => setLogOpen((v) => !v)}>
+            <Plus style={{ width: 15, height: 15 }} />
+            {logOpen ? 'Close' : 'Log RTFT'}
+          </button>
+          <button className={loading ? 'icon-btn spin' : 'icon-btn'} title="Refresh" onClick={load} aria-label="Refresh RTFT">
             <RefreshCw />
           </button>
         </div>
       </div>
+
+      {logOpen && (
+        <div className="panel-body" style={{ borderBottom: '1px solid var(--border)' }}>
+          <div className="seal-row3" style={{ gridTemplateColumns: '1.4fr 1fr' }}>
+            <div className="form-field" style={{ marginBottom: 0 }}>
+              <label>Asset</label>
+              <AssetPicker
+                options={assets}
+                value={asset}
+                onChange={setAsset}
+                loading={assetsFn.loading && !assetsFn.data}
+              />
+            </div>
+            <div className="form-field" style={{ marginBottom: 0 }}>
+              <label>Inspection date</label>
+              <input type="date" value={date} onChange={(e) => setDate(e.target.value)} />
+            </div>
+          </div>
+
+          {asset ? (
+            <RtftSection equipment={asset} authUser={currentUserEmail} selectedDate={date} onSubmit={submitEntry} />
+          ) : (
+            <div className="q-hint">Select an asset above to log an RTFT entry.</div>
+          )}
+        </div>
+      )}
+
       <div className="panel-body no-pad">
         <div style={{ overflowX: 'auto' }}>
           <table className="sched">
@@ -81,9 +156,9 @@ export default function RtftTrackerPanel() {
               {state === 'error' && (
                 <tr>
                   <td colSpan={9} className="table-error">
-                    Couldn&apos;t load RTFT entries ({fn.error}).
+                    Couldn&apos;t load RTFT entries.
                     <br />
-                    <button className="retry-btn" onClick={() => void fn.trigger()}>
+                    <button className="retry-btn" onClick={load}>
                       Retry
                     </button>
                   </td>
@@ -92,7 +167,8 @@ export default function RtftTrackerPanel() {
               {state === 'ready' && rows.length === 0 && (
                 <tr>
                   <td colSpan={9} className="table-empty">
-                    No RTFT entries yet. Submit one from an activity&apos;s detail drawer.
+                    No RTFT entries yet. Use &quot;Log RTFT&quot; above, or submit one from an
+                    activity&apos;s detail drawer.
                   </td>
                 </tr>
               )}

@@ -197,6 +197,24 @@ same `getSettings()`. The fix is a one-line policy swap (`settings_select_authen
 but changing a live RLS policy needs your explicit go-ahead rather than being applied
 automatically — ask for it to be applied when you're ready.
 
+## RTFT — standalone logging + per-asset coverage
+
+Same two additions as Tamper Seals got, applied to RTFT (`RtftTrackerPanel.tsx`):
+
+- **Standalone logging**: `RtftSection.tsx` used to require a whole `ScheduleRow` (it read
+  `row.asset` for the Equipment field) — generalized to take a plain `equipment: string` instead,
+  the same way `TamperSealSection` was generalized earlier. The Activity Drawer usage just passes
+  `activeRow.asset` now. **Log RTFT** in the RTFT Tracker's header opens the exact same form
+  (Equipment/type/inspector/OFE/present flags/issues/L2 pass) with an `AssetPicker` — extracted
+  into its own file since it's now shared between this and Tamper Seals — standing in for "which
+  activity is this" so an inspection can be logged directly against an asset, no scheduled
+  activity required.
+- **Coverage badge**: every asset should have at least one RTFT entry — the header badge counts
+  how many of `STY4dropdownoptions.Assets` have never shown up as an `equipment` value on any
+  `STY4RTFT` row yet (hover it to see which ones), same pattern as Submittals' missing-coverage
+  badge. There's no exempt-assets list for this one (wasn't asked for) — every tracked asset
+  counts.
+
 ## To-Do — Teams & task assignment
 
 To-Dos are no longer hardcoded sample data — they're real, persisted rows (`arcapp_tasks`), and
