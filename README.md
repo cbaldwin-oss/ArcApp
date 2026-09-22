@@ -205,8 +205,13 @@ Pack Photo's) — `useGetNetaTrackerData`/`useUpdateNetaField` in `src/lib/api.t
   - `Returned Files` — same four display columns, then **Issues** (free text, shown as a caution
     chip when it isn't blank/"None"), editable **Technical Review**, **Stamp Present**, **Neta
     Completed**, **Uploaded to ACC** (checkboxes) and **Comments**.
-  - `DOCUMENT LINK` is plain text in the sheet (a duplicate of the filename, not an actual
-    hyperlink) — shown as-is, not rendered as a clickable link.
+  - `DOCUMENT NAME` and the `FOLDER LOCATION` pill are both clickable, opening the same place a
+    click in the sheet would — the actual Drive file and its Drive folder respectively. Both sheet
+    cells are `=HYPERLINK(url, "label")` formulas (not native cell links, and not visible via
+    `getValues()`), so `readNetaTab` in the script also reads `getFormulas()` for those two columns
+    and regexes the URL out, returned as `documentLinkUrl`/`folderLocationUrl` alongside each row.
+    A row falls back to plain, non-clickable text for either one if its cell somehow isn't a
+    HYPERLINK formula (never observed in practice — 778/778 and 119/119 had one when checked).
 - **Writes are addressed by literal sheet row number** (returned alongside each row by
   `getNetaData`), which is fast but fragile if rows get inserted/deleted between page load and an
   edit — `updateNetaField` also sends the row's `documentName`, and the script refuses the write

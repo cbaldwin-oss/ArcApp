@@ -190,11 +190,32 @@ function NetaCommentField({ tab, netaRow, value }: { tab: NetaTab; netaRow: Neta
   )
 }
 
-function NetaRowMeta({ row }: { row: NetaTreeRow & { submittedDate: string; folderLocation: string } }) {
+type NetaLinkedRow = NetaTreeRow & { submittedDate: string; folderLocation: string; folderLocationUrl: string; documentLinkUrl: string }
+
+/** The sheet's Document Name cell is itself the `=HYPERLINK(...)` — opening the file straight
+ * from the sheet click and opening it here both land on the same Drive "view" URL. Falls back to
+ * plain text if a row's Document Link cell somehow isn't a HYPERLINK formula. */
+function NetaDocTitle({ row }: { row: NetaLinkedRow & { documentName: string } }) {
+  if (!row.documentLinkUrl) return <span className="neta-row-title">{row.documentName}</span>
+  return (
+    <a className="neta-row-title oi-title" href={row.documentLinkUrl} target="_blank" rel="noreferrer">
+      {row.documentName}
+    </a>
+  )
+}
+
+function NetaRowMeta({ row }: { row: NetaLinkedRow }) {
   return (
     <div className="neta-row-meta">
       {row.submittedDate && <span>{row.submittedDate}</span>}
-      {row.folderLocation && <span className="tag norm">{row.folderLocation}</span>}
+      {row.folderLocation &&
+        (row.folderLocationUrl ? (
+          <a className="tag norm neta-folder-link" href={row.folderLocationUrl} target="_blank" rel="noreferrer">
+            {row.folderLocation}
+          </a>
+        ) : (
+          <span className="tag norm">{row.folderLocation}</span>
+        ))}
     </div>
   )
 }
@@ -203,7 +224,7 @@ function SubmissionRow({ row }: { row: NetaSubmissionRow }) {
   return (
     <div className="neta-row">
       <div className="neta-row-main">
-        <span className="neta-row-title">{row.documentName}</span>
+        <NetaDocTitle row={row} />
         <NetaRowMeta row={row} />
       </div>
       <div className="neta-row-fields">
@@ -220,7 +241,7 @@ function ReturnedRow({ row }: { row: NetaReturnedRow }) {
   return (
     <div className="neta-row">
       <div className="neta-row-main">
-        <span className="neta-row-title">{row.documentName}</span>
+        <NetaDocTitle row={row} />
         <NetaRowMeta row={row} />
         {row.issues && row.issues.toLowerCase() !== 'none' && <span className="status-chip caution">{row.issues}</span>}
       </div>

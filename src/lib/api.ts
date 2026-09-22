@@ -781,7 +781,14 @@ export type NetaSubmissionRow = {
   documentName: string
   submittedDate: string
   folderLocation: string
+  /** The sheet cell is `=HYPERLINK(url, "<label>")` — folderLocation is the label, this is the
+   * target Drive folder URL (a per-equipment-category folder, or a fixed status folder like
+   * "READY TO UPLOAD"). Empty if that cell isn't a HYPERLINK formula. */
+  folderLocationUrl: string
   documentLink: string
+  /** Same deal as folderLocationUrl — the Drive file's own view URL. Every row has one in
+   * practice (778/778, 119/119 when this was checked), but treat as optional. */
+  documentLinkUrl: string
   clericalReview: boolean
   submittedToGoogle: boolean
   issuesFound: boolean
@@ -795,7 +802,9 @@ export type NetaReturnedRow = {
   documentName: string
   submittedDate: string
   folderLocation: string
+  folderLocationUrl: string
   documentLink: string
+  documentLinkUrl: string
   issues: string
   technicalReview: boolean
   stampPresent: boolean
@@ -839,7 +848,9 @@ async function getNetaTrackerData(): Promise<NetaTrackerData> {
     documentName: netaStr(r.documentName),
     submittedDate: netaStr(r.submittedDate),
     folderLocation: netaStr(r.folderLocation),
+    folderLocationUrl: netaStr(r.folderLocationUrl),
     documentLink: netaStr(r.documentLink),
+    documentLinkUrl: netaStr(r.documentLinkUrl),
     clericalReview: netaBool(r.clericalReview),
     submittedToGoogle: netaBool(r.submittedToGoogle),
     issuesFound: netaBool(r.issuesFound),
@@ -853,7 +864,9 @@ async function getNetaTrackerData(): Promise<NetaTrackerData> {
     documentName: netaStr(r.documentName),
     submittedDate: netaStr(r.submittedDate),
     folderLocation: netaStr(r.folderLocation),
+    folderLocationUrl: netaStr(r.folderLocationUrl),
     documentLink: netaStr(r.documentLink),
+    documentLinkUrl: netaStr(r.documentLinkUrl),
     issues: netaStr(r.issues),
     technicalReview: netaBool(r.technicalReview),
     stampPresent: netaBool(r.stampPresent),
