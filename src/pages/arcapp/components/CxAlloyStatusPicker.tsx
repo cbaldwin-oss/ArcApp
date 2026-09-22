@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useGetCxAlloySettingsSheet } from '../../../lib/api'
 import type { CxAlloySettingsData } from '../../../lib/api'
+import { hasCapability } from '../../../lib/project'
 
 type Props = {
   label: string
@@ -26,14 +27,24 @@ type Props = {
  * flagged, rather than silently dropped.
  */
 export default function CxAlloyStatusPicker({ label, hint, column, value, canEdit, loading, onSave }: Props) {
+  const available = hasCapability('cxAlloyActions')
   const fn = useGetCxAlloySettingsSheet()
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
 
   useEffect(() => {
-    void fn.trigger()
+    if (available) void fn.trigger()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+
+  if (!available) {
+    return (
+      <div style={{ marginBottom: 22, maxWidth: 560 }}>
+        <label style={{ display: 'block', marginBottom: 8 }}>{label}</label>
+        <div className="q-hint">Not available — this project's Apps Script doesn't have the ArcApp getCxAlloySettings action added yet.</div>
+      </div>
+    )
+  }
 
   const options = (fn.data as CxAlloySettingsData | undefined)?.[column] ?? []
   const stale = value.filter((v) => !options.includes(v))

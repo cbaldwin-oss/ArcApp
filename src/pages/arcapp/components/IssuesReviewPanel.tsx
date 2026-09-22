@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState } from 'react'
 import { RefreshCw } from 'lucide-react'
 import { useGetIssues, cxAlloyIssueUrl } from '../../../lib/api'
+import { hasCapability } from '../../../lib/project'
+import CapabilityNotice from './CapabilityNotice'
 
 type Row = {
   issue_id: string
@@ -26,14 +28,21 @@ function priorityClass(p: string): string {
 }
 
 export default function IssuesReviewPanel() {
+  const available = hasCapability('cxAlloyActions')
   const fn = useGetIssues()
   const [filter, setFilter] = useState('')
   const [priorityFilter, setPriorityFilter] = useState(ALL_PRIORITIES)
 
   useEffect(() => {
-    void fn.trigger()
+    if (available) void fn.trigger()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+
+  if (!available) {
+    return (
+      <CapabilityNotice feature="Issues" id="issues" reason="This project's Apps Script doesn't have the ArcApp getIssues action added yet." />
+    )
+  }
 
   const data = fn.data as { rows: Row[]; reviewStatuses: string[] } | undefined
   const rows = data?.rows ?? []

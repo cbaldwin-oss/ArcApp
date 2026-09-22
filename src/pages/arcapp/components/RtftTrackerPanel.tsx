@@ -4,8 +4,10 @@ import { Plus, RefreshCw, AlertTriangle } from 'lucide-react'
 import { useGetAssetOptions, useGetRtft, useSubmitRtft } from '../../../lib/api'
 import type { RtftInput } from '../../../lib/api'
 import { fmtDate, localIsoDate } from '../utils'
+import { hasCapability } from '../../../lib/project'
 import RtftSection from './RtftSection'
 import AssetPicker from './AssetPicker'
+import CapabilityNotice from './CapabilityNotice'
 import type { ShellContext } from '../ShellContext'
 
 type RtftRow = {
@@ -31,6 +33,7 @@ function ynClass(v: string): string {
 
 export default function RtftTrackerPanel() {
   const { currentUserEmail } = useOutletContext<ShellContext>()
+  const available = hasCapability('siteLogging')
   const fn = useGetRtft()
   const assetsFn = useGetAssetOptions()
   const submitFn = useSubmitRtft()
@@ -40,9 +43,15 @@ export default function RtftTrackerPanel() {
     void assetsFn.trigger()
   }
   useEffect(() => {
-    load()
+    if (available) load()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+
+  if (!available) {
+    return (
+      <CapabilityNotice feature="RTFT" id="rtft" reason="This project has no <prefix>RTFT table yet — that's what RTFT entries write to." />
+    )
+  }
 
   const rows = (fn.data as RtftRow[] | undefined) ?? []
   const assets = (assetsFn.data as string[] | undefined) ?? []

@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { Outlet, useLocation } from 'react-router-dom'
 import { useCurrentUser } from '../../lib/useCurrentUser'
+import { CURRENT_PROJECT } from '../../lib/project'
 import {
   useGetSchedule, useGetResultOptions, useCheckEditor, useSaveResult, useLogTamperSeals, useSubmitRtft,
   useGetSettings, useSaveSetting, useGetWorkflows, useGetWorkflowItems,
@@ -19,7 +20,7 @@ import SignInModal from './components/SignInModal'
 import type { SealPayloadRow } from './components/TamperSealSection'
 import type { RtftPayload } from './components/RtftSection'
 
-const SOURCE_LABEL = 'STY4BackEndData'
+const SOURCE_LABEL = `${CURRENT_PROJECT}BackEndData`
 
 /**
  * The persistent app shell: sidebar navigation + everything every routed page might need,

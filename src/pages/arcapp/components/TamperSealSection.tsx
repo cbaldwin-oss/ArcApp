@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import type { SealSummary } from '../types'
 import { parseOmitted, parseSealNumberParts } from '../utils'
+import { hasCapability } from '../../../lib/project'
 
 type SealInstance = {
   id: number
@@ -116,6 +117,10 @@ export default function TamperSealSection({ assetName, location, authUser, selec
   // No sign-in required to log tamper seals yet — attribute the entry if someone happens to be
   // signed in, otherwise it's logged without a signoff. Revisit once real auth is in place.
   const disabled = busy
+
+  if (!hasCapability('siteLogging')) {
+    return <div className="q-hint">Tamper Seal logging isn&apos;t available for this project yet.</div>
+  }
 
   function update(id: number, patch: Partial<SealInstance>) {
     setInstances((prev) => prev.map((i) => (i.id === id ? { ...i, ...patch } : i)))

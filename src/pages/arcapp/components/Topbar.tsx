@@ -1,7 +1,52 @@
+import { useEffect, useRef, useState } from 'react'
+import { ChevronDown } from 'lucide-react'
+import { CURRENT_PROJECT, PROJECTS, projectLabel, setCurrentProject } from '../../../lib/project'
+
 type TopbarProps = {
   userName: string | null
   userInitials: string
   onAuthClick: () => void
+}
+
+function ProjectSwitcher() {
+  const [open, setOpen] = useState(false)
+  const ref = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    function onDocClick(e: MouseEvent) {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false)
+    }
+    document.addEventListener('mousedown', onDocClick)
+    return () => document.removeEventListener('mousedown', onDocClick)
+  }, [])
+
+  return (
+    <div className="project-switcher" ref={ref}>
+      <button type="button" className="site-chip" onClick={() => setOpen((v) => !v)} aria-haspopup="listbox" aria-expanded={open}>
+        <span className="led" /> {projectLabel(CURRENT_PROJECT)}
+        <ChevronDown style={{ width: 12, height: 12 }} />
+      </button>
+      {open && (
+        <div className="project-switcher-menu" role="listbox">
+          {PROJECTS.map((p) => (
+            <button
+              key={p.key}
+              type="button"
+              role="option"
+              aria-selected={p.key === CURRENT_PROJECT}
+              className={p.key === CURRENT_PROJECT ? 'project-switcher-item active' : 'project-switcher-item'}
+              onClick={() => {
+                setOpen(false)
+                setCurrentProject(p.key)
+              }}
+            >
+              {p.label}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  )
 }
 
 export default function Topbar({ userName, userInitials, onAuthClick }: TopbarProps) {
@@ -29,9 +74,7 @@ export default function Topbar({ userName, userInitials, onAuthClick }: TopbarPr
       </div>
 
       <div className="topbar-right">
-        <div className="site-chip">
-          <span className="led" /> STY4 · PHASE 2
-        </div>
+        <ProjectSwitcher />
         <div
           className={userName ? 'auth-pill signed-in' : 'auth-pill'}
           title={userName ? `Signed in as ${userName} — click to sign out` : 'Click to sign in'}

@@ -31,6 +31,73 @@ exists in your database untouched, in case something else reads it.
    without signing in. `arcapp_settings` stays editor-only. See `supabase/policies.sql` for the
    editor-restricted versions this replaced, kept commented out for an easy revert.
 
+## Project switcher — STY4 / SAN-NT1B
+
+ArcApp now supports more than one LaunchPad project. Click the site pill in the top-right (next to
+Sign In) to pick between **STY4** (Phoenix DC3) and **SAN-NT1B** — the choice is saved to
+`localStorage` and the page reloads, so every fetch in the app comes back scoped to the newly
+picked project.
+
+- **`src/lib/project.ts`** is the single source of truth — `CURRENT_PROJECT` is read once at
+  module load (switching reloads the page rather than trying to make every hook in the app
+  reactive to a live change), and every table-name template in `src/lib/api.ts`
+  (`STY4dropdownoptions` → `` `${CXALLOY_TABLE_PREFIX}dropdownoptions` ``, same for
+  `BackEndData`/`authorized_editors`) reads it instead of a hardcoded `'STY4'` literal.
+- **CxAlloy's own project id/domain differ per site**, not just the table prefix — found while
+  wiring this up: STY4's checklists/issues deep-link to `google.cxalloy.com` (CxAlloy project
+  `50506`), SAN-NT1B's to `tq.cxalloy.com` (project `49639`). `cxAlloyLinkBase()` in `project.ts`
+  holds both.
+- **ArcApp's own tables are now project-scoped, not one shared pool.** `arcapp_settings` (PK
+  changed to `(project_key, setting_key)`), `arcapp_tasks`, `arcapp_teams`, `arcapp_submittals`,
+  `arcapp_workflows`, and `arcapp_item_assignments` (unique constraint changed to
+  `(project_key, item_type, item_id)`) all got a `project_key text NOT NULL DEFAULT 'STY4'`
+  column — every read filters by it and every write stamps it, so switching to SAN-NT1B starts
+  with its own empty Teams/Tasks/Submittals/Settings/Workflows rather than seeing STY4's. Existing
+  rows backfilled to `'STY4'` automatically. No new RLS policies were needed — every existing
+  policy on these tables already grants access unconditionally (`USING (true)`, or an editor check
+  that doesn't reference any column), so project isolation is enforced entirely app-side by the
+  `.eq('project_key', ...)`/stamped-column pattern, the same way this app already trusted itself
+  (not RLS) for things like a submittal's asset list. `arcapp_authorized_users` (who may sign in
+  at all) and `arcapp_workflow_items` (the static catalog of workflow item *types*) were
+  deliberately left global — both are app-wide concepts, not per-site data.
+- **Two real capability gaps found while wiring up SAN-NT1B** (`hasCapability()` in
+  `project.ts`), each showing a clean "not available for this project" notice
+  (`CapabilityNotice.tsx`) instead of a broken page, and hidden from the Sidebar entirely:
+  - **`siteLogging`** — Tamper Seals and RTFT write to `<prefix>Assets`/`<prefix>RTFT`, and
+    SAN-NT1B has neither table yet (confirmed live — 404 from Supabase). Per your call, these
+    stay unavailable for SAN-NT1B rather than provisioning matching tables sight-unseen.
+  - **`cxAlloyActions`** — Checklists, Issues, Asset Attributes (+ its photo-crop OCR), the
+    Checklist/Issue To-Do sections, and the CxAlloy status pickers in Settings all call custom
+    Apps Script actions (`getChecklists`/`getIssues`/`getCxAlloySettings`/
+    `getEquipmentAttributes`/`saveAttributes`/`saveImageOnly`/`ocrImage`) that were added
+    specifically to STY4's script deployment. SAN-NT1B's separately-deployed script doesn't have
+    them yet — confirmed live: `action=getChecklists` against it falls through to a different,
+    equipment-tracker-shaped default response instead of an error, which would otherwise have
+    rendered as a page of blank/malformed rows rather than failing cleanly. Adding those same
+    actions to SAN-NT1B's script (mirroring whatever was added to STY4's — not committed to this
+    repo, per the Checklists/Asset Attributes sections above) would close this gap.
+- **What already works for SAN-NT1B with zero extra setup**: Activities (`SANNT1BBackEndData`,
+  confirmed live), dropdown options, Equipment Status Tracker (reads Supabase directly, not Apps
+  Script — confirmed live with 837 real assets), Submittals, To-Do (manual tasks/teams), Joint
+  Packs (once its own Sheet/script is set up, same as any new project), and Settings.
+- Verified live end-to-end: switching STY4 → SAN-NT1B updates the site pill and localStorage,
+  hides the five gated Sidebar items, shows real SAN-NT1B data on Activities/Equipment Tracker,
+  shows the clean unavailable notice on Tamper Seals/Checklists (both direct-URL and Sidebar-
+  hidden), and switching back to STY4 restores the full nav and its own data — with zero console
+  errors after fixing one component (`CxAlloyStatusPicker`, used by 4 pickers on the Settings
+  page) that was still fetching unconditionally regardless of the `cxAlloyActions` gate.
+
+**⚠️ Unrelated pre-existing security finding, surfaced while checking table constraints for this
+migration (not applied — needs your review):** 8 tables in this Supabase project have Row Level
+Security **disabled**, fully exposed to the `anon`/`authenticated` keys: `PHXA7_Attributes`,
+`SLC1ArcAppSettings`, `SLC1RTFT`, `STY4ArcAppSettings`, `STY4RTFT`, `STY4Submittals`,
+`user_activity_logs`, `wrappers_fdw_stats`. `STY4RTFT`/`STY4Submittals` were already flagged in the
+"Security" section below; `STY4ArcAppSettings`/`SLC1ArcAppSettings` are new to me — not tables
+this codebase reads or writes (it uses `arcapp_settings`), so they look like leftovers from a
+different/earlier ArcApp deployment for STY4 and SLC1. Enabling RLS on any of these without adding
+a matching policy first would silently break whatever currently reads them, so review with
+whoever owns them before running anything.
+
 ## Checklists & Issues (CxAlloy, via Google Sheet)
 
 Unlike the rest of this app, Checklists and Issues don't come from Supabase — they come from the

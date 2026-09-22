@@ -5,8 +5,9 @@ import type { ShellContext } from '../ShellContext'
 import { ConnPill, syncNote } from '../components/SchedulePanel'
 import ScheduleTable from '../components/ScheduleTable'
 import { fmtDateLong, localIsoDate } from '../utils'
+import { CURRENT_PROJECT } from '../../../lib/project'
 
-const SOURCE_LABEL = 'STY4BackEndData'
+const SOURCE_LABEL = `${CURRENT_PROJECT}BackEndData`
 
 /** The full Schedule browser — day nav, free-text filter, and every row for the selected day.
  * Replaces the old "Expand" fullscreen overlay now that this is its own page. */

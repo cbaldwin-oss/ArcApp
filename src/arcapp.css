@@ -106,8 +106,21 @@ html, body, #root{ margin:0; padding:0; min-height:100%; background:#05070d; }
   display:flex; align-items:center; gap:8px;
   font-family:var(--font-mono); font-size:11.5px; font-weight:500; color:var(--text-muted);
   background:var(--bg-elev-2); border:1px solid var(--border); border-radius:999px; padding:6px 14px 6px 10px;
-  letter-spacing:0.4px;
+  letter-spacing:0.4px; cursor:pointer;
 }
+.arcapp .site-chip:hover{ border-color:var(--green); color:var(--text); }
+.arcapp .project-switcher{ position:relative; }
+.arcapp .project-switcher-menu{
+  position:absolute; top:calc(100% + 6px); right:0; min-width:200px; z-index:50;
+  background:var(--bg-elev); border:1px solid var(--border-strong); border-radius:var(--radius-sm);
+  box-shadow:var(--shadow-md); padding:6px; display:flex; flex-direction:column; gap:2px;
+}
+.arcapp .project-switcher-item{
+  display:block; width:100%; text-align:left; background:none; border:none; border-radius:var(--radius-sm);
+  color:var(--text-muted); font-family:var(--font-mono); font-size:12px; padding:9px 11px; cursor:pointer;
+}
+.arcapp .project-switcher-item:hover{ background:var(--bg-elev-2); color:var(--text); }
+.arcapp .project-switcher-item.active{ color:var(--green); background:var(--green-tint); }
 .arcapp .led{ width:7px; height:7px; border-radius:50%; background:var(--green); animation:arc-pulse 2.4s ease-in-out infinite; }
 .arcapp .led.amber{ background:var(--amber); }
 .arcapp .led.red{ background:var(--red); }

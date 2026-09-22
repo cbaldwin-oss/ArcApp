@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { CheckCircle2 } from 'lucide-react'
 import { useGetRtft } from '../../../lib/api'
 import type { RtftRow } from '../../../lib/api'
+import { hasCapability } from '../../../lib/project'
 
 export type RtftPayload = {
   date: string
@@ -127,6 +128,10 @@ export default function RtftSection({ equipment, authUser, selectedDate, onSubmi
   }
 
   const statusText = msg.text || (authUser ? `Signed in as ${authUser}.` : 'Not signed in — entry will save without an inspector signoff unless typed above.')
+
+  if (!hasCapability('siteLogging')) {
+    return <div className="q-hint">RTFT logging isn&apos;t available for this project yet.</div>
+  }
 
   return (
     <div className="q-block">

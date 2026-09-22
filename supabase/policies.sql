@@ -202,3 +202,14 @@ CREATE POLICY "item_assignments_select_public" ON arcapp_item_assignments
   FOR SELECT TO anon, authenticated USING (true);
 CREATE POLICY "item_assignments_write_public" ON arcapp_item_assignments
   FOR ALL TO anon, authenticated USING (true) WITH CHECK (true);
+
+
+-- =============================================================================
+-- APPLIED — SAN-NT1B project switcher's `project_key` columns (see schema.sql). No new policies
+-- needed: every existing policy on arcapp_settings/tasks/teams/submittals/workflows/
+-- item_assignments already grants access with `USING (true)` (or an editor check that doesn't
+-- reference any column value) — none of them restrict by column, so adding project_key doesn't
+-- change what a policy allows. Isolation between projects is enforced entirely app-side, by every
+-- query in src/lib/api.ts filtering/stamping `.eq('project_key', CURRENT_PROJECT)` — same as how
+-- this app was already trusting itself (not RLS) to keep e.g. one submittal's assets list correct.
+-- =============================================================================

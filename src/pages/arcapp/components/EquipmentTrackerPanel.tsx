@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom'
 import { ChevronDown, ChevronUp, Eraser, FileDown, RefreshCw, Search as SearchIcon } from 'lucide-react'
 import { useGetEquipmentTrackerData } from '../../../lib/api'
 import type { EqPhaseRule, EquipmentTrackerConfig, EquipmentTrackerRow } from '../../../lib/api'
+import { CURRENT_PROJECT } from '../../../lib/project'
 import {
   combineOpenIssues,
   computeMaxCols,
@@ -531,7 +532,7 @@ export default function EquipmentTrackerPanel() {
           rows={visibleRows.map((m) => m.row)}
           maxCols={maxCols}
           config={config}
-          siteLabel="STY4"
+          siteLabel={CURRENT_PROJECT}
           onClose={() => setPdfOpen(false)}
         />
       )}

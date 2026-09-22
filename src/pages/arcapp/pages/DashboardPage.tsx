@@ -2,12 +2,13 @@ import { useNavigate, useOutletContext } from 'react-router-dom'
 import type { ShellContext } from '../ShellContext'
 import { MILESTONES } from '../sampleData'
 import { isTodoMine } from '../utils'
+import { CURRENT_PROJECT } from '../../../lib/project'
 import KpiRow from '../components/KpiRow'
 import TodoPanel from '../components/TodoPanel'
 import MilestonesPanel from '../components/MilestonesPanel'
 import SchedulePanel from '../components/SchedulePanel'
 
-const SOURCE_LABEL = 'STY4BackEndData'
+const SOURCE_LABEL = `${CURRENT_PROJECT}BackEndData`
 
 /** The landing page — an at-a-glance overview. Each widget's "expand" now navigates to that
  * section's own full page (via the sidebar) instead of opening an in-page overlay. */

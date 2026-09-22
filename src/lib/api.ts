@@ -19,8 +19,16 @@
 
 import { useApiFn } from './useApiFn'
 import { supabase } from './supabaseClient'
+import { CURRENT_PROJECT, cxAlloyLinkBase, hasCapability } from './project'
 import { FALLBACK_WORKFLOW_ITEMS, type WorkflowItem } from '../pages/arcapp/workflowItems'
 import type { Team, TeamMember, Todo, TaskTag } from '../pages/arcapp/types'
+
+// The active LaunchPad project (site) — see src/lib/project.ts. Every table-name template below
+// (STY4dropdownoptions, STY4BackEndData, STY4authorized_editors, etc.) reads this instead of a
+// hardcoded 'STY4' literal now, so the whole file follows whichever project is currently
+// selected. Declared here (not near its original single use above cxAlloyChecklistUrl/
+// cxAlloyIssueUrl) since checkEditor() and the dropdown-options functions below need it too.
+const CXALLOY_TABLE_PREFIX: string = CURRENT_PROJECT
 
 // ---------------------------------------------------------------------------
 // shared helpers
@@ -65,7 +73,7 @@ async function checkEditor(): Promise<EditorPermission> {
   if (!email) return { email: null, isAuthorized: false, role: null, company: null }
 
   const res = await supabase
-    .from('STY4authorized_editors')
+    .from(`${CXALLOY_TABLE_PREFIX}authorized_editors`)
     .select('is_admin, company, role')
     .ilike('email', email)
     .limit(1)
@@ -86,7 +94,7 @@ export function useCheckEditor() {
 // ---------------------------------------------------------------------------
 
 async function getActivityOptions(): Promise<string[]> {
-  const res = await supabase.from('STY4dropdownoptions').select('Activities').not('Activities', 'is', null)
+  const res = await supabase.from(`${CXALLOY_TABLE_PREFIX}dropdownoptions`).select('Activities').not('Activities', 'is', null)
   return distinctTrimmed(unwrap(res) as Array<Record<string, unknown>>, 'Activities')
 }
 export function useGetActivityOptions() {
@@ -94,7 +102,7 @@ export function useGetActivityOptions() {
 }
 
 async function getAssetOptions(): Promise<string[]> {
-  const res = await supabase.from('STY4dropdownoptions').select('Assets').not('Assets', 'is', null)
+  const res = await supabase.from(`${CXALLOY_TABLE_PREFIX}dropdownoptions`).select('Assets').not('Assets', 'is', null)
   return distinctTrimmed(unwrap(res) as Array<Record<string, unknown>>, 'Assets')
 }
 export function useGetAssetOptions() {
@@ -105,7 +113,7 @@ export function useGetAssetOptions() {
 // Trade_Partners, Results, Zone) — unlike the flat single-column pulls above, this keeps the
 // Asset->Place pairing so picking an asset can auto-fill its place instead of asking for both.
 async function getAssetPlaceOptions(): Promise<Array<{ asset: string; place: string }>> {
-  const res = await supabase.from('STY4dropdownoptions').select('Assets, Places').not('Assets', 'is', null)
+  const res = await supabase.from(`${CXALLOY_TABLE_PREFIX}dropdownoptions`).select('Assets, Places').not('Assets', 'is', null)
   const rows = unwrap(res) as Array<{ Assets: string | null; Places: string | null }>
   const seen = new Set<string>()
   const out: Array<{ asset: string; place: string }> = []
@@ -122,7 +130,7 @@ export function useGetAssetPlaceOptions() {
 }
 
 async function getResultOptions(): Promise<string[]> {
-  const res = await supabase.from('STY4dropdownoptions').select('Results').not('Results', 'is', null)
+  const res = await supabase.from(`${CXALLOY_TABLE_PREFIX}dropdownoptions`).select('Results').not('Results', 'is', null)
   return distinctTrimmed(unwrap(res) as Array<Record<string, unknown>>, 'Results')
 }
 export function useGetResultOptions() {
@@ -141,19 +149,23 @@ export function useGetResultOptions() {
 // 15-20k+ rows and callers only ever want a handful of statuses.
 // ---------------------------------------------------------------------------
 
-const CXALLOY_TABLE_PREFIX = 'STY4'
-// CxAlloy's own numeric project id (not this app's Supabase data) — used only to build
-// https://google.cxalloy.com/... deep links. Matches the id already hardcoded in the Apps Script.
-const CXALLOY_PROJECT_ID = '50506'
-
 export function cxAlloyChecklistUrl(checklistId: string): string {
-  return `https://google.cxalloy.com/project/${CXALLOY_PROJECT_ID}/checklists/${encodeURIComponent(checklistId)}`
+  const { domain, projectId } = cxAlloyLinkBase()
+  return `https://${domain}/project/${projectId}/checklists/${encodeURIComponent(checklistId)}`
 }
 export function cxAlloyIssueUrl(issueId: string): string {
-  return `https://google.cxalloy.com/project/${CXALLOY_PROJECT_ID}/constructionissue/${encodeURIComponent(issueId)}#sort%5B%5D=identified-d`
+  const { domain, projectId } = cxAlloyLinkBase()
+  return `https://${domain}/project/${projectId}/constructionissue/${encodeURIComponent(issueId)}#sort%5B%5D=identified-d`
 }
 
 async function getCxAlloyScriptUrl(): Promise<string> {
+  // Guards every caller (fetchCxAlloySheet, plus Asset Attributes/OCR which call this directly)
+  // against a project whose Apps Script hasn't had the ArcApp-specific actions added yet — see
+  // the `cxAlloyActions` capability comment in src/lib/project.ts for why that's a real gap today
+  // rather than something to detect from the response shape.
+  if (!hasCapability('cxAlloyActions')) {
+    throw new Error(`This project's Apps Script doesn't have the ArcApp actions (getChecklists/getIssues/etc.) added yet.`)
+  }
   const res = await supabase
     .from('launchpad_projects')
     .select('google_script_url')
@@ -332,7 +344,10 @@ export type ItemAssignment = {
 }
 
 async function getItemAssignments(): Promise<ItemAssignment[]> {
-  const res = await supabase.from('arcapp_item_assignments').select('item_type, item_id, assigned_team_id, assigned_email, assigned_name')
+  const res = await supabase
+    .from('arcapp_item_assignments')
+    .select('item_type, item_id, assigned_team_id, assigned_email, assigned_name')
+    .eq('project_key', CURRENT_PROJECT)
   const rows = unwrap(res) as Array<{
     item_type: string
     item_id: string
@@ -364,6 +379,7 @@ async function saveItemAssignments(params: {
   if (!params.items.length) return { count: 0 }
   const updatedBy = (await getCurrentUserEmail()) || 'admin'
   const records = params.items.map((item) => ({
+    project_key: CURRENT_PROJECT,
     item_type: item.itemType,
     item_id: item.itemId,
     assigned_team_id: params.assignedTeamId,
@@ -372,7 +388,7 @@ async function saveItemAssignments(params: {
     updated_by: updatedBy,
     updated_at: new Date().toISOString(),
   }))
-  const res = await supabase.from('arcapp_item_assignments').upsert(records, { onConflict: 'item_type,item_id' })
+  const res = await supabase.from('arcapp_item_assignments').upsert(records, { onConflict: 'project_key,item_type,item_id' })
   if (res.error) throw new Error(res.error.message)
   return { count: records.length }
 }
@@ -626,7 +642,12 @@ export function useGetEquipmentTrackerData() {
 const JOINT_PACK_SCRIPT_SETTING_KEY = 'joint_pack_script_url'
 
 async function getJointPackScriptUrl(): Promise<string> {
-  const res = await supabase.from('arcapp_settings').select('setting_value').eq('setting_key', JOINT_PACK_SCRIPT_SETTING_KEY).maybeSingle()
+  const res = await supabase
+    .from('arcapp_settings')
+    .select('setting_value')
+    .eq('project_key', CURRENT_PROJECT)
+    .eq('setting_key', JOINT_PACK_SCRIPT_SETTING_KEY)
+    .maybeSingle()
   if (res.error) throw new Error(res.error.message)
   const url = (res.data as { setting_value: string | null } | null)?.setting_value
   if (!url) throw new Error('Joint Pack Photo logging isn\'t wired up yet — no Apps Script URL configured.')
@@ -740,6 +761,10 @@ export type RtftRow = {
   signoff: string
 }
 async function getRtft(): Promise<RtftRow[]> {
+  // STY4RTFT only exists for STY4 today — see the `siteLogging` capability comment in
+  // src/lib/project.ts. The RTFT page/section itself already hides behind this same check; this
+  // is defense in depth for any other caller (e.g. ActivityDrawer's embedded RTFT section).
+  if (!hasCapability('siteLogging')) return []
   const res = await supabase
     .from('STY4RTFT')
     .select(
@@ -770,6 +795,7 @@ export type RtftInput = {
   l2Pass: string
 }
 async function submitRtft(p: RtftInput): Promise<{ id: number }> {
+  if (!hasCapability('siteLogging')) throw new Error('RTFT logging isn’t available for this project yet.')
   const signoff = await getCurrentUserEmail()
   const res = await supabase
     .from('STY4RTFT')
@@ -817,7 +843,7 @@ export type ScheduleRowDTO = {
 }
 async function getSchedule(params: { date: string }): Promise<ScheduleRowDTO[]> {
   const res = await supabase
-    .from('STY4BackEndData')
+    .from(`${CXALLOY_TABLE_PREFIX}BackEndData`)
     .select('id, day_label, time, place, activity, asset, status, trade_partners, result, loto')
     .eq('day_label', params.date)
     .order('time', { ascending: true })
@@ -852,7 +878,7 @@ export function useGetSchedule() {
 }
 
 async function saveResult(params: { id: number | string; result: string }): Promise<{ id: number | string; result: string }> {
-  const res = await supabase.from('STY4BackEndData').update({ result: params.result }).eq('id', params.id)
+  const res = await supabase.from(`${CXALLOY_TABLE_PREFIX}BackEndData`).update({ result: params.result }).eq('id', params.id)
   if (res.error) throw new Error(res.error.message)
   return { id: params.id, result: params.result }
 }
@@ -892,7 +918,7 @@ function splitCsv(v: string | undefined, fallback: string[]): string[] {
   return parts.length ? parts : fallback
 }
 async function getSettings(): Promise<AppSettings> {
-  const res = await supabase.from('arcapp_settings').select('setting_key, setting_value')
+  const res = await supabase.from('arcapp_settings').select('setting_key, setting_value').eq('project_key', CURRENT_PROJECT)
   const rows = unwrap(res) as Array<{ setting_key: string; setting_value: string | null }>
   const map = new Map(rows.map((r) => [r.setting_key, r.setting_value ?? '']))
   return {
@@ -926,8 +952,8 @@ async function saveSetting(params: { key: string; value: string }): Promise<{ ke
   const res = await supabase
     .from('arcapp_settings')
     .upsert(
-      { setting_key: params.key, setting_value: params.value, updated_by: updatedBy, updated_at: new Date().toISOString() },
-      { onConflict: 'setting_key' },
+      { project_key: CURRENT_PROJECT, setting_key: params.key, setting_value: params.value, updated_by: updatedBy, updated_at: new Date().toISOString() },
+      { onConflict: 'project_key,setting_key' },
     )
   if (res.error) throw new Error(res.error.message)
   return { key: params.key, value: params.value }
@@ -972,6 +998,7 @@ async function getSubmittalsList(): Promise<Submittal[]> {
   const res = await supabase
     .from('arcapp_submittals')
     .select('id, title, file_url, file_name, assets, review_status, notes_log, updated_by, updated_at, created_at')
+    .eq('project_key', CURRENT_PROJECT)
     .order('created_at', { ascending: false })
   const rows = unwrap(res) as Array<{
     id: string
@@ -1049,6 +1076,7 @@ async function saveSubmittalRecord(params: SubmittalInput): Promise<{ id: string
   if (!ALLOWED_SUBMITTAL_STATUSES.has(params.reviewStatus)) throw new Error(`Invalid review status: ${params.reviewStatus}`)
   const updatedBy = (await getCurrentUserEmail()) || 'admin'
   const record: Record<string, unknown> = {
+    project_key: CURRENT_PROJECT,
     title,
     file_url: params.fileUrl,
     file_name: params.fileName,
@@ -1095,6 +1123,10 @@ export type TamperSealRow = {
   created_at: string
 }
 async function getTamperSeals(): Promise<TamperSealRow[]> {
+  // STY4Assets only exists for STY4 today — see the `siteLogging` capability comment in
+  // src/lib/project.ts. The Tamper Seals page/section already hides behind this same check; this
+  // is defense in depth for any other caller (e.g. ActivityDrawer's embedded seal section).
+  if (!hasCapability('siteLogging')) return []
   const res = await supabase
     .from('STY4Assets')
     .select(
@@ -1135,6 +1167,7 @@ export type SealInput = {
 async function logTamperSeals(params: { rows: SealInput[] }): Promise<{ inserted: number }> {
   const rows = params.rows || []
   if (rows.length === 0) return { inserted: 0 }
+  if (!hasCapability('siteLogging')) throw new Error('Tamper Seal logging isn’t available for this project yet.')
   const signoff = await getCurrentUserEmail()
   const records = rows.map((r) => ({
     asset_name: r.asset_name,
@@ -1282,7 +1315,11 @@ function toStrArray(v: unknown): string[] {
   return []
 }
 async function getWorkflows(): Promise<Workflow[]> {
-  const res = await supabase.from('arcapp_workflows').select('id, activities, items').order('created_at', { ascending: true, nullsFirst: false })
+  const res = await supabase
+    .from('arcapp_workflows')
+    .select('id, activities, items')
+    .eq('project_key', CURRENT_PROJECT)
+    .order('created_at', { ascending: true, nullsFirst: false })
   const rows = unwrap(res) as Array<{ id: string; activities: unknown; items: unknown }>
   return rows.map((r) => ({ id: String(r.id), activities: toStrArray(r.activities), items: toStrArray(r.items) }))
 }
@@ -1317,8 +1354,11 @@ async function saveWorkflows(params: { workflows: Workflow[] }): Promise<{ count
     }
   }
 
-  // Reconcile by id: delete rows no longer present, then upsert the rest.
-  const existingRes = await supabase.from('arcapp_workflows').select('id')
+  // Reconcile by id: delete rows no longer present, then upsert the rest. Scoped to the current
+  // project on both the read and the delete — without this, "no longer present" would compare
+  // against every project's workflow ids at once and delete other projects' rows out from under
+  // them.
+  const existingRes = await supabase.from('arcapp_workflows').select('id').eq('project_key', CURRENT_PROJECT)
   const existingIds = (unwrap(existingRes) as Array<{ id: string }>).map((r) => r.id)
   const keepIds = new Set(clean.map((w) => w.id))
   const toDelete = existingIds.filter((id) => !keepIds.has(id))
@@ -1331,6 +1371,7 @@ async function saveWorkflows(params: { workflows: Workflow[] }): Promise<{ count
     const upsertRes = await supabase.from('arcapp_workflows').upsert(
       clean.map((w) => ({
         id: w.id,
+        project_key: CURRENT_PROJECT,
         activities: w.activities,
         items: w.items,
         updated_at: new Date().toISOString(),
@@ -1363,7 +1404,7 @@ function toTeam(r: { id: string; name: string; members: unknown }): Team {
   }
 }
 async function getTeams(): Promise<Team[]> {
-  const res = await supabase.from('arcapp_teams').select('id, name, members').order('name', { ascending: true })
+  const res = await supabase.from('arcapp_teams').select('id, name, members').eq('project_key', CURRENT_PROJECT).order('name', { ascending: true })
   const rows = unwrap(res) as Array<{ id: string; name: string; members: unknown }>
   return rows.map(toTeam)
 }
@@ -1381,7 +1422,11 @@ async function saveTeam(params: TeamInput): Promise<{ id: string }> {
   const record = { name, members, updated_at: new Date().toISOString(), updated_by: updatedBy }
   const res = params.id
     ? await supabase.from('arcapp_teams').update(record).eq('id', params.id).select('id').single()
-    : await supabase.from('arcapp_teams').insert(record).select('id').single()
+    : await supabase
+        .from('arcapp_teams')
+        .insert({ ...record, project_key: CURRENT_PROJECT })
+        .select('id')
+        .single()
   const row = unwrap(res) as { id: string }
   return { id: row.id }
 }
@@ -1423,6 +1468,7 @@ async function getTasks(): Promise<Todo[]> {
   const res = await supabase
     .from('arcapp_tasks')
     .select('id, text, tag, sys, due_date, done, completed_at, assigned_team_id, assigned_email, assigned_name')
+    .eq('project_key', CURRENT_PROJECT)
     .order('done', { ascending: true })
     .order('due_date', { ascending: true, nullsFirst: false })
   const rows = unwrap(res) as Array<Record<string, unknown>>
@@ -1460,7 +1506,11 @@ async function saveTask(params: TaskInput): Promise<{ id: string }> {
   }
   const res = params.id
     ? await supabase.from('arcapp_tasks').update(record).eq('id', params.id).select('id').single()
-    : await supabase.from('arcapp_tasks').insert({ ...record, created_by: who }).select('id').single()
+    : await supabase
+        .from('arcapp_tasks')
+        .insert({ ...record, project_key: CURRENT_PROJECT, created_by: who })
+        .select('id')
+        .single()
   const row = unwrap(res) as { id: string }
   return { id: row.id }
 }

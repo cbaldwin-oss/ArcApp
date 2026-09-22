@@ -199,3 +199,35 @@ CREATE TABLE IF NOT EXISTS arcapp_item_assignments (
   updated_by text,
   UNIQUE (item_type, item_id)
 );
+
+-- ---------------------------------------------------------------------------
+-- APPLIED — SAN-NT1B project switcher (requested 2026-09-21).
+--
+-- ArcApp already shared its Supabase project with LaunchPad, which turned out to already track
+-- SAN-NT1B as a full second project (own Apps Script, own <prefix>dropdownoptions/BackEndData/
+-- authorized_editors tables — see src/lib/project.ts for the two capability gaps found there:
+-- no <prefix>Assets/<prefix>RTFT tables yet, and its Apps Script doesn't have the ArcApp-specific
+-- actions added yet). CxAlloy/Sheet-backed reads already carry their own table-name prefix per
+-- project (STY4dropdownoptions vs SANNT1Bdropdownoptions, etc. — just a dynamic prefix, no schema
+-- change needed there). But every ArcApp-OWNED table below was a single shared pool with no
+-- notion of "which site" at all — these `project_key` columns are what make picking a different
+-- project in the Topbar switcher actually isolate that project's Teams/Tasks/Submittals/Settings/
+-- Workflows/Checklist-Issue-assignments from every other project's, instead of just changing which
+-- Sheet data is displayed. Existing rows default/backfill to 'STY4' (everything that existed
+-- before this was STY4's data anyway). `arcapp_authorized_users` (who may sign in at all) and
+-- `arcapp_workflow_items` (the static catalog of possible workflow item *types*) are deliberately
+-- NOT scoped — those are both app-wide concepts, not per-site data.
+-- ---------------------------------------------------------------------------
+
+ALTER TABLE arcapp_settings ADD COLUMN IF NOT EXISTS project_key text NOT NULL DEFAULT 'STY4';
+ALTER TABLE arcapp_settings DROP CONSTRAINT arcapp_settings_pkey;
+ALTER TABLE arcapp_settings ADD PRIMARY KEY (project_key, setting_key);
+
+ALTER TABLE arcapp_tasks ADD COLUMN IF NOT EXISTS project_key text NOT NULL DEFAULT 'STY4';
+ALTER TABLE arcapp_teams ADD COLUMN IF NOT EXISTS project_key text NOT NULL DEFAULT 'STY4';
+ALTER TABLE arcapp_submittals ADD COLUMN IF NOT EXISTS project_key text NOT NULL DEFAULT 'STY4';
+ALTER TABLE arcapp_workflows ADD COLUMN IF NOT EXISTS project_key text NOT NULL DEFAULT 'STY4';
+
+ALTER TABLE arcapp_item_assignments ADD COLUMN IF NOT EXISTS project_key text NOT NULL DEFAULT 'STY4';
+ALTER TABLE arcapp_item_assignments DROP CONSTRAINT arcapp_item_assignments_item_type_item_id_key;
+ALTER TABLE arcapp_item_assignments ADD CONSTRAINT arcapp_item_assignments_project_item_key UNIQUE (project_key, item_type, item_id);

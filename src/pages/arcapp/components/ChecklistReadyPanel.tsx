@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState } from 'react'
 import { RefreshCw } from 'lucide-react'
 import { useGetChecklists, cxAlloyChecklistUrl } from '../../../lib/api'
+import { hasCapability } from '../../../lib/project'
+import CapabilityNotice from './CapabilityNotice'
 
 type Row = {
   checklist_id: string
@@ -17,14 +19,25 @@ type Row = {
 const ALL_TYPES = 'All types'
 
 export default function ChecklistReadyPanel() {
+  const available = hasCapability('cxAlloyActions')
   const fn = useGetChecklists()
   const [filter, setFilter] = useState('')
   const [typeFilter, setTypeFilter] = useState(ALL_TYPES)
 
   useEffect(() => {
-    void fn.trigger()
+    if (available) void fn.trigger()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+
+  if (!available) {
+    return (
+      <CapabilityNotice
+        feature="Checklists"
+        id="checklists"
+        reason="This project's Apps Script doesn't have the ArcApp getChecklists action added yet."
+      />
+    )
+  }
 
   const data = fn.data as { rows: Row[]; readyStatuses: string[] } | undefined
   const rows = data?.rows ?? []

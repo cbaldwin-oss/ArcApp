@@ -4,8 +4,10 @@ import { Plus, RefreshCw } from 'lucide-react'
 import { useGetAssetPlaceOptions, useGetTamperSeals, useLogTamperSeals } from '../../../lib/api'
 import type { SealInput } from '../../../lib/api'
 import { fmtDate, localIsoDate } from '../utils'
+import { hasCapability } from '../../../lib/project'
 import TamperSealSection from './TamperSealSection'
 import AssetPicker from './AssetPicker'
+import CapabilityNotice from './CapabilityNotice'
 import type { ShellContext } from '../ShellContext'
 
 type SealRow = {
@@ -29,15 +31,27 @@ function sealStatusClass(status: string): string {
 
 export default function TamperSealLogPanel() {
   const { currentUserEmail } = useOutletContext<ShellContext>()
+  const available = hasCapability('siteLogging')
   const fn = useGetTamperSeals()
   const assetPlaceFn = useGetAssetPlaceOptions()
   const logFn = useLogTamperSeals()
 
   useEffect(() => {
+    if (!available) return
     void fn.trigger()
     void assetPlaceFn.trigger()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+
+  if (!available) {
+    return (
+      <CapabilityNotice
+        feature="Tamper Seals"
+        id="tamperseals"
+        reason="This project has no <prefix>Assets table yet — that's what Tamper Seal entries write to."
+      />
+    )
+  }
 
   const rows = (fn.data as SealRow[] | undefined) ?? []
   const assetPlaceOptions = assetPlaceFn.data ?? []
