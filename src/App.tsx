@@ -15,6 +15,7 @@ import ChecklistReadyPanel from './pages/arcapp/components/ChecklistReadyPanel'
 import IssuesReviewPanel from './pages/arcapp/components/IssuesReviewPanel'
 import TamperSealLogPanel from './pages/arcapp/components/TamperSealLogPanel'
 import RtftTrackerPanel from './pages/arcapp/components/RtftTrackerPanel'
+import NetaTrackerPanel from './pages/arcapp/components/NetaTrackerPanel'
 
 function SetupRequired() {
   return (
@@ -70,6 +71,7 @@ export default function App() {
         <Route path="tamperseals" element={<TamperSealLogPanel />} />
         <Route path="rtft" element={<RtftTrackerPanel />} />
         <Route path="attributes" element={<AssetAttributesPage />} />
+        <Route path="netatracker" element={<NetaTrackerPanel />} />
         <Route path="equipmenttracker" element={<EquipmentTrackerPage />} />
         <Route path="settings" element={<SettingsPage />} />
         <Route path="*" element={<Navigate to="/" replace />} />

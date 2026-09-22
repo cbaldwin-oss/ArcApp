@@ -56,12 +56,14 @@ export function projectLabel(key: ProjectKey): string {
  *    unrecognized `action` param there currently falls through to a different, equipment-tracker-
  *    shaped default response instead of an error, which would otherwise render as a page full of
  *    blank/malformed rows rather than fail cleanly.
+ *  - `netaTracker`: mirrors the "STY4 NETA Tracker" Google Sheet (see NetaTrackerPanel.tsx) via
+ *    its own dedicated Apps Script — that sheet, and its script, only exist for STY4 today.
  */
-export type Capability = 'siteLogging' | 'cxAlloyActions'
+export type Capability = 'siteLogging' | 'cxAlloyActions' | 'netaTracker'
 
 const CAPABILITIES: Record<ProjectKey, Record<Capability, boolean>> = {
-  STY4: { siteLogging: true, cxAlloyActions: true },
-  SANNT1B: { siteLogging: false, cxAlloyActions: false },
+  STY4: { siteLogging: true, cxAlloyActions: true, netaTracker: true },
+  SANNT1B: { siteLogging: false, cxAlloyActions: false, netaTracker: false },
 }
 
 export function hasCapability(cap: Capability, project: ProjectKey = CURRENT_PROJECT): boolean {

@@ -12,6 +12,7 @@ import {
   ClipboardCheck,
   Tag,
   Grid3x3,
+  FileSpreadsheet,
   Settings as SettingsIcon,
 } from 'lucide-react'
 import { hasCapability, type Capability } from '../../../lib/project'
@@ -28,6 +29,7 @@ const NAV: Array<{ to: string; label: string; icon: typeof LayoutDashboard; requ
   { to: '/tamperseals', label: 'Tamper Seals', icon: ShieldAlert, requires: 'siteLogging' },
   { to: '/rtft', label: 'RTFT', icon: ClipboardCheck, requires: 'siteLogging' },
   { to: '/attributes', label: 'Asset Attributes', icon: Tag, requires: 'cxAlloyActions' },
+  { to: '/netatracker', label: 'NETA Tracker', icon: FileSpreadsheet, requires: 'netaTracker' },
   { to: '/equipmenttracker', label: 'Equipment Tracker', icon: Grid3x3 },
   { to: '/settings', label: 'Settings', icon: SettingsIcon },
 ]

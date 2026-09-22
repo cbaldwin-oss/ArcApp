@@ -178,6 +178,59 @@ different spreadsheet from CxAlloy's. `useGetJointPackData`/`useLogJointPackPhot
 - Logging photos doesn't require signing in (same as Tamper Seal/RTFT logging) — only changing the
   destination folder in Settings is editor-gated.
 
+## NETA Tracker (mirrors a live Google Sheet, two-way — via its own Apps Script)
+
+`NetaTrackerPanel.tsx` reproduces the **"STY4 NETA Tracker"** spreadsheet's `Submissions` and
+`Returned Files` tabs inside ArcApp — same Zone → Area → Asset Category grouping, same checkboxes,
+same Comments field — and unlike every other Sheet-backed feature in this app, **writes back to
+it**: toggling a checkbox or editing a comment here sets that exact cell in the live sheet the
+field crew already works from, so ArcApp never becomes a second, drifting copy of the tracker. A
+third private spreadsheet, a third dedicated Apps Script (separate from both CxAlloy's and Joint
+Pack Photo's) — `useGetNetaTrackerData`/`useUpdateNetaField` in `src/lib/api.ts` call it via
+`doGet`/`doPost`, same shape as the other two.
+
+- **Row hierarchy**: the sheet doesn't use native Sheets row grouping — instead it has special
+  single-cell marker rows above each section: `ZONE HEADER: ZONE 1`, `------ AREA: EY09 ------`,
+  `[ ASSET CATEGORY: ATX-A ]`. The script walks each tab top to bottom, matches these three
+  patterns, and stamps every data row below with the nearest zone/area/category above it, so
+  `api.ts` never needs to know that convention — it just gets `{ zone, area, category }` on every
+  row. (Found by downloading the actual workbook and inspecting tab names/headers directly — the
+  natural-language sheet read tool only ever surfaces one tab, and this spreadsheet has seven:
+  `UGLY`, `Submissions`, `Returned Files`, `Submission Tracker`, `BlEH`, `SUBMISSIONS -`,
+  `RETURNED FROM GOOGLE` — only the two the user asked for are wired up.)
+- **Columns**:
+  - `Submissions` — Document Name, Submitted Date, Folder Location, Document Link (all read-only
+    display), then editable **Clerical Review**, **Submitted to Google**, **Issues Found**
+    (checkboxes) and **Comments** (text).
+  - `Returned Files` — same four display columns, then **Issues** (free text, shown as a caution
+    chip when it isn't blank/"None"), editable **Technical Review**, **Stamp Present**, **Neta
+    Completed**, **Uploaded to ACC** (checkboxes) and **Comments**.
+  - `DOCUMENT LINK` is plain text in the sheet (a duplicate of the filename, not an actual
+    hyperlink) — shown as-is, not rendered as a clickable link.
+- **Writes are addressed by literal sheet row number** (returned alongside each row by
+  `getNetaData`), which is fast but fragile if rows get inserted/deleted between page load and an
+  edit — `updateNetaField` also sends the row's `documentName`, and the script refuses the write
+  (with a clear error) if column A of that row no longer matches, rather than silently editing the
+  wrong row.
+- **"Show completed"** (off by default) hides rows already at their terminal checkbox —
+  `submittedToGoogle` for Submissions (the sheet's own header note says that checkbox hides the row
+  there too), `uploadedToAcc` for Returned Files — mirroring how the sheet is normally worked from.
+  Search matches document name/area/category and auto-expands the whole tree while active.
+- The Apps Script's URL is stored in `arcapp_settings` under `neta_tracker_script_url` — set
+  directly in Supabase, same as `joint_pack_script_url`; not an editable Settings field.
+- The script itself (`doGet`/`doPost`, not committed to this repo, same as the other two aren't)
+  needs to be pasted into **Extensions → Apps Script** on the "STY4 NETA Tracker" spreadsheet and
+  deployed as a web app (**Execute as: Me**, **Who has access: Anyone**).
+- STY4-only today — gated by the `netaTracker` capability in `src/lib/project.ts`; SAN-NT1B shows
+  the standard "not available for this project" notice since it has no NETA Tracker sheet or
+  script of its own.
+- No sign-in required to toggle checkboxes or edit comments, same as Tamper Seal/RTFT logging.
+- **Verified** with a mocked Apps Script response (real deployment URL isn't set up yet): tree
+  expand/collapse, search-narrows-and-auto-expands, tab switching, "Show completed", checkbox
+  toggle (optimistic, POSTs the right `{tab, row, field, value, expectedDocumentName}`), comment
+  save-on-blur, and the SAN-NT1B capability gate (nav link hidden, direct URL shows the notice,
+  zero console errors) — all confirmed via Playwright screenshots.
+
 ## Tamper Seals — standalone logging
 
 The Tamper Seals page (`TamperSealLogPanel.tsx`) used to be read-only — seals could only be logged

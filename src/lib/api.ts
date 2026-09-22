@@ -738,6 +738,161 @@ export function useLogJointPackPhotos() {
 }
 
 // ---------------------------------------------------------------------------
+// NETA Tracker — mirrors the "STY4 NETA Tracker" Google Sheet (tabs: Submissions, Returned
+// Files) via its own dedicated Apps Script web app — a third spreadsheet/script, separate from
+// both CxAlloy's and Joint Pack Photo's (see NetaTrackerScript.gs, given to the user to deploy;
+// not committed to this repo, same as the other two scripts aren't). Its URL lives in
+// arcapp_settings under 'neta_tracker_script_url' — set directly in the DB, not exposed as an
+// editable Settings field, same as joint_pack_script_url isn't.
+//
+// Unlike everything else that reads from a Sheet, this one writes BACK to it: toggling a
+// checkbox or editing Comments in ArcApp calls updateNetaField, which sets that exact cell in the
+// live sheet the field crew already works from, so ArcApp never becomes a second, drifting copy
+// of the data. Row hierarchy (Zone > Area > Asset Category) comes from special marker rows the
+// sheet uses in place of native row grouping (e.g. "ZONE HEADER: ZONE 1", "------ AREA: EY09
+// ------", "[ ASSET CATEGORY: ATX-A ]") — the script parses these while walking the sheet and
+// stamps every data row with the nearest one above it, so this file never needs to know that
+// convention itself. STY4-only — see the `netaTracker` capability in src/lib/project.ts.
+// ---------------------------------------------------------------------------
+
+const NETA_SCRIPT_SETTING_KEY = 'neta_tracker_script_url'
+
+async function getNetaScriptUrl(): Promise<string> {
+  if (!hasCapability('netaTracker')) throw new Error('NETA Tracker isn’t available for this project.')
+  const res = await supabase
+    .from('arcapp_settings')
+    .select('setting_value')
+    .eq('project_key', CURRENT_PROJECT)
+    .eq('setting_key', NETA_SCRIPT_SETTING_KEY)
+    .maybeSingle()
+  if (res.error) throw new Error(res.error.message)
+  const url = (res.data as { setting_value: string | null } | null)?.setting_value
+  if (!url) throw new Error('NETA Tracker isn’t wired up yet — no Apps Script URL configured.')
+  return url
+}
+
+export type NetaTab = 'Submissions' | 'Returned Files'
+
+export type NetaSubmissionRow = {
+  row: number
+  zone: string
+  area: string
+  category: string
+  documentName: string
+  submittedDate: string
+  folderLocation: string
+  documentLink: string
+  clericalReview: boolean
+  submittedToGoogle: boolean
+  issuesFound: boolean
+  comments: string
+}
+export type NetaReturnedRow = {
+  row: number
+  zone: string
+  area: string
+  category: string
+  documentName: string
+  submittedDate: string
+  folderLocation: string
+  documentLink: string
+  issues: string
+  technicalReview: boolean
+  stampPresent: boolean
+  netaCompleted: boolean
+  uploadedToAcc: boolean
+  comments: string
+}
+export type NetaTrackerData = {
+  submissions: NetaSubmissionRow[]
+  returnedFiles: NetaReturnedRow[]
+  syncedAt: string | null
+}
+
+function netaBool(v: unknown): boolean {
+  return v === true || v === 'TRUE' || v === 'true'
+}
+function netaStr(v: unknown): string {
+  return v === null || v === undefined ? '' : String(v)
+}
+
+async function getNetaTrackerData(): Promise<NetaTrackerData> {
+  const scriptUrl = await getNetaScriptUrl()
+  const url = new URL(scriptUrl)
+  url.searchParams.set('action', 'getNetaData')
+  const res = await fetch(url.toString())
+  if (!res.ok) throw new Error(`NETA Tracker request failed (HTTP ${res.status})`)
+  const json = (await res.json()) as {
+    status?: string
+    error?: string
+    syncedAt?: string
+    submissions?: Array<Record<string, unknown>>
+    returnedFiles?: Array<Record<string, unknown>>
+  }
+  if (json.status === 'error') throw new Error(json.error || 'NETA Tracker request failed')
+
+  const submissions: NetaSubmissionRow[] = (json.submissions ?? []).map((r) => ({
+    row: Number(r.row) || 0,
+    zone: netaStr(r.zone),
+    area: netaStr(r.area),
+    category: netaStr(r.category),
+    documentName: netaStr(r.documentName),
+    submittedDate: netaStr(r.submittedDate),
+    folderLocation: netaStr(r.folderLocation),
+    documentLink: netaStr(r.documentLink),
+    clericalReview: netaBool(r.clericalReview),
+    submittedToGoogle: netaBool(r.submittedToGoogle),
+    issuesFound: netaBool(r.issuesFound),
+    comments: netaStr(r.comments),
+  }))
+  const returnedFiles: NetaReturnedRow[] = (json.returnedFiles ?? []).map((r) => ({
+    row: Number(r.row) || 0,
+    zone: netaStr(r.zone),
+    area: netaStr(r.area),
+    category: netaStr(r.category),
+    documentName: netaStr(r.documentName),
+    submittedDate: netaStr(r.submittedDate),
+    folderLocation: netaStr(r.folderLocation),
+    documentLink: netaStr(r.documentLink),
+    issues: netaStr(r.issues),
+    technicalReview: netaBool(r.technicalReview),
+    stampPresent: netaBool(r.stampPresent),
+    netaCompleted: netaBool(r.netaCompleted),
+    uploadedToAcc: netaBool(r.uploadedToAcc),
+    comments: netaStr(r.comments),
+  }))
+  return { submissions, returnedFiles, syncedAt: json.syncedAt ?? null }
+}
+export function useGetNetaTrackerData() {
+  return useApiFn(getNetaTrackerData)
+}
+
+export type UpdateNetaFieldParams = {
+  tab: NetaTab
+  row: number
+  field: string
+  value: boolean | string
+  /** Guards against a row having shifted (rows inserted/deleted) since this page's data was
+   * loaded — the script refuses the write if column A of that row no longer matches. */
+  expectedDocumentName: string
+}
+async function updateNetaField(params: UpdateNetaFieldParams): Promise<{ success: boolean }> {
+  const scriptUrl = await getNetaScriptUrl()
+  const res = await fetch(scriptUrl, {
+    method: 'POST',
+    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+    body: JSON.stringify({ action: 'updateNetaField', ...params }),
+  })
+  if (!res.ok) throw new Error(`Save failed (HTTP ${res.status})`)
+  const json = (await res.json()) as { success?: boolean; error?: string }
+  if (!json.success) throw new Error(json.error || 'Save failed.')
+  return { success: true }
+}
+export function useUpdateNetaField() {
+  return useApiFn(updateNetaField)
+}
+
+// ---------------------------------------------------------------------------
 // RTFT — mirrors getRtft.ts / submitRtft.ts
 // ---------------------------------------------------------------------------
 

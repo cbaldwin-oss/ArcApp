@@ -888,6 +888,41 @@ html, body, #root{ margin:0; padding:0; min-height:100%; background:#05070d; }
 }
 .arcapp .oi-popover-actions{ display:flex; gap:8px; margin-top:12px; }
 .arcapp .oi-popover-actions .eq-filter-btn{ flex:1; }
+
+/* NETA Tracker — mirrors the "STY4 NETA Tracker" sheet's Zone > Area > Asset Category grouping */
+.arcapp .neta-tabs{ display:flex; gap:8px; margin-bottom:4px; }
+.arcapp .neta-tab{
+  font-family:var(--font-mono); font-size:12px; color:var(--text-muted); background:var(--bg-elev-2);
+  border:1px solid var(--border-strong); border-radius:var(--radius-sm); padding:8px 14px; cursor:pointer;
+}
+.arcapp .neta-tab.active{ color:var(--green); border-color:var(--green-dim); background:var(--green-tint); }
+.arcapp .neta-tree{ margin-top:10px; }
+.arcapp .neta-group{ border-bottom:1px solid var(--border); }
+.arcapp .neta-group:last-child{ border-bottom:none; }
+.arcapp .neta-group-head{
+  display:flex; align-items:center; gap:9px; width:100%; text-align:left; background:none; border:none;
+  color:var(--text); font-family:var(--font-mono); font-size:13px; padding:10px 4px; cursor:pointer;
+}
+.arcapp .neta-group-head:hover{ color:var(--green-soft); }
+.arcapp .neta-group-label{ flex:1; }
+.arcapp .neta-subgroups{ padding-left:20px; }
+.arcapp .neta-subgroup-head{ font-size:12px; color:var(--text-muted); padding:8px 4px; }
+.arcapp .neta-rows{ padding-left:20px; padding-bottom:6px; }
+.arcapp .neta-row{
+  background:var(--bg-elev); border:1px solid var(--border-strong); border-radius:var(--radius-sm);
+  padding:10px 12px; margin:6px 0; display:flex; flex-direction:column; gap:8px;
+}
+.arcapp .neta-row-main{ display:flex; flex-direction:column; gap:4px; }
+.arcapp .neta-row-title{ font-size:13px; color:var(--text); word-break:break-word; }
+.arcapp .neta-row-meta{ display:flex; align-items:center; gap:8px; flex-wrap:wrap; font-family:var(--font-mono); font-size:11px; color:var(--text-faint); }
+.arcapp .neta-row-fields{ display:flex; gap:14px; flex-wrap:wrap; }
+.arcapp .neta-check{ display:flex; align-items:center; gap:6px; font-size:12px; color:var(--text-muted); cursor:pointer; }
+.arcapp .neta-check input{ width:15px; height:15px; accent-color:var(--green); flex:0 0 auto; }
+.arcapp .neta-comments input{
+  width:100%; background:var(--bg-elev-2); border:1px solid var(--border-strong); border-radius:var(--radius-sm);
+  color:var(--text); font-family:var(--font-body); font-size:12.5px; padding:7px 10px;
+}
+.arcapp .neta-comments{ display:flex; flex-direction:column; gap:4px; }
 .arcapp .eq-header-sticky{ position:sticky; top:0; z-index:6; width:max-content; min-width:100%; }
 .arcapp .eq-group-bar, .arcapp .eq-col-header-row, .arcapp .eq-row{ display:flex; align-items:stretch; width:max-content; min-width:100%; }
 .arcapp .eq-group-bar{ background:var(--green-dim); height:28px; }
