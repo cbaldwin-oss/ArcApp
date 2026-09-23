@@ -920,6 +920,7 @@ html, body, #root{ margin:0; padding:0; min-height:100%; background:#05070d; }
 .arcapp .neta-row-fields{ display:flex; gap:14px; flex-wrap:wrap; }
 .arcapp .neta-check{ display:flex; align-items:center; gap:6px; font-size:12px; color:var(--text-muted); cursor:pointer; }
 .arcapp .neta-check input{ width:15px; height:15px; accent-color:var(--green); flex:0 0 auto; }
+.arcapp .neta-check.neta-na{ cursor:default; color:var(--text-faint); }
 .arcapp .neta-comments input{
   width:100%; background:var(--bg-elev-2); border:1px solid var(--border-strong); border-radius:var(--radius-sm);
   color:var(--text); font-family:var(--font-body); font-size:12.5px; padding:7px 10px;

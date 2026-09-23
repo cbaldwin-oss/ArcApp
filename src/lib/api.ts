@@ -807,9 +807,11 @@ export type NetaReturnedRow = {
   documentLinkUrl: string
   issues: string
   technicalReview: boolean
-  stampPresent: boolean
+  /** The sheet has no checkbox here at all while `issues` isn't "None" (the cell literally holds
+   * the text "N/A" instead) — a real state, not just "unchecked". See netaBoolOrNA. */
+  stampPresent: boolean | 'N/A'
   netaCompleted: boolean
-  uploadedToAcc: boolean
+  uploadedToAcc: boolean | 'N/A'
   comments: string
 }
 export type NetaTrackerData = {
@@ -823,6 +825,9 @@ function netaBool(v: unknown): boolean {
 }
 function netaStr(v: unknown): string {
   return v === null || v === undefined ? '' : String(v)
+}
+function netaBoolOrNA(v: unknown): boolean | 'N/A' {
+  return typeof v === 'string' && v.trim().toUpperCase() === 'N/A' ? 'N/A' : netaBool(v)
 }
 
 async function getNetaTrackerData(): Promise<NetaTrackerData> {
@@ -869,9 +874,9 @@ async function getNetaTrackerData(): Promise<NetaTrackerData> {
     documentLinkUrl: netaStr(r.documentLinkUrl),
     issues: netaStr(r.issues),
     technicalReview: netaBool(r.technicalReview),
-    stampPresent: netaBool(r.stampPresent),
+    stampPresent: netaBoolOrNA(r.stampPresent),
     netaCompleted: netaBool(r.netaCompleted),
-    uploadedToAcc: netaBool(r.uploadedToAcc),
+    uploadedToAcc: netaBoolOrNA(r.uploadedToAcc),
     comments: netaStr(r.comments),
   }))
   return { submissions, returnedFiles, syncedAt: json.syncedAt ?? null }

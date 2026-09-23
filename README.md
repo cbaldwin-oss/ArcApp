@@ -222,19 +222,53 @@ Pack Photo's) — `useGetNetaTrackerData`/`useUpdateNetaField` in `src/lib/api.t
   there too), `uploadedToAcc` for Returned Files — mirroring how the sheet is normally worked from.
   Search matches document name/area/category and auto-expands the whole tree while active.
 - The Apps Script's URL is stored in `arcapp_settings` under `neta_tracker_script_url` — set
-  directly in Supabase, same as `joint_pack_script_url`; not an editable Settings field.
-- The script itself (`doGet`/`doPost`, not committed to this repo, same as the other two aren't)
-  needs to be pasted into **Extensions → Apps Script** on the "STY4 NETA Tracker" spreadsheet and
-  deployed as a web app (**Execute as: Me**, **Who has access: Anyone**).
+  directly in Supabase, same as `joint_pack_script_url`; not an editable Settings field. Reading it
+  requires the `arcapp_settings` SELECT policy to allow `anon` too, not just `authenticated` — a
+  pre-existing gap (found while wiring this up) that also silently broke Joint Pack Photos and a
+  few other features for signed-out users; fixed the same day this was found.
+- **`NetaTrackerScript.gs` is this spreadsheet's one bound script, not an ArcApp-only file** — it's
+  a merge of two independent pieces that happen to share the same project:
+  1. The **existing Drive-folder importer + checkbox automation** that was already there (a
+     "Document Importer" menu that crawls Drive and rebuilds both tabs' grids, plus an installable
+     `onEdit` trigger — `masterTrigger` → `onCheckboxEdit`/`onReturnedFilesEdit` — that moves a
+     file between Drive folders and applies the Submissions red-issue highlight when a checkbox is
+     toggled by a person in the sheet UI).
+  2. **ArcApp's web app** (`doGet`/`doPost`).
+
+  These have to live in the same Apps Script project because Google Sheets' `onEdit` triggers
+  (simple or installable) **only fire for edits made through the Sheets UI by a person** — never
+  for edits made programmatically via `Range.setValue()`, whether that call comes from this same
+  script or a different one. Without doing anything about it, a checkbox toggled from ArcApp would
+  silently skip the Drive-move/highlight automation entirely. Fix: `updateNetaField` calls
+  `onCheckboxEdit`/`onReturnedFilesEdit` itself, right after `setValue()`, passing a minimal
+  `{ range }` object — the only piece of the real event object either function actually reads — so
+  an ArcApp edit runs the identical follow-on automation a real click would. A failure in that
+  automation (e.g. a Drive move erroring) never fails the write itself; the cell is already
+  correctly set by that point, same as a real `onEdit` trigger throwing wouldn't undo the checkbox.
+- **Stamp Present / Uploaded to ACC can be "N/A", not just checked/unchecked**: the importer leaves
+  those two Returned Files cells as the literal text "N/A" (no checkbox at all) while a row's
+  Issues column isn't "None" — they can't be resolved until the issue is cleared. `getNetaData`
+  passes that string through untouched (no boolean coercion in the script), `netaBoolOrNA` in
+  `api.ts` tells "N/A" apart from a real boolean, and `NetaCheckboxOrNA` in the panel renders a
+  fixed, non-interactive "N/A" tag instead of a checkbox for either field on those rows —
+  `updateNetaField` also refuses the write server-side if the row's Issues column isn't "None",
+  so nothing (ArcApp UI, a stray API call) can silently overwrite that marker with `true`/`false`.
+  (Found and fixed a related bug live: the "Show completed" filter's `r.uploadedToAcc` truthiness
+  check treated the *string* `"N/A"` as truthy, hiding open-issue rows behind that toggle by
+  mistake — changed to `r.uploadedToAcc === true`.)
 - STY4-only today — gated by the `netaTracker` capability in `src/lib/project.ts`; SAN-NT1B shows
   the standard "not available for this project" notice since it has no NETA Tracker sheet or
   script of its own.
 - No sign-in required to toggle checkboxes or edit comments, same as Tamper Seal/RTFT logging.
-- **Verified** with a mocked Apps Script response (real deployment URL isn't set up yet): tree
-  expand/collapse, search-narrows-and-auto-expands, tab switching, "Show completed", checkbox
-  toggle (optimistic, POSTs the right `{tab, row, field, value, expectedDocumentName}`), comment
-  save-on-blur, and the SAN-NT1B capability gate (nav link hidden, direct URL shows the notice,
-  zero console errors) — all confirmed via Playwright screenshots.
+- **Verified against the real deployed script and real sheet data** (778 Submissions / 119 Returned
+  Files rows): `getNetaData`'s shape and row counts match a direct workbook inspection exactly; a
+  real write applies and is visible on the next read; the row-shift guard correctly refuses a
+  write when `expectedDocumentName` doesn't match; the field whitelist correctly refuses writing to
+  a non-editable column; a test write was reverted afterward, leaving the sheet exactly as found.
+  Hyperlinks (Document Name → Drive file, Folder Location → Drive folder), tree expand/collapse,
+  search, tab switching, "Show completed", the N/A-vs-checkbox rendering, and the SAN-NT1B
+  capability gate were all confirmed via Playwright against a mocked response (matching the real
+  script's shape) — zero console errors throughout.
 
 ## Tamper Seals — standalone logging
 

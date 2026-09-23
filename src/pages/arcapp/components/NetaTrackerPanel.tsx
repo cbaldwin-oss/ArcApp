@@ -164,6 +164,22 @@ function NetaCheckbox({
   )
 }
 
+/** Stamp Present / Uploaded to ACC on Returned Files: the sheet has no checkbox at all here while
+ * the row's Issues column isn't "None" (the cell literally holds the text "N/A") — the script
+ * refuses to write either field in that state too. Render the same fixed tag the sheet shows
+ * instead of a checkbox that would be misleading either way (checked implies resolved, unchecked
+ * implies "not yet" — neither is true here). */
+function NetaCheckboxOrNA(props: { tab: NetaTab; netaRow: NetaTreeRow; field: string; label: string; value: boolean | 'N/A' }) {
+  if (props.value === 'N/A') {
+    return (
+      <span className="neta-check neta-na" title="Not applicable while this row has an open issue">
+        <span className="tag norm">N/A</span> {props.label}
+      </span>
+    )
+  }
+  return <NetaCheckbox tab={props.tab} netaRow={props.netaRow} field={props.field} label={props.label} value={props.value} />
+}
+
 function NetaCommentField({ tab, netaRow, value }: { tab: NetaTab; netaRow: NetaTreeRow; value: string }) {
   const fn = useUpdateNetaField()
   const [local, setLocal] = useState(value)
@@ -247,9 +263,9 @@ function ReturnedRow({ row }: { row: NetaReturnedRow }) {
       </div>
       <div className="neta-row-fields">
         <NetaCheckbox tab="Returned Files" netaRow={row} field="technicalReview" label="Technical Review" value={row.technicalReview} />
-        <NetaCheckbox tab="Returned Files" netaRow={row} field="stampPresent" label="Stamp Present" value={row.stampPresent} />
+        <NetaCheckboxOrNA tab="Returned Files" netaRow={row} field="stampPresent" label="Stamp Present" value={row.stampPresent} />
         <NetaCheckbox tab="Returned Files" netaRow={row} field="netaCompleted" label="Neta Completed" value={row.netaCompleted} />
-        <NetaCheckbox tab="Returned Files" netaRow={row} field="uploadedToAcc" label="Uploaded to ACC" value={row.uploadedToAcc} />
+        <NetaCheckboxOrNA tab="Returned Files" netaRow={row} field="uploadedToAcc" label="Uploaded to ACC" value={row.uploadedToAcc} />
       </div>
       <NetaCommentField tab="Returned Files" netaRow={row} value={row.comments} />
     </div>
@@ -314,7 +330,7 @@ export default function NetaTrackerPanel() {
   const filteredReturned = useMemo(
     () =>
       returnedFiles.filter((r) => {
-        if (!showCompleted && r.uploadedToAcc) return false
+        if (!showCompleted && r.uploadedToAcc === true) return false
         if (!q) return true
         return r.documentName.toLowerCase().includes(q) || r.category.toLowerCase().includes(q) || r.area.toLowerCase().includes(q)
       }),
