@@ -54,6 +54,8 @@ export type ShellContext = {
   issueTodoEnabled: boolean
   checklistOpenStatuses: string[]
   issueOpenStatuses: string[]
+  netaSubmissionsTodoEnabled: boolean
+  netaReturnedTodoEnabled: boolean
   settingsLoading: boolean
   onSaveSetting: (key: string, value: string) => Promise<void>
 }

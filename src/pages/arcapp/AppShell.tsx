@@ -128,6 +128,8 @@ export default function AppShell() {
         issueTodoEnabled?: boolean
         checklistOpenStatuses?: string[]
         issueOpenStatuses?: string[]
+        netaSubmissionsTodoEnabled?: boolean
+        netaReturnedTodoEnabled?: boolean
       }
     | undefined
   const jointPackFolder = settingsData?.jointPackPhotosFolder ?? ''
@@ -138,6 +140,8 @@ export default function AppShell() {
   const issueTodoEnabled = settingsData?.issueTodoEnabled ?? false
   const checklistOpenStatuses = settingsData?.checklistOpenStatuses ?? []
   const issueOpenStatuses = settingsData?.issueOpenStatuses ?? []
+  const netaSubmissionsTodoEnabled = settingsData?.netaSubmissionsTodoEnabled ?? false
+  const netaReturnedTodoEnabled = settingsData?.netaReturnedTodoEnabled ?? false
 
   const userName = user?.name ?? null
   const initials = user
@@ -306,6 +310,8 @@ export default function AppShell() {
     issueTodoEnabled,
     checklistOpenStatuses,
     issueOpenStatuses,
+    netaSubmissionsTodoEnabled,
+    netaReturnedTodoEnabled,
     settingsLoading: settingsFn.loading,
     onSaveSetting: saveSetting,
   }

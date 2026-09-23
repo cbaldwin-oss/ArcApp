@@ -5,11 +5,13 @@ import {
   cxAlloyChecklistUrl,
   cxAlloyIssueUrl,
   useGetItemAssignments,
+  useGetNetaTrackerData,
   useGetOpenChecklists,
   useGetOpenIssues,
   useSaveItemAssignments,
 } from '../../../lib/api'
-import type { ChecklistRow, IssueRow, ItemAssignment, ItemType } from '../../../lib/api'
+import type { ChecklistRow, IssueRow, ItemAssignment, ItemType, NetaReturnedRow, NetaSubmissionRow } from '../../../lib/api'
+import { hasCapability } from '../../../lib/project'
 import type { ShellContext } from '../ShellContext'
 import type { Team } from '../types'
 import { todoAssignmentLabel } from '../utils'
@@ -43,6 +45,31 @@ function issueToItem(r: IssueRow): OItem {
     status: r.status,
     link: cxAlloyIssueUrl(r.issue_id),
     cxAssignedName: r.assigned_name,
+  }
+}
+
+// NETA rows have no CxAlloy-style stable id — the sheet row number shifts whenever the Document
+// Importer re-crawls Drive and rebuilds the grid, so documentName (a real Drive filename, stable
+// across re-imports) is used as the assignment key instead. `link` is the row's own Document Link
+// (a real Drive file URL, from the same =HYPERLINK(...) parsing the NETA Tracker page uses).
+function netaSubmissionToItem(r: NetaSubmissionRow): OItem {
+  return {
+    id: r.documentName,
+    title: r.documentName,
+    subtitle: [r.area, r.category].filter(Boolean).join(' · '),
+    status: r.folderLocation,
+    link: r.documentLinkUrl,
+    cxAssignedName: '',
+  }
+}
+function netaReturnedToItem(r: NetaReturnedRow): OItem {
+  return {
+    id: r.documentName,
+    title: r.documentName,
+    subtitle: [r.area, r.category].filter(Boolean).join(' · '),
+    status: r.issues && r.issues.toLowerCase() !== 'none' ? r.issues : r.folderLocation,
+    link: r.documentLinkUrl,
+    cxAssignedName: '',
   }
 }
 
@@ -203,7 +230,7 @@ function OpenItemsSection({
                 <input
                   type="text"
                   className="oi-search"
-                  placeholder={`Search ${items.length.toLocaleString()} open ${title.split(' ')[1]?.toLowerCase() ?? 'items'}…`}
+                  placeholder={`Search ${items.length.toLocaleString()} open ${title.replace(/^Open\s*/i, '').toLowerCase() || 'items'}…`}
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
                 />
@@ -291,10 +318,25 @@ function OpenItemsSection({
  * keyed by CxAlloy id, since the sheet data itself can't be written back to. */
 export default function OpenItemsTodoPanel() {
   const ctx = useOutletContext<ShellContext>()
-  const { checklistTodoEnabled, issueTodoEnabled, checklistOpenStatuses, issueOpenStatuses, teams } = ctx
+  const {
+    checklistTodoEnabled,
+    issueTodoEnabled,
+    checklistOpenStatuses,
+    issueOpenStatuses,
+    netaSubmissionsTodoEnabled,
+    netaReturnedTodoEnabled,
+    teams,
+  } = ctx
+  // NETA Tracker is STY4-only (see the `netaTracker` capability in src/lib/project.ts) — even
+  // though the Settings toggles above are project-scoped and shouldn't stay on after a switch,
+  // this is the same defense-in-depth every other NETA consumer applies.
+  const netaAvailable = hasCapability('netaTracker')
+  const netaSubmissionsOn = netaSubmissionsTodoEnabled && netaAvailable
+  const netaReturnedOn = netaReturnedTodoEnabled && netaAvailable
 
   const checklistsFn = useGetOpenChecklists()
   const issuesFn = useGetOpenIssues()
+  const netaFn = useGetNetaTrackerData()
   const assignmentsFn = useGetItemAssignments()
   const saveFn = useSaveItemAssignments()
 
@@ -308,24 +350,46 @@ export default function OpenItemsTodoPanel() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [issueTodoEnabled, issueOpenStatuses.join('|')])
 
+  // Both NETA sections read the same underlying fetch (one Apps Script call returns both tabs) —
+  // triggering once here means "refresh" on either section refreshes both, which matches reality
+  // better than two independent fetches would.
   useEffect(() => {
-    if (checklistTodoEnabled || issueTodoEnabled) void assignmentsFn.trigger()
+    if (netaSubmissionsOn || netaReturnedOn) void netaFn.trigger()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [checklistTodoEnabled, issueTodoEnabled])
+  }, [netaSubmissionsOn, netaReturnedOn])
+
+  useEffect(() => {
+    if (checklistTodoEnabled || issueTodoEnabled || netaSubmissionsOn || netaReturnedOn) void assignmentsFn.trigger()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [checklistTodoEnabled, issueTodoEnabled, netaSubmissionsOn, netaReturnedOn])
 
   const assignments = useMemo(() => assignmentsFn.data ?? [], [assignmentsFn.data])
   const checklistAssignments = useMemo(() => new Map(assignments.filter((a) => a.itemType === 'checklist').map((a) => [a.itemId, a])), [assignments])
   const issueAssignments = useMemo(() => new Map(assignments.filter((a) => a.itemType === 'issue').map((a) => [a.itemId, a])), [assignments])
+  const netaSubmissionAssignments = useMemo(
+    () => new Map(assignments.filter((a) => a.itemType === 'neta_submission').map((a) => [a.itemId, a])),
+    [assignments],
+  )
+  const netaReturnedAssignments = useMemo(
+    () => new Map(assignments.filter((a) => a.itemType === 'neta_returned').map((a) => [a.itemId, a])),
+    [assignments],
+  )
 
   async function onAssign(items: Array<{ itemType: ItemType; itemId: string }>, result: AssignResult) {
     await saveFn.trigger({ items, assignedTeamId: result.teamId, assignedEmail: result.email, assignedName: result.name }).result
     void assignmentsFn.trigger()
   }
 
-  if (!checklistTodoEnabled && !issueTodoEnabled) return null
+  if (!checklistTodoEnabled && !issueTodoEnabled && !netaSubmissionsOn && !netaReturnedOn) return null
 
   const checklistItems = (checklistsFn.data?.rows ?? []).map(checklistToItem)
   const issueItems = (issuesFn.data?.rows ?? []).map(issueToItem)
+  // "Still open" here mirrors the NETA Tracker page's own default filtering exactly — not
+  // yet Submitted to Google (Submissions) / not yet Uploaded to ACC (Returned Files). A row whose
+  // Uploaded to ACC is "N/A" (open issue, see NetaTrackerScript.gs) is correctly still "open" —
+  // it needs MORE attention, not less, so `!== true` rather than a falsy check.
+  const netaSubmissionItems = (netaFn.data?.submissions ?? []).filter((r) => !r.submittedToGoogle).map(netaSubmissionToItem)
+  const netaReturnedItems = (netaFn.data?.returnedFiles ?? []).filter((r) => r.uploadedToAcc !== true).map(netaReturnedToItem)
 
   return (
     <>
@@ -353,6 +417,34 @@ export default function OpenItemsTodoPanel() {
           onRetry={() => void issuesFn.trigger()}
           configuredEmpty={!issueOpenStatuses.length}
           assignmentsByItemId={issueAssignments}
+          teams={teams}
+          onAssign={onAssign}
+        />
+      )}
+      {netaSubmissionsOn && (
+        <OpenItemsSection
+          title="Open NETA Submissions"
+          itemType="neta_submission"
+          items={netaSubmissionItems}
+          loading={netaFn.loading}
+          error={netaFn.error ?? ''}
+          onRetry={() => void netaFn.trigger()}
+          configuredEmpty={false}
+          assignmentsByItemId={netaSubmissionAssignments}
+          teams={teams}
+          onAssign={onAssign}
+        />
+      )}
+      {netaReturnedOn && (
+        <OpenItemsSection
+          title="Open NETA Returned Files"
+          itemType="neta_returned"
+          items={netaReturnedItems}
+          loading={netaFn.loading}
+          error={netaFn.error ?? ''}
+          onRetry={() => void netaFn.trigger()}
+          configuredEmpty={false}
+          assignmentsByItemId={netaReturnedAssignments}
           teams={teams}
           onAssign={onAssign}
         />

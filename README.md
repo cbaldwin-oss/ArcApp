@@ -529,6 +529,42 @@ own assignable sections, instead of only being manually copied into a task by ha
   read/write calls involved in that last check were intercepted rather than run against the live
   (currently empty) table, so no test data was left behind in production.
 
+### NETA Tracker To-Do — same mechanism, applied to NETA Submissions/Returned Files
+
+Same pattern as Checklist/Issue To-Do above, applied to the two NETA Tracker tabs (see the "NETA
+Tracker" section above) instead of CxAlloy data — built in `OpenItemsTodoPanel.tsx` alongside it,
+reusing the exact same `OpenItemsSection` component (search, pagination, multi-select, bulk-assign,
+"Unassigned only") unchanged.
+
+- **Two independent toggles in Settings** (`neta_submissions_todo_enabled`/
+  `neta_returned_todo_enabled`) turn on an "Open NETA Submissions"/"Open NETA Returned Files"
+  section on the To-Do page. Unlike Checklist/Issue To-Do, there's **no open-status picker to
+  configure** — "still open" here is the same fixed, non-configurable definition the NETA Tracker
+  page itself already uses (Submissions: not yet Submitted to Google; Returned Files: not yet
+  Uploaded to ACC), not a freeform CxAlloy status vocabulary.
+- A Returned Files row whose Uploaded to ACC is "N/A" (an open issue — see the N/A-handling note
+  under "NETA Tracker" above) still counts as open here (`!== true`, not a falsy check) — it needs
+  *more* attention, not less, so it isn't filtered out by mistake the way a naive truthy check on
+  the string "N/A" would (a real bug caught and fixed in the NETA Tracker page itself; this To-Do
+  panel was built with that fix already in mind).
+- **Item identity uses the document name, not the sheet row number** — a re-import from the sheet's
+  own "Document Importer" menu rebuilds and re-sorts the whole grid, so row 5 today can be a
+  completely different document after that runs. The filename is what's actually stable.
+- Both sections share one underlying fetch (`useGetNetaTrackerData` — one Apps Script call already
+  returns both tabs), so refreshing either section refreshes both.
+- The assign chip's link now points at the row's real Drive file (`documentLinkUrl`, the same
+  `=HYPERLINK(...)`-parsed URL the NETA Tracker page itself links to) rather than a deep link into
+  a separate system, since that's what already exists for this data.
+- Gated behind the `netaTracker` capability the same way every other NETA Tracker consumer is —
+  the Settings toggles themselves are hidden entirely for SAN-NT1B, and the To-Do panel
+  additionally re-checks the capability itself before rendering or fetching, so a toggle stuck on
+  from a prior state can't cause a wasted fetch or a broken section after switching projects.
+- Verified with mocked NETA data: both sections render with correct open counts (excluding
+  already-completed rows), the N/A-row-still-counts-as-open behavior confirmed, a real assign
+  flow exercised end-to-end (upserts `{item_type: 'neta_returned', item_id: '<documentName>', ...}`
+  correctly), and the SAN-NT1B capability gate confirmed to suppress both rendering and fetching
+  even with the toggles forced on — zero console errors throughout.
+
 ## Sign-in — Google OAuth + an authorized-users allowlist
 
 Sign-in is now a real modal (`SignInModal.tsx`, replacing the old `window.prompt()` hack) with

@@ -4,6 +4,7 @@ import WorkflowsBuilder from './WorkflowsBuilder'
 import CxAlloyStatusPicker from './CxAlloyStatusPicker'
 import AuthorizedUsersManager from './AuthorizedUsersManager'
 import SubmittalExemptAssetsManager from './SubmittalExemptAssetsManager'
+import { hasCapability } from '../../../lib/project'
 
 type Props = {
   jointPackFolder: string
@@ -14,6 +15,8 @@ type Props = {
   issueTodoEnabled: boolean
   checklistOpenStatuses: string[]
   issueOpenStatuses: string[]
+  netaSubmissionsTodoEnabled: boolean
+  netaReturnedTodoEnabled: boolean
   canEdit: boolean
   /** Separate, looser gate for Workflows specifically — see Dashboard.tsx for why. */
   canManageWorkflows: boolean
@@ -146,6 +149,8 @@ export default function SettingsPanel({
   issueTodoEnabled,
   checklistOpenStatuses,
   issueOpenStatuses,
+  netaSubmissionsTodoEnabled,
+  netaReturnedTodoEnabled,
   canEdit,
   canManageWorkflows,
   loading,
@@ -231,6 +236,36 @@ export default function SettingsPanel({
             onSave={(values) => onSaveSetting('issue_open_statuses', values.join(', '))}
           />
         </div>
+
+        {hasCapability('netaTracker') && (
+          <div style={{ marginBottom: 22, maxWidth: 560 }}>
+            <label style={{ display: 'block', marginBottom: 4, fontFamily: 'var(--font-display)', fontSize: 13, fontWeight: 700, letterSpacing: '0.4px', textTransform: 'uppercase', color: 'var(--text)' }}>
+              NETA Tracker To-Do
+            </label>
+            <div className="q-hint" style={{ marginBottom: 12 }}>
+              Surfaces still-open NETA Tracker documents on the To-Do page as assignable instances,
+              same as Checklist/Issue To-Do above. "Still open" isn't configurable here — it's the
+              same not-yet-completed definition the NETA Tracker page itself uses (Submissions: not
+              yet Submitted to Google; Returned Files: not yet Uploaded to ACC).
+            </div>
+            <ToggleField
+              label="NETA Submissions To-Do"
+              hint="Shows an Open NETA Submissions section on the To-Do page."
+              initial={netaSubmissionsTodoEnabled}
+              canEdit={canEdit}
+              loading={loading}
+              onSave={(v) => onSaveSetting('neta_submissions_todo_enabled', v ? 'true' : '')}
+            />
+            <ToggleField
+              label="NETA Returned Files To-Do"
+              hint="Shows an Open NETA Returned Files section on the To-Do page."
+              initial={netaReturnedTodoEnabled}
+              canEdit={canEdit}
+              loading={loading}
+              onSave={(v) => onSaveSetting('neta_returned_todo_enabled', v ? 'true' : '')}
+            />
+          </div>
+        )}
 
         <WorkflowsBuilder canEdit={canManageWorkflows} canEditItems={canEdit} />
 

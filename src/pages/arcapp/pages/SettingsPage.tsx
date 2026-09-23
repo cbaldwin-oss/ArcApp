@@ -14,6 +14,8 @@ export default function SettingsPage() {
       issueTodoEnabled={ctx.issueTodoEnabled}
       checklistOpenStatuses={ctx.checklistOpenStatuses}
       issueOpenStatuses={ctx.issueOpenStatuses}
+      netaSubmissionsTodoEnabled={ctx.netaSubmissionsTodoEnabled}
+      netaReturnedTodoEnabled={ctx.netaReturnedTodoEnabled}
       canEdit={ctx.canEdit}
       canManageWorkflows={ctx.canManageWorkflows}
       loading={ctx.settingsLoading}

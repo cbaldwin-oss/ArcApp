@@ -334,7 +334,7 @@ export function useGetOpenIssues() {
 // shape unchanged since the field names match Todo's).
 // ---------------------------------------------------------------------------
 
-export type ItemType = 'checklist' | 'issue'
+export type ItemType = 'checklist' | 'issue' | 'neta_submission' | 'neta_returned'
 export type ItemAssignment = {
   itemType: ItemType
   itemId: string
@@ -1077,6 +1077,12 @@ export type AppSettings = {
   issueTodoEnabled: boolean
   checklistOpenStatuses: string[]
   issueOpenStatuses: string[]
+  /** NETA Tracker To-Do — same assignment mechanism as Checklist/Issue To-Do, but "still open"
+   * isn't a configurable status list here: it's the same fixed not-yet-completed definition the
+   * NETA Tracker page itself uses (Submissions: not yet Submitted to Google; Returned Files: not
+   * yet Uploaded to ACC), so there's no open-status picker to configure. Off by default. */
+  netaSubmissionsTodoEnabled: boolean
+  netaReturnedTodoEnabled: boolean
 }
 const SETTINGS_DEFAULTS = {
   checklistReadyStatuses: ['Finished'],
@@ -1103,6 +1109,8 @@ async function getSettings(): Promise<AppSettings> {
     issueTodoEnabled: map.get('issue_todo_enabled') === 'true',
     checklistOpenStatuses: splitCsv(map.get('checklist_open_statuses'), SETTINGS_DEFAULTS.checklistOpenStatuses),
     issueOpenStatuses: splitCsv(map.get('issue_open_statuses'), SETTINGS_DEFAULTS.issueOpenStatuses),
+    netaSubmissionsTodoEnabled: map.get('neta_submissions_todo_enabled') === 'true',
+    netaReturnedTodoEnabled: map.get('neta_returned_todo_enabled') === 'true',
   }
 }
 export function useGetSettings() {
@@ -1118,6 +1126,8 @@ const ALLOWED_SETTING_KEYS = new Set([
   'issue_todo_enabled',
   'checklist_open_statuses',
   'issue_open_statuses',
+  'neta_submissions_todo_enabled',
+  'neta_returned_todo_enabled',
 ])
 async function saveSetting(params: { key: string; value: string }): Promise<{ key: string; value: string }> {
   if (!ALLOWED_SETTING_KEYS.has(params.key)) throw new Error(`Unknown setting key: ${params.key}`)
