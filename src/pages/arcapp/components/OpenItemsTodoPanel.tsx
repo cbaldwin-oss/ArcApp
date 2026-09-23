@@ -312,31 +312,21 @@ function OpenItemsSection({
   )
 }
 
-type MyItemEntry = { item: OItem; itemType: ItemType; typeLabel: string; assignment: ItemAssignment }
+export type MyItemEntry = { item: OItem; itemType: ItemType; typeLabel: string; assignment: ItemAssignment }
 type MyPopoverState = { top: number; left: number; itemType: ItemType; itemId: string; initial: AssignResult }
 
 /**
- * Personal rollup: every still-open Checklist/Issue/NETA item assigned to the signed-in user
- * directly, or to a team they're on — pulled from the same open-item lists and assignment maps
- * the four "Open ..." sections below already compute, just re-filtered by `isTodoMine`. Those four
- * sections are NOT filtered by assignee and keep showing everything to everyone, same as before —
- * this is purely an additional, personalized view of a subset of the same data, so an assignee
- * sees "this is my responsibility" without anyone else's visibility changing.
+ * Renders one "assigned to me" row — used inline inside "Your To-Dos" (TodoPage.tsx) under the
+ * "My Tasks" tab, NOT as its own separate section (a standalone "Assigned to You" panel next to
+ * "Your To-Dos" read as a duplicate "my stuff" list — this folds into the one that already
+ * existed instead). Reassigning from here still uses the normal AssignPopover, so a person can
+ * hand something off to someone else or a team without leaving their own to-do list.
  */
-function MyResponsibilitiesSection({
-  items,
-  teams,
-  onAssign,
-}: {
-  items: MyItemEntry[]
-  teams: Team[]
-  onAssign: (items: Array<{ itemType: ItemType; itemId: string }>, result: AssignResult) => Promise<void>
-}) {
-  const [expanded, setExpanded] = useState(true)
+export function MyItemRow({ entry, teams, onAssign }: { entry: MyItemEntry; teams: Team[]; onAssign: (items: Array<{ itemType: ItemType; itemId: string }>, result: AssignResult) => Promise<void> }) {
   const [popover, setPopover] = useState<MyPopoverState | null>(null)
   const [busy, setBusy] = useState(false)
 
-  function openRowAssign(e: React.MouseEvent, entry: MyItemEntry) {
+  function openRowAssign(e: React.MouseEvent) {
     const rect = (e.currentTarget as HTMLElement).getBoundingClientRect()
     let left = rect.left
     if (left + 260 > window.innerWidth) left = window.innerWidth - 270
@@ -364,43 +354,20 @@ function MyResponsibilitiesSection({
   }
 
   return (
-    <section className="panel oi-section">
-      <div className="panel-header oi-clickable" onClick={() => setExpanded((v) => !v)}>
-        <div className="panel-header-left">
-          {expanded ? <ChevronDown style={{ width: 16, height: 16 }} /> : <ChevronRight style={{ width: 16, height: 16 }} />}
-          <h2 className="panel-title">Assigned to You</h2>
-          <span className="panel-count">{items.length} open</span>
+    <div className="oi-row">
+      <div className="oi-main">
+        <a className="oi-title" href={entry.item.link} target="_blank" rel="noreferrer">
+          {entry.item.title}
+        </a>
+        <div className="oi-meta">
+          <span className="tag norm">{entry.typeLabel}</span>
+          {entry.item.subtitle && <span>{entry.item.subtitle}</span>}
+          {entry.item.status && <span className="tag norm">{entry.item.status}</span>}
         </div>
       </div>
-
-      {expanded && (
-        <div className="panel-body">
-          {items.length === 0 ? (
-            <div className="q-hint">Nothing assigned to you or a team you&apos;re on right now.</div>
-          ) : (
-            <div className="oi-rows">
-              {items.map((entry) => (
-                <div className="oi-row" key={`${entry.itemType}:${entry.item.id}`}>
-                  <div className="oi-main">
-                    <a className="oi-title" href={entry.item.link} target="_blank" rel="noreferrer">
-                      {entry.item.title}
-                    </a>
-                    <div className="oi-meta">
-                      <span className="tag norm">{entry.typeLabel}</span>
-                      {entry.item.subtitle && <span>{entry.item.subtitle}</span>}
-                      {entry.item.status && <span className="tag norm">{entry.item.status}</span>}
-                    </div>
-                  </div>
-                  <button type="button" className="oi-assign-chip" disabled={busy} onClick={(e) => openRowAssign(e, entry)}>
-                    {todoAssignmentLabel(entry.assignment, teams) || 'Reassign'}
-                  </button>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      )}
-
+      <button type="button" className="oi-assign-chip" disabled={busy} onClick={openRowAssign}>
+        {todoAssignmentLabel(entry.assignment, teams) || 'Reassign'}
+      </button>
       {popover && (
         <AssignPopover
           top={popover.top}
@@ -412,15 +379,17 @@ function MyResponsibilitiesSection({
           onClose={() => setPopover(null)}
         />
       )}
-    </section>
+    </div>
   )
 }
 
-/** Auto-generated to-do sections for still-open Checklists/Issues (read-only CxAlloy sheet data)
- * — each toggled on independently in Settings, each expandable to show/reassign every instance,
- * individually or via multi-select. Assignment itself is stored in arcapp_item_assignments,
- * keyed by CxAlloy id, since the sheet data itself can't be written back to. */
-export default function OpenItemsTodoPanel() {
+/**
+ * All the data the four "Open ..." sections AND the "Assigned to You" rows inside "Your To-Dos"
+ * need, fetched exactly once — TodoPage.tsx calls this and passes the result to both, so nothing
+ * here gets fetched twice (an open-status pick can be thousands of rows; doubling that would be
+ * wasteful, not just untidy).
+ */
+export function useOpenItemsData() {
   const ctx = useOutletContext<ShellContext>()
   const {
     checklistTodoEnabled,
@@ -485,8 +454,6 @@ export default function OpenItemsTodoPanel() {
     void assignmentsFn.trigger()
   }
 
-  if (!checklistTodoEnabled && !issueTodoEnabled && !netaSubmissionsOn && !netaReturnedOn) return null
-
   const checklistItems = (checklistsFn.data?.rows ?? []).map(checklistToItem)
   const issueItems = (issuesFn.data?.rows ?? []).map(issueToItem)
   // "Still open" here mirrors the NETA Tracker page's own default filtering exactly — not
@@ -496,9 +463,9 @@ export default function OpenItemsTodoPanel() {
   const netaSubmissionItems = (netaFn.data?.submissions ?? []).filter((r) => !r.submittedToGoogle).map(netaSubmissionToItem)
   const netaReturnedItems = (netaFn.data?.returnedFiles ?? []).filter((r) => r.uploadedToAcc !== true).map(netaReturnedToItem)
 
-  // "Assigned to You" is a personalized re-filter of the exact same four lists above — it changes
-  // nothing about what the four "Open ..." sections below show everyone else; an item assigned to
-  // someone stays fully visible there too, unfiltered, same as before this existed.
+  // "Assigned to You" (rendered inside "Your To-Dos") is a personalized re-filter of these same
+  // four lists — it changes nothing about what the four "Open ..." sections below show everyone
+  // else; an item assigned to someone stays fully visible there too, unfiltered.
   const myItems: MyItemEntry[] = currentUserEmail
     ? [
         ...checklistItems.flatMap((item) => {
@@ -524,9 +491,63 @@ export default function OpenItemsTodoPanel() {
       ]
     : []
 
+  return {
+    checklistTodoEnabled,
+    issueTodoEnabled,
+    checklistOpenStatuses,
+    issueOpenStatuses,
+    netaSubmissionsOn,
+    netaReturnedOn,
+    checklistsFn,
+    issuesFn,
+    netaFn,
+    checklistItems,
+    issueItems,
+    netaSubmissionItems,
+    netaReturnedItems,
+    checklistAssignments,
+    issueAssignments,
+    netaSubmissionAssignments,
+    netaReturnedAssignments,
+    myItems,
+    onAssign,
+  }
+}
+
+export type OpenItemsData = ReturnType<typeof useOpenItemsData>
+
+/** Auto-generated to-do sections for still-open Checklists/Issues (read-only CxAlloy sheet data)
+ * — each toggled on independently in Settings, each expandable to show/reassign every instance,
+ * individually or via multi-select. Assignment itself is stored in arcapp_item_assignments,
+ * keyed by CxAlloy id, since the sheet data itself can't be written back to. Data comes in as a
+ * prop (from useOpenItemsData, called once in TodoPage.tsx) rather than being fetched here, so
+ * "Assigned to You" inside "Your To-Dos" can share it without a second, duplicate fetch. */
+export default function OpenItemsTodoPanel({ data, teams }: { data: OpenItemsData; teams: Team[] }) {
+  const {
+    checklistTodoEnabled,
+    issueTodoEnabled,
+    checklistOpenStatuses,
+    issueOpenStatuses,
+    netaSubmissionsOn,
+    netaReturnedOn,
+    checklistsFn,
+    issuesFn,
+    netaFn,
+    checklistItems,
+    issueItems,
+    netaSubmissionItems,
+    netaReturnedItems,
+    checklistAssignments,
+    issueAssignments,
+    netaSubmissionAssignments,
+    netaReturnedAssignments,
+    onAssign,
+  } = data
+
+  if (!checklistTodoEnabled && !issueTodoEnabled && !netaSubmissionsOn && !netaReturnedOn) return null
+
   return (
     <>
-      {currentUserEmail && <MyResponsibilitiesSection items={myItems} teams={teams} onAssign={onAssign} />}
       {checklistTodoEnabled && (
         <OpenItemsSection
           title="Open Checklists"

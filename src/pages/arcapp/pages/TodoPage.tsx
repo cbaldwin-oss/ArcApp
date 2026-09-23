@@ -7,7 +7,7 @@ import type { Todo, TaskTag } from '../types'
 import { isTodoMine } from '../utils'
 import { TodoList } from '../components/TodoPanel'
 import TeamsManager from '../components/TeamsManager'
-import OpenItemsTodoPanel from '../components/OpenItemsTodoPanel'
+import OpenItemsTodoPanel, { MyItemRow, useOpenItemsData } from '../components/OpenItemsTodoPanel'
 
 type AssignMode = 'none' | 'team' | 'person'
 type FormState = {
@@ -41,6 +41,7 @@ type Tab = 'mine' | 'all'
 export default function TodoPage() {
   const ctx = useOutletContext<ShellContext>()
   const { todos, teams, currentUserEmail } = ctx
+  const openItems = useOpenItemsData()
 
   const [tab, setTab] = useState<Tab>(currentUserEmail ? 'mine' : 'all')
   const [formOpen, setFormOpen] = useState(false)
@@ -49,9 +50,11 @@ export default function TodoPage() {
   const [formError, setFormError] = useState('')
   const [saving, setSaving] = useState(false)
 
-  const mineCount = todos.filter((t) => isTodoMine(t, currentUserEmail, teams)).length
-  const visible = tab === 'mine' ? todos.filter((t) => isTodoMine(t, currentUserEmail, teams)) : todos
-  const open = visible.filter((t) => !t.done).length
+  const mineTodos = todos.filter((t) => isTodoMine(t, currentUserEmail, teams))
+  const mineCount = mineTodos.length + openItems.myItems.length
+  const visible = tab === 'mine' ? mineTodos : todos
+  const shownMyItems = tab === 'mine' ? openItems.myItems : []
+  const open = (tab === 'mine' ? openItems.myItems.length : 0) + visible.filter((t) => !t.done).length
 
   function openNew() {
     setEditingId(null)
@@ -122,7 +125,7 @@ export default function TodoPage() {
     <>
       <TeamsManager teams={teams} tasks={todos} onSave={ctx.onSaveTeam} onDelete={ctx.onDeleteTeam} />
 
-      <OpenItemsTodoPanel />
+      <OpenItemsTodoPanel data={openItems} teams={teams} />
 
       <section className="panel" id="todo">
         <div className="panel-header">
@@ -247,7 +250,21 @@ export default function TodoPage() {
               Couldn&apos;t load tasks ({ctx.tasksError}).
             </div>
           )}
-          {!ctx.tasksLoading && !ctx.tasksError && visible.length === 0 && (
+          {/* Checklist/Issue/NETA items assigned to you or a team you're on — folded directly into
+              "My Tasks" rather than a separate section, since a second "my stuff" list next to this
+              one read as a duplicate. Reassigning here doesn't touch this list's manual tasks below;
+              it's the exact same underlying assignment popover used everywhere else. Only ever
+              shown on the "My Tasks" tab — "All Tasks" stays exactly what it always was (manual
+              tasks only), since every open Checklist/Issue/NETA item already has its own general,
+              unfiltered home in the "Open ..." sections above. */}
+          {!ctx.tasksLoading && !ctx.tasksError && shownMyItems.length > 0 && (
+            <div className="oi-rows" style={{ marginBottom: visible.length > 0 ? 14 : 0 }}>
+              {shownMyItems.map((entry) => (
+                <MyItemRow key={`${entry.itemType}:${entry.item.id}`} entry={entry} teams={teams} onAssign={openItems.onAssign} />
+              ))}
+            </div>
+          )}
+          {!ctx.tasksLoading && !ctx.tasksError && visible.length === 0 && shownMyItems.length === 0 && (
             <div className="q-hint">{tab === 'mine' ? 'Nothing assigned to you right now.' : 'No tasks yet.'}</div>
           )}
           {!ctx.tasksLoading && !ctx.tasksError && visible.length > 0 && (
