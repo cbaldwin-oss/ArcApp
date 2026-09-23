@@ -141,8 +141,11 @@ export function todoAssignmentLabel(todo: Pick<Todo, 'assignedTeamId' | 'assigne
   return ''
 }
 
-/** True if `userEmail` is directly assigned, or is a member of the team the task is assigned to. */
-export function isTodoMine(todo: Todo, userEmail: string | null, teams: Team[]): boolean {
+/** True if `userEmail` is directly assigned, or is a member of the team the task is assigned to.
+ * Takes just the assignment fields (not the full Todo shape) so it also works unchanged on
+ * ItemAssignment records (Checklist/Issue/NETA To-Do) — same field names, same "at most one of
+ * team or person" convention. */
+export function isTodoMine(todo: Pick<Todo, 'assignedEmail' | 'assignedTeamId'>, userEmail: string | null, teams: Team[]): boolean {
   if (!userEmail) return false
   const email = userEmail.toLowerCase()
   if (todo.assignedEmail && todo.assignedEmail.toLowerCase() === email) return true

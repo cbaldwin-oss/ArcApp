@@ -565,6 +565,32 @@ reusing the exact same `OpenItemsSection` component (search, pagination, multi-s
   correctly), and the SAN-NT1B capability gate confirmed to suppress both rendering and fetching
   even with the toggles forced on — zero console errors throughout.
 
+### "Assigned to You" — a personal rollup, without changing anyone else's view
+
+The four "Open ..." sections above are deliberately **not** filtered by assignee — everyone sees
+every open Checklist/Issue/NETA item regardless of who it's assigned to, same as before any of
+this existed. **Assigned to You** (`MyResponsibilitiesSection` in `OpenItemsTodoPanel.tsx`) is an
+additional, separate section that re-filters those exact same four lists down to just the items
+assigned to the signed-in user directly, or to a team they're on — so an assignee sees it surfaced
+as their responsibility without anyone else's visibility changing at all.
+
+- Reuses `isTodoMine` (already powering the manual to-do list's "My Tasks" tab), generalized to
+  accept just `{ assignedEmail, assignedTeamId }` instead of a full `Todo`, so it works unchanged
+  on `ItemAssignment` records too — no new matching logic, no duplicate fetch (it re-filters the
+  same in-memory lists the four sections below already hold, so nothing extra is fetched over the
+  network for this).
+- Shown at the top of the to-do items, above the four "Open ..." sections, only when signed in
+  (mirrors "My Tasks" hiding entirely rather than showing an always-empty state when signed out).
+- Each row shows a type badge (Checklist / Issue / NETA Submission / NETA Returned) since this is
+  the one place items from all four sources are mixed together, plus a chip showing the current
+  assignment (team or person) that doubles as a reassign button — same `AssignPopover` as
+  everywhere else, so a person can hand something off to someone else or a team from here directly.
+- Verified with a faked signed-in session: the section correctly showed only the 2 of 4 sample
+  items actually assigned to the test user (not the one assigned to someone else, not the two
+  unassigned ones), while the general "Open Checklists" and "Open NETA Submissions" sections
+  underneath still showed all rows unfiltered — confirming assignment narrows this one personal
+  view without hiding anything from the general lists.
+
 ## Sign-in — Google OAuth + an authorized-users allowlist
 
 Sign-in is now a real modal (`SignInModal.tsx`, replacing the old `window.prompt()` hack) with
