@@ -17,6 +17,8 @@ type Props = {
   issueOpenStatuses: string[]
   netaSubmissionsTodoEnabled: boolean
   netaReturnedTodoEnabled: boolean
+  cxAlloyLinkBaseDetected: { domain: string; projectId: string } | null
+  cxalloyLinkBaseOverride: string
   canEdit: boolean
   /** Separate, looser gate for Workflows specifically — see Dashboard.tsx for why. */
   canManageWorkflows: boolean
@@ -151,6 +153,8 @@ export default function SettingsPanel({
   issueOpenStatuses,
   netaSubmissionsTodoEnabled,
   netaReturnedTodoEnabled,
+  cxAlloyLinkBaseDetected,
+  cxalloyLinkBaseOverride,
   canEdit,
   canManageWorkflows,
   loading,
@@ -165,6 +169,20 @@ export default function SettingsPanel({
         </div>
       </div>
       <div className="panel-body">
+        <Field
+          label="CxAlloy project override — domain/project id"
+          hint={
+            `Format: domain/projectId, e.g. google.cxalloy.com/70. Checklist/Issue deep links use this ` +
+            `to build their URL. Auto-detected from this project's Equipment Tracker data by default ` +
+            (cxAlloyLinkBaseDetected
+              ? `(currently detected: ${cxAlloyLinkBaseDetected.domain}/${cxAlloyLinkBaseDetected.projectId}) — leave blank to keep using that.`
+              : `— nothing detected yet for this project (no Equipment Tracker data synced, or none of it has a link field). Set this manually until it does.`)
+          }
+          initial={cxalloyLinkBaseOverride}
+          canEdit={canEdit}
+          loading={loading}
+          onSave={(v) => onSaveSetting('cxalloy_link_base_override', v)}
+        />
         <Field
           label="Joint Pack Photos — Google Drive destination folder ID"
           hint="Open the destination folder in Drive and copy the ID from its URL (.../folders/<THIS PART>). Must be a folder the Joint Pack Apps Script's account can write to."

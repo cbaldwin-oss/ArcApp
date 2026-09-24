@@ -4,7 +4,7 @@ import { useCurrentUser } from '../../lib/useCurrentUser'
 import { CURRENT_PROJECT } from '../../lib/project'
 import {
   useGetSchedule, useGetResultOptions, useCheckEditor, useSaveResult, useLogTamperSeals, useSubmitRtft,
-  useGetSettings, useSaveSetting, useGetWorkflows, useGetWorkflowItems,
+  useGetSettings, useSaveSetting, useGetWorkflows, useGetWorkflowItems, useGetCxAlloyLinkBase, parseCxAlloyLinkBase,
   useGetTasks, useSaveTask, useSetTaskDone, useDeleteTask, useGetTeams, useSaveTeam, useDeleteTeam,
 } from '../../lib/api'
 import type { TaskInput } from '../../lib/api'
@@ -46,6 +46,7 @@ export default function AppShell() {
   const submitRtftFn = useSubmitRtft()
   const settingsFn = useGetSettings()
   const saveSettingFn = useSaveSetting()
+  const cxAlloyLinkBaseFn = useGetCxAlloyLinkBase()
   const workflowsFn = useGetWorkflows()
   const workflowItemsFn = useGetWorkflowItems()
   const tasksFn = useGetTasks()
@@ -86,6 +87,7 @@ export default function AppShell() {
     void optionsFn.trigger()
     void editorFn.trigger()
     void settingsFn.trigger()
+    void cxAlloyLinkBaseFn.trigger()
     void workflowsFn.trigger()
     void workflowItemsFn.trigger()
     void tasksFn.trigger()
@@ -130,6 +132,7 @@ export default function AppShell() {
         issueOpenStatuses?: string[]
         netaSubmissionsTodoEnabled?: boolean
         netaReturnedTodoEnabled?: boolean
+        cxalloyLinkBaseOverride?: string
       }
     | undefined
   const jointPackFolder = settingsData?.jointPackPhotosFolder ?? ''
@@ -142,6 +145,12 @@ export default function AppShell() {
   const issueOpenStatuses = settingsData?.issueOpenStatuses ?? []
   const netaSubmissionsTodoEnabled = settingsData?.netaSubmissionsTodoEnabled ?? false
   const netaReturnedTodoEnabled = settingsData?.netaReturnedTodoEnabled ?? false
+  const cxalloyLinkBaseOverride = settingsData?.cxalloyLinkBaseOverride ?? ''
+  const cxAlloyLinkBaseDetected = (cxAlloyLinkBaseFn.data as { domain: string; projectId: string } | null | undefined) ?? null
+  // A manual Settings override always wins over auto-detection — see getCxAlloyLinkBase in
+  // api.ts for why auto-detection alone can come back null (no Equipment Tracker data synced yet
+  // for this project) or, in principle, find the wrong thing.
+  const cxAlloyLinkBase = parseCxAlloyLinkBase(cxalloyLinkBaseOverride) ?? cxAlloyLinkBaseDetected
 
   const userName = user?.name ?? null
   const initials = user
@@ -312,6 +321,9 @@ export default function AppShell() {
     issueOpenStatuses,
     netaSubmissionsTodoEnabled,
     netaReturnedTodoEnabled,
+    cxAlloyLinkBase,
+    cxAlloyLinkBaseDetected,
+    cxalloyLinkBaseOverride,
     settingsLoading: settingsFn.loading,
     onSaveSetting: saveSetting,
   }

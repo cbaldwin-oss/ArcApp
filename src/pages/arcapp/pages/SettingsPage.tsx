@@ -16,6 +16,8 @@ export default function SettingsPage() {
       issueOpenStatuses={ctx.issueOpenStatuses}
       netaSubmissionsTodoEnabled={ctx.netaSubmissionsTodoEnabled}
       netaReturnedTodoEnabled={ctx.netaReturnedTodoEnabled}
+      cxAlloyLinkBaseDetected={ctx.cxAlloyLinkBaseDetected}
+      cxalloyLinkBaseOverride={ctx.cxalloyLinkBaseOverride}
       canEdit={ctx.canEdit}
       canManageWorkflows={ctx.canManageWorkflows}
       loading={ctx.settingsLoading}

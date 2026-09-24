@@ -19,7 +19,7 @@
 
 import { useApiFn } from './useApiFn'
 import { supabase } from './supabaseClient'
-import { CURRENT_PROJECT, cxAlloyLinkBase, hasCapability } from './project'
+import { CURRENT_PROJECT, hasCapability } from './project'
 import { FALLBACK_WORKFLOW_ITEMS, type WorkflowItem } from '../pages/arcapp/workflowItems'
 import type { Team, TeamMember, Todo, TaskTag } from '../pages/arcapp/types'
 
@@ -149,13 +149,68 @@ export function useGetResultOptions() {
 // 15-20k+ rows and callers only ever want a handful of statuses.
 // ---------------------------------------------------------------------------
 
-export function cxAlloyChecklistUrl(checklistId: string): string {
-  const { domain, projectId } = cxAlloyLinkBase()
-  return `https://${domain}/project/${projectId}/checklists/${encodeURIComponent(checklistId)}`
+/** google.cxalloy.com/70 for STY4, tq.cxalloy.com/49639 for SAN-NT1B — a real per-tenant
+ * difference (found while wiring up SAN-NT1B), not just a project id on one shared domain. Used
+ * to build a deep link for a bare checklist/issue id (rows that already carry their own full
+ * link, like Equipment Tracker's `_Link` columns, don't need this). This used to be a hardcoded
+ * per-project map in src/lib/project.ts — meant a code change for every new site, and the STY4
+ * entry (50506) turned out to be wrong anyway (the real value, confirmed against ~12k live
+ * Equipment Tracker links, is 70). See getCxAlloyLinkBase below for where it comes from now. */
+export type CxAlloyLinkBase = { domain: string; projectId: string }
+
+export function cxAlloyChecklistUrl(checklistId: string, base: CxAlloyLinkBase | null): string {
+  if (!base) return ''
+  return `https://${base.domain}/project/${base.projectId}/checklists/${encodeURIComponent(checklistId)}`
 }
-export function cxAlloyIssueUrl(issueId: string): string {
-  const { domain, projectId } = cxAlloyLinkBase()
-  return `https://${domain}/project/${projectId}/constructionissue/${encodeURIComponent(issueId)}#sort%5B%5D=identified-d`
+export function cxAlloyIssueUrl(issueId: string, base: CxAlloyLinkBase | null): string {
+  if (!base) return ''
+  return `https://${base.domain}/project/${base.projectId}/constructionissue/${encodeURIComponent(issueId)}#sort%5B%5D=identified-d`
+}
+
+const CXALLOY_LINK_RE = /^https?:\/\/([^/]+)\/project\/(\d+)\//
+
+/** Parses a manual override from Settings ("google.cxalloy.com/70") — same shape either field
+ * of a `_Link` URL would give, just typed by hand instead of pulled from one. */
+export function parseCxAlloyLinkBase(v: string): CxAlloyLinkBase | null {
+  const trimmed = v.trim()
+  if (!trimmed) return null
+  const m = /^([^/\s]+)\/(\d+)$/.exec(trimmed)
+  return m ? { domain: m[1], projectId: m[2] } : null
+}
+
+/**
+ * Auto-detects the CxAlloy domain+project id from this project's own Equipment Tracker data
+ * instead of a hardcoded map — every `_Link` field the sheet sync already produces
+ * (`Asset_Link`, `<checklist>_Link`, `<issue>_Link`, ...) points at the same domain+project id, so
+ * the first one found in the first few rows is enough. Only pulls `data->0`/`->1`/`->2` (a few KB)
+ * via PostgREST's jsonb path selection, not the whole `launchpad_equipment_tracker_data.data`
+ * column — that's the same payload the Equipment Tracker page itself loads, and for STY4 today
+ * that's ~1.6MB; fetching all of it a second time just to read two short strings would be wasteful
+ * on every page load. Returns null (not an error) if this project's Equipment Tracker has no data
+ * yet, or no row happens to carry a `_Link` field within the first few rows checked — a Settings
+ * override (see AppShell.tsx's effective cxAlloyLinkBase) covers that case.
+ */
+async function getCxAlloyLinkBase(): Promise<CxAlloyLinkBase | null> {
+  const res = await supabase
+    .from('launchpad_equipment_tracker_data')
+    .select('r0:data->0,r1:data->1,r2:data->2')
+    .eq('project_key', CXALLOY_TABLE_PREFIX)
+    .maybeSingle()
+  if (res.error) throw new Error(res.error.message)
+  const row = res.data as Record<string, Record<string, unknown> | null> | null
+  if (!row) return null
+  for (const sample of [row.r0, row.r1, row.r2]) {
+    if (!sample) continue
+    for (const [key, value] of Object.entries(sample)) {
+      if (!key.endsWith('_Link') || typeof value !== 'string') continue
+      const m = CXALLOY_LINK_RE.exec(value)
+      if (m) return { domain: m[1], projectId: m[2] }
+    }
+  }
+  return null
+}
+export function useGetCxAlloyLinkBase() {
+  return useApiFn(getCxAlloyLinkBase)
 }
 
 async function getCxAlloyScriptUrl(): Promise<string> {
@@ -1083,6 +1138,12 @@ export type AppSettings = {
    * yet Uploaded to ACC), so there's no open-status picker to configure. Off by default. */
   netaSubmissionsTodoEnabled: boolean
   netaReturnedTodoEnabled: boolean
+  /** Manual override for the auto-detected CxAlloy domain+project id (see getCxAlloyLinkBase in
+   * this file) — "domain/projectId", e.g. "google.cxalloy.com/70". Blank by default; only needed
+   * if auto-detection can't find one (no Equipment Tracker data synced yet for this project) or
+   * finds the wrong one. AppShell.tsx logs/resolves the effective value here so it's visible
+   * without opening dev tools. */
+  cxalloyLinkBaseOverride: string
 }
 const SETTINGS_DEFAULTS = {
   checklistReadyStatuses: ['Finished'],
@@ -1111,6 +1172,7 @@ async function getSettings(): Promise<AppSettings> {
     issueOpenStatuses: splitCsv(map.get('issue_open_statuses'), SETTINGS_DEFAULTS.issueOpenStatuses),
     netaSubmissionsTodoEnabled: map.get('neta_submissions_todo_enabled') === 'true',
     netaReturnedTodoEnabled: map.get('neta_returned_todo_enabled') === 'true',
+    cxalloyLinkBaseOverride: map.get('cxalloy_link_base_override') ?? '',
   }
 }
 export function useGetSettings() {
@@ -1128,6 +1190,7 @@ const ALLOWED_SETTING_KEYS = new Set([
   'issue_open_statuses',
   'neta_submissions_todo_enabled',
   'neta_returned_todo_enabled',
+  'cxalloy_link_base_override',
 ])
 async function saveSetting(params: { key: string; value: string }): Promise<{ key: string; value: string }> {
   if (!ALLOWED_SETTING_KEYS.has(params.key)) throw new Error(`Unknown setting key: ${params.key}`)

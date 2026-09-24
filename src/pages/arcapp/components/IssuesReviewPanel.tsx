@@ -1,7 +1,9 @@
 import { useEffect, useMemo, useState } from 'react'
+import { useOutletContext } from 'react-router-dom'
 import { RefreshCw } from 'lucide-react'
 import { useGetIssues, cxAlloyIssueUrl } from '../../../lib/api'
 import { hasCapability } from '../../../lib/project'
+import type { ShellContext } from '../ShellContext'
 import CapabilityNotice from './CapabilityNotice'
 
 type Row = {
@@ -28,6 +30,7 @@ function priorityClass(p: string): string {
 }
 
 export default function IssuesReviewPanel() {
+  const { cxAlloyLinkBase } = useOutletContext<ShellContext>()
   const available = hasCapability('cxAlloyActions')
   const fn = useGetIssues()
   const [filter, setFilter] = useState('')
@@ -143,8 +146,8 @@ export default function IssuesReviewPanel() {
               {state === 'ready' && filtered.map((r, i) => (
                 <tr key={`${r.issue_id}-${i}`}>
                   <td className="tag-cell">
-                    {r.issue_id ? (
-                      <a href={cxAlloyIssueUrl(r.issue_id)} target="_blank" rel="noopener noreferrer">
+                    {r.issue_id && cxAlloyLinkBase ? (
+                      <a href={cxAlloyIssueUrl(r.issue_id, cxAlloyLinkBase)} target="_blank" rel="noopener noreferrer">
                         {r.name}
                       </a>
                     ) : (

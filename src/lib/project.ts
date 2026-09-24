@@ -70,20 +70,6 @@ export function hasCapability(cap: Capability, project: ProjectKey = CURRENT_PRO
   return CAPABILITIES[project][cap]
 }
 
-/** CxAlloy deep-link base per project — found while wiring up SAN-NT1B that this isn't just a
- * different project id on the same domain: STY4's checklists/issues live at google.cxalloy.com
- * (CxAlloy project 50506), SAN-NT1B's at tq.cxalloy.com (project 49639) — apparently different
- * CxAlloy tenant subdomains per client, not one shared instance. Used by cxAlloyChecklistUrl()/
- * cxAlloyIssueUrl() in api.ts to build a deep link for a bare checklist/issue id (rows that
- * already carry their own full link, like Equipment Tracker's `_Link` columns, don't need this). */
-const CXALLOY_LINK_BASE: Record<ProjectKey, { domain: string; projectId: string }> = {
-  STY4: { domain: 'google.cxalloy.com', projectId: '50506' },
-  SANNT1B: { domain: 'tq.cxalloy.com', projectId: '49639' },
-}
-export function cxAlloyLinkBase(project: ProjectKey = CURRENT_PROJECT): { domain: string; projectId: string } {
-  return CXALLOY_LINK_BASE[project]
-}
-
 export function setCurrentProject(key: ProjectKey) {
   if (key === CURRENT_PROJECT) return
   try {

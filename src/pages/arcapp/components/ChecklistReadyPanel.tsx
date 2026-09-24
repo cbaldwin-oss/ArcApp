@@ -1,7 +1,9 @@
 import { useEffect, useMemo, useState } from 'react'
+import { useOutletContext } from 'react-router-dom'
 import { RefreshCw } from 'lucide-react'
 import { useGetChecklists, cxAlloyChecklistUrl } from '../../../lib/api'
 import { hasCapability } from '../../../lib/project'
+import type { ShellContext } from '../ShellContext'
 import CapabilityNotice from './CapabilityNotice'
 
 type Row = {
@@ -19,6 +21,7 @@ type Row = {
 const ALL_TYPES = 'All types'
 
 export default function ChecklistReadyPanel() {
+  const { cxAlloyLinkBase } = useOutletContext<ShellContext>()
   const available = hasCapability('cxAlloyActions')
   const fn = useGetChecklists()
   const [filter, setFilter] = useState('')
@@ -138,8 +141,8 @@ export default function ChecklistReadyPanel() {
               {state === 'ready' && filtered.map((r, i) => (
                 <tr key={`${r.checklist_id || r.number}-${i}`}>
                   <td className="tag-cell">
-                    {r.checklist_id ? (
-                      <a href={cxAlloyChecklistUrl(r.checklist_id)} target="_blank" rel="noopener noreferrer">
+                    {r.checklist_id && cxAlloyLinkBase ? (
+                      <a href={cxAlloyChecklistUrl(r.checklist_id, cxAlloyLinkBase)} target="_blank" rel="noopener noreferrer">
                         {r.number}
                       </a>
                     ) : (

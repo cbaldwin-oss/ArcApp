@@ -123,9 +123,28 @@ directly:
   built from whatever values are actually present in the loaded rows instead. If the CxAlloy
   Settings tab gets reconciled with real data, `ChecklistReadyPanel.tsx`/`IssuesReviewPanel.tsx`
   have a comment marking where to switch that filter's source over.
-- Checklist numbers and issue names link out to `google.cxalloy.com/project/50506/...` — `50506`
-  is CxAlloy's own project id, hardcoded in `src/lib/api.ts` (`CXALLOY_PROJECT_ID`) to match what
-  the Apps Script itself already hardcodes.
+- Checklist numbers and issue names link out to CxAlloy (`cxAlloyChecklistUrl`/`cxAlloyIssueUrl` in
+  `src/lib/api.ts`). The domain+project id those build from — `google.cxalloy.com/70` for STY4,
+  `tq.cxalloy.com/49639` for SAN-NT1B — used to be a hardcoded per-project map in
+  `src/lib/project.ts`; that meant a code change for every new site, and the STY4 entry (`50506`)
+  turned out to be wrong anyway. It's now **auto-detected from this project's own Equipment
+  Tracker data** instead (`getCxAlloyLinkBase` in `api.ts`): every `_Link` field that sheet sync
+  already produces — `Asset_Link`, `<checklist>_Link`, `<issue>_Link`, etc. — points at the same
+  domain+project id, so the first one found (in the first few rows, via PostgREST's jsonb path
+  selection — a few KB, not the ~1.6MB full Equipment Tracker payload the tracker page itself
+  loads) is enough, confirmed consistent across ~12k real STY4 links and ~2.9k real SAN-NT1B ones.
+  A new site's checklist/issue links work with **zero code changes** as soon as its Equipment
+  Tracker data syncs — no per-site entry to add anymore.
+  - **Settings → CxAlloy project override** shows whatever was auto-detected (so it's visible
+    without opening dev tools) and accepts a manual `domain/projectId` override that takes
+    precedence — for a brand-new site whose Equipment Tracker data hasn't synced yet, or if
+    auto-detection ever finds the wrong thing. Same `arcapp_settings` mechanism as everything else
+    there (`cxalloy_link_base_override`), fetched once in `AppShell.tsx` alongside the rest of
+    startup state and exposed via `ShellContext.cxAlloyLinkBase` (effective) /
+    `cxAlloyLinkBaseDetected` (raw auto-detected value, for the Settings hint).
+  - Checklist/Issue rows render as plain text instead of a broken link while `cxAlloyLinkBase` is
+    null (still loading, or nothing detected and no override set) — same "degrade gracefully, no
+    dead link" approach as everything else CxAlloy-related.
 
 ## Joint Pack Photos (via Google Sheet + Drive, its own Apps Script)
 

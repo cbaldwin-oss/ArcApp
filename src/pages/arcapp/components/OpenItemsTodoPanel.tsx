@@ -10,7 +10,7 @@ import {
   useGetOpenIssues,
   useSaveItemAssignments,
 } from '../../../lib/api'
-import type { ChecklistRow, IssueRow, ItemAssignment, ItemType, NetaReturnedRow, NetaSubmissionRow } from '../../../lib/api'
+import type { ChecklistRow, CxAlloyLinkBase, IssueRow, ItemAssignment, ItemType, NetaReturnedRow, NetaSubmissionRow } from '../../../lib/api'
 import { hasCapability } from '../../../lib/project'
 import type { ShellContext } from '../ShellContext'
 import type { Team } from '../types'
@@ -27,23 +27,23 @@ type OItem = {
   cxAssignedName: string
 }
 
-function checklistToItem(r: ChecklistRow): OItem {
+function checklistToItem(r: ChecklistRow, linkBase: CxAlloyLinkBase | null): OItem {
   return {
     id: r.checklist_id,
     title: r.number ? `${r.number} — ${r.name}` : r.name,
     subtitle: [r.asset_name, r.type_name, r.discipline].filter(Boolean).join(' · '),
     status: r.status,
-    link: cxAlloyChecklistUrl(r.checklist_id),
+    link: cxAlloyChecklistUrl(r.checklist_id, linkBase),
     cxAssignedName: r.assigned_name,
   }
 }
-function issueToItem(r: IssueRow): OItem {
+function issueToItem(r: IssueRow, linkBase: CxAlloyLinkBase | null): OItem {
   return {
     id: r.issue_id,
     title: r.name,
     subtitle: [r.asset_name, r.priority].filter(Boolean).join(' · '),
     status: r.status,
-    link: cxAlloyIssueUrl(r.issue_id),
+    link: cxAlloyIssueUrl(r.issue_id, linkBase),
     cxAssignedName: r.assigned_name,
   }
 }
@@ -400,6 +400,7 @@ export function useOpenItemsData() {
     netaReturnedTodoEnabled,
     teams,
     currentUserEmail,
+    cxAlloyLinkBase,
   } = ctx
   // NETA Tracker is STY4-only (see the `netaTracker` capability in src/lib/project.ts) — even
   // though the Settings toggles above are project-scoped and shouldn't stay on after a switch,
@@ -454,8 +455,8 @@ export function useOpenItemsData() {
     void assignmentsFn.trigger()
   }
 
-  const checklistItems = (checklistsFn.data?.rows ?? []).map(checklistToItem)
-  const issueItems = (issuesFn.data?.rows ?? []).map(issueToItem)
+  const checklistItems = (checklistsFn.data?.rows ?? []).map((r) => checklistToItem(r, cxAlloyLinkBase))
+  const issueItems = (issuesFn.data?.rows ?? []).map((r) => issueToItem(r, cxAlloyLinkBase))
   // "Still open" here mirrors the NETA Tracker page's own default filtering exactly — not
   // yet Submitted to Google (Submissions) / not yet Uploaded to ACC (Returned Files). A row whose
   // Uploaded to ACC is "N/A" (open issue, see NetaTrackerScript.gs) is correctly still "open" —
