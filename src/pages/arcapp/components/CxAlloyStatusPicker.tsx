@@ -96,7 +96,7 @@ export default function CxAlloyStatusPicker({ label, hint, column, value, canEdi
 
       <div className="q-hint">{hint}</div>
       {error && <div className="q-hint err">{error}</div>}
-      {!canEdit && <div className="q-hint">Only authorized editors can change settings.</div>}
+      {!canEdit && <div className="q-hint">Only admins can change settings.</div>}
     </div>
   )
 }

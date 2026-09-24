@@ -19,7 +19,13 @@ type Props = {
   netaReturnedTodoEnabled: boolean
   cxAlloyLinkBaseDetected: { domain: string; projectId: string } | null
   cxalloyLinkBaseOverride: string
+  /** Broader than isAdmin — any signed-in, authorized ArcApp user. Only used here for Workflows
+   * (item catalog + building workflows), which isn't admin-restricted. */
   canEdit: boolean
+  /** From arcapp_authorized_users.role === 'admin' — every other field on this page requires this,
+   * not just canEdit. Settings is specifically an admin-only page; editors can see it (so they
+   * know what's configured) but every control is disabled for them. */
+  isAdmin: boolean
   /** Separate, looser gate for Workflows specifically — see Dashboard.tsx for why. */
   canManageWorkflows: boolean
   loading: boolean
@@ -83,7 +89,7 @@ function Field({
         <Save style={{ width: 15, height: 15 }} />
         Save
       </button>
-      <div className={msg.cls}>{msg.text || (!canEdit ? 'Only authorized editors can change settings.' : '')}</div>
+      <div className={msg.cls}>{msg.text || (!canEdit ? 'Only admins can change settings.' : '')}</div>
     </div>
   )
 }
@@ -156,6 +162,7 @@ export default function SettingsPanel({
   cxAlloyLinkBaseDetected,
   cxalloyLinkBaseOverride,
   canEdit,
+  isAdmin,
   canManageWorkflows,
   loading,
   onSaveSetting,
@@ -168,6 +175,11 @@ export default function SettingsPanel({
           <span className="panel-count">app-wide</span>
         </div>
       </div>
+      {!isAdmin && (
+        <div className="q-hint" style={{ padding: '0 20px 12px' }}>
+          You can see how this project is configured, but only an admin can change it.
+        </div>
+      )}
       <div className="panel-body">
         <Field
           label="CxAlloy project override — domain/project id"
@@ -179,7 +191,7 @@ export default function SettingsPanel({
               : `— nothing detected yet for this project (no Equipment Tracker data synced, or none of it has a link field). Set this manually until it does.`)
           }
           initial={cxalloyLinkBaseOverride}
-          canEdit={canEdit}
+          canEdit={isAdmin}
           loading={loading}
           onSave={(v) => onSaveSetting('cxalloy_link_base_override', v)}
         />
@@ -187,7 +199,7 @@ export default function SettingsPanel({
           label="Joint Pack Photos — Google Drive destination folder ID"
           hint="Open the destination folder in Drive and copy the ID from its URL (.../folders/<THIS PART>). Must be a folder the Joint Pack Apps Script's account can write to."
           initial={jointPackFolder}
-          canEdit={canEdit}
+          canEdit={isAdmin}
           loading={loading}
           onSave={(v) => onSaveSetting('joint_pack_photos_folder', v)}
         />
@@ -196,7 +208,7 @@ export default function SettingsPanel({
           hint="Pulled live from the CxAlloy Settings tab (STY4A API Database). Checked statuses show up on the Checklists page."
           column="checklistStatuses"
           value={checklistReadyStatuses}
-          canEdit={canEdit}
+          canEdit={isAdmin}
           loading={loading}
           onSave={(values) => onSaveSetting('checklist_ready_statuses', values.join(', '))}
         />
@@ -205,7 +217,7 @@ export default function SettingsPanel({
           hint="Pulled live from the CxAlloy Settings tab (STY4A API Database). Checked statuses show up on the Issues page."
           column="issueStatuses"
           value={issueReviewStatuses}
-          canEdit={canEdit}
+          canEdit={isAdmin}
           loading={loading}
           onSave={(values) => onSaveSetting('issue_review_statuses', values.join(', '))}
         />
@@ -223,7 +235,7 @@ export default function SettingsPanel({
             label="Checklist To-Do"
             hint="Shows an Open Checklists section on the To-Do page."
             initial={checklistTodoEnabled}
-            canEdit={canEdit}
+            canEdit={isAdmin}
             loading={loading}
             onSave={(v) => onSaveSetting('checklist_todo_enabled', v ? 'true' : '')}
           />
@@ -232,7 +244,7 @@ export default function SettingsPanel({
             hint="Pulled live from the CxAlloy Settings tab. Different from Checklist Ready above — this is 'still outstanding', not 'ready for CxA review'. Nothing shows on the To-Do page until at least one status is checked here."
             column="checklistStatuses"
             value={checklistOpenStatuses}
-            canEdit={canEdit}
+            canEdit={isAdmin}
             loading={loading}
             onSave={(values) => onSaveSetting('checklist_open_statuses', values.join(', '))}
           />
@@ -240,7 +252,7 @@ export default function SettingsPanel({
             label="Issues To-Do"
             hint="Shows an Open Issues section on the To-Do page."
             initial={issueTodoEnabled}
-            canEdit={canEdit}
+            canEdit={isAdmin}
             loading={loading}
             onSave={(v) => onSaveSetting('issue_todo_enabled', v ? 'true' : '')}
           />
@@ -249,7 +261,7 @@ export default function SettingsPanel({
             hint="Pulled live from the CxAlloy Settings tab. Different from Issues for Review above — this is 'still outstanding', not 'ready for review'. Nothing shows on the To-Do page until at least one status is checked here."
             column="issueStatuses"
             value={issueOpenStatuses}
-            canEdit={canEdit}
+            canEdit={isAdmin}
             loading={loading}
             onSave={(values) => onSaveSetting('issue_open_statuses', values.join(', '))}
           />
@@ -270,7 +282,7 @@ export default function SettingsPanel({
               label="NETA Submissions To-Do"
               hint="Shows an Open NETA Submissions section on the To-Do page."
               initial={netaSubmissionsTodoEnabled}
-              canEdit={canEdit}
+              canEdit={isAdmin}
               loading={loading}
               onSave={(v) => onSaveSetting('neta_submissions_todo_enabled', v ? 'true' : '')}
             />
@@ -278,7 +290,7 @@ export default function SettingsPanel({
               label="NETA Returned Files To-Do"
               hint="Shows an Open NETA Returned Files section on the To-Do page."
               initial={netaReturnedTodoEnabled}
-              canEdit={canEdit}
+              canEdit={isAdmin}
               loading={loading}
               onSave={(v) => onSaveSetting('neta_returned_todo_enabled', v ? 'true' : '')}
             />
@@ -289,12 +301,12 @@ export default function SettingsPanel({
 
         <SubmittalExemptAssetsManager
           value={submittalExemptAssets}
-          canEdit={canEdit}
+          canEdit={isAdmin}
           loading={loading}
           onSave={(values) => onSaveSetting('submittal_exempt_assets', values.join(', '))}
         />
 
-        <AuthorizedUsersManager canEdit={canEdit} />
+        <AuthorizedUsersManager canEdit={isAdmin} />
       </div>
     </section>
   )

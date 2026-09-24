@@ -489,27 +489,21 @@ html, body, #root{ margin:0; padding:0; min-height:100%; background:#05070d; }
 }
 .arcapp .activity-drawer.open{ transform:scale(1); opacity:1; }
 
-/* ---------- sign-in modal ---------- */
-.arcapp .signin-modal{
-  width:100%; max-width:380px; background:var(--bg-elev); border:1px solid var(--border-strong);
-  border-radius:var(--radius); padding:22px; box-shadow:var(--shadow-md);
+/* ---------- sign-in page (full-page gate, replaces the old dismissible modal) ---------- */
+.arcapp .signin-page{
+  position:relative; z-index:1; min-height:100vh; display:flex; align-items:center; justify-content:center; padding:24px;
 }
-.arcapp .signin-modal-head{ display:flex; justify-content:space-between; align-items:center; margin-bottom:4px; }
-.arcapp .signin-modal-head h3{ margin:0; font-family:var(--font-display); font-size:17px; color:var(--text); }
-.arcapp .signin-modal-divider{
+.arcapp .signin-page-card{
+  width:100%; max-width:400px; background:var(--bg-elev); border:1px solid var(--border-strong);
+  border-radius:var(--radius); padding:28px; box-shadow:var(--shadow-md);
+}
+.arcapp .signin-page-brand{ display:flex; align-items:center; gap:12px; }
+.arcapp .signin-page-divider{
   display:flex; align-items:center; gap:10px; margin:16px 0;
   font-family:var(--font-mono); font-size:10.5px; text-transform:uppercase; color:var(--text-faint);
 }
-.arcapp .signin-modal-divider::before, .arcapp .signin-modal-divider::after{
+.arcapp .signin-page-divider::before, .arcapp .signin-page-divider::after{
   content:''; flex:1; height:1px; background:var(--border);
-}
-.arcapp .auth-error-banner{
-  display:flex; justify-content:space-between; align-items:center; gap:12px;
-  padding:10px 30px; background:var(--red-tint); border-bottom:1px solid var(--red);
-  color:var(--red); font-size:13px;
-}
-.arcapp .auth-error-banner button{
-  background:none; border:none; color:inherit; cursor:pointer; font-size:16px; line-height:1; flex:0 0 auto;
 }
 
 .arcapp .drawer-header{

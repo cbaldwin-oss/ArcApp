@@ -7,19 +7,11 @@
 ALTER TABLE arcapp_workflows ENABLE ROW LEVEL SECURITY;
 ALTER TABLE arcapp_settings ENABLE ROW LEVEL SECURITY;
 
--- Any signed-in user can read app config (settings).
---
--- BUG (found 2026-09-19, NOT YET FIXED): this is `authenticated` only, no `anon` — meaning
--- anyone not signed in currently gets NOTHING back from arcapp_settings (silently, not an
--- error), which breaks Joint Pack Photos' Drive-folder/script-URL lookup, the Checklists/Issues
--- ready-status filters, and the Submittals missing-count/exempt-assets list for every
--- not-signed-in user — all of which are meant to work without signing in. Fix:
---   DROP POLICY "settings_select_authenticated" ON arcapp_settings;
---   CREATE POLICY "settings_select_public" ON arcapp_settings
---     FOR SELECT TO anon, authenticated USING (true);
--- Not applied automatically — changing a live RLS policy needs an explicit go-ahead.
-CREATE POLICY "settings_select_authenticated" ON arcapp_settings
-  FOR SELECT TO authenticated USING (true);
+-- Read is public (found missing `anon` 2026-09-19, fixed same week — was breaking Joint Pack
+-- Photos' Drive-folder/script-URL lookup, the Checklists/Issues ready-status filters, and the
+-- Submittals missing-count/exempt-assets list for every not-signed-in user).
+CREATE POLICY "settings_select_public" ON arcapp_settings
+  FOR SELECT TO anon, authenticated USING (true);
 
 -- TEMPORARY (requested 2026-09-14, widened same day): NO sign-in required at all to
 -- read/create/edit/delete Workflows — `anon` and `authenticated` both allowed. Matches the
@@ -33,27 +25,32 @@ CREATE POLICY "workflows_write_public" ON arcapp_workflows
   FOR ALL TO anon, authenticated
   USING (true)
   WITH CHECK (true);
--- Editor-restricted versions this replaced — the "arcapp_workflow_items" catalog below still
--- uses this same read-open/write-editors pattern, unchanged:
+-- Editor-restricted version this replaced — the "arcapp_workflow_items" catalog below still uses
+-- this same read-open/write-authorized pattern, unchanged:
 -- CREATE POLICY "workflows_select_authenticated" ON arcapp_workflows
 --   FOR SELECT TO authenticated USING (true);
--- CREATE POLICY "workflows_write_editors" ON arcapp_workflows
+-- CREATE POLICY "workflows_write_authorized" ON arcapp_workflows
 --   FOR ALL TO authenticated
---   USING (EXISTS (SELECT 1 FROM "STY4authorized_editors" e WHERE lower(e.email) = lower(auth.jwt() ->> 'email')))
---   WITH CHECK (EXISTS (SELECT 1 FROM "STY4authorized_editors" e WHERE lower(e.email) = lower(auth.jwt() ->> 'email')));
+--   USING (EXISTS (SELECT 1 FROM arcapp_authorized_users a WHERE lower(a.email) = lower(auth.jwt() ->> 'email')))
+--   WITH CHECK (EXISTS (SELECT 1 FROM arcapp_authorized_users a WHERE lower(a.email) = lower(auth.jwt() ->> 'email')));
 
-CREATE POLICY "settings_write_editors" ON arcapp_settings
+-- Settings specifically requires role = 'admin', not just any authorized user — "editors cannot
+-- adjust settings" (requested 2026-09-24). Was `STY4authorized_editors`-based ("*_write_editors")
+-- until the same date, when ArcApp's whole permission model moved to its own table — see
+-- arcapp_authorized_users below.
+CREATE POLICY "settings_write_admins" ON arcapp_settings
   FOR ALL TO authenticated
-  USING (EXISTS (SELECT 1 FROM "STY4authorized_editors" e WHERE lower(e.email) = lower(auth.jwt() ->> 'email')))
-  WITH CHECK (EXISTS (SELECT 1 FROM "STY4authorized_editors" e WHERE lower(e.email) = lower(auth.jwt() ->> 'email')));
+  USING (EXISTS (SELECT 1 FROM arcapp_authorized_users a WHERE lower(a.email) = lower(auth.jwt() ->> 'email') AND a.role = 'admin'))
+  WITH CHECK (EXISTS (SELECT 1 FROM arcapp_authorized_users a WHERE lower(a.email) = lower(auth.jwt() ->> 'email') AND a.role = 'admin'));
 
 
 
 -- =============================================================================
 -- ALREADY APPLIED. Read is public (`anon` included) so the New Workflow form's item
 -- checklist works with no sign-in, matching arcapp_workflows above. Writing to the catalog
--- itself (add/rename/retire an item) stays editor-only — that wasn't part of the "no sign-in"
--- request, only building workflows was.
+-- itself (add/rename/retire an item) stays authorized-only — that wasn't part of the "no sign-in"
+-- request, only building workflows was. (Any authorized user, admin or editor — the item catalog
+-- isn't Settings, so it doesn't need the narrower admin-only check that table gets.)
 -- =============================================================================
 
 ALTER TABLE arcapp_workflow_items ENABLE ROW LEVEL SECURITY;
@@ -61,10 +58,10 @@ ALTER TABLE arcapp_workflow_items ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "workflow_items_select_public" ON arcapp_workflow_items
   FOR SELECT TO anon, authenticated USING (true);
 
-CREATE POLICY "workflow_items_write_editors" ON arcapp_workflow_items
+CREATE POLICY "workflow_items_write_authorized" ON arcapp_workflow_items
   FOR ALL TO authenticated
-  USING (EXISTS (SELECT 1 FROM "STY4authorized_editors" e WHERE lower(e.email) = lower(auth.jwt() ->> 'email')))
-  WITH CHECK (EXISTS (SELECT 1 FROM "STY4authorized_editors" e WHERE lower(e.email) = lower(auth.jwt() ->> 'email')));
+  USING (EXISTS (SELECT 1 FROM arcapp_authorized_users a WHERE lower(a.email) = lower(auth.jwt() ->> 'email')))
+  WITH CHECK (EXISTS (SELECT 1 FROM arcapp_authorized_users a WHERE lower(a.email) = lower(auth.jwt() ->> 'email')));
 
 
 -- =============================================================================
@@ -125,14 +122,18 @@ CREATE POLICY "tasks_write_public" ON arcapp_tasks
 
 
 -- =============================================================================
--- NOT YET APPLIED — arcapp_authorized_users (sign-in gate). Deliberately NOT wide open like
--- the tables above — this IS the access control list.
+-- APPLIED — arcapp_authorized_users (sign-in gate + roles). Deliberately NOT wide open like the
+-- tables above — this IS the access control list, and as of 2026-09-24 it's ArcApp's ENTIRE
+-- permission model (see schema.sql for the role column and CHECK constraint).
 --
 -- Read is scoped to your OWN row only (lower(email) = your JWT's email) — the app only ever
--- needs to check "is *I* on this list", never enumerate who else is, so no anon read at all and
--- no way for a signed-in user to see the whole roster. Editors additionally get full read+write
--- (for the management UI in Settings) via the second, ALL-scoped policy — Postgres RLS ORs
--- multiple permissive policies for the same command together, so both apply at once.
+-- needs to check "is *I* on this list, and what's my role", never enumerate who else is, so no
+-- anon read at all and no way for a signed-in user to see the whole roster. Admins additionally
+-- get full read+write (for the management UI in Settings) via the second, ALL-scoped policy —
+-- Postgres RLS ORs multiple permissive policies for the same command together, so both apply at
+-- once. This is self-referential (checks THIS table to decide who can write to THIS table) rather
+-- than deferring to STY4authorized_editors — by explicit request, so ArcApp's access control has
+-- no dependency on LaunchPad's shared table at all, in either direction.
 -- =============================================================================
 
 ALTER TABLE arcapp_authorized_users ENABLE ROW LEVEL SECURITY;
@@ -141,17 +142,16 @@ CREATE POLICY "authorized_users_select_own" ON arcapp_authorized_users
   FOR SELECT TO authenticated
   USING (lower(email) = lower(auth.jwt() ->> 'email'));
 
-CREATE POLICY "authorized_users_write_editors" ON arcapp_authorized_users
+CREATE POLICY "authorized_users_write_admins" ON arcapp_authorized_users
   FOR ALL TO authenticated
-  USING (EXISTS (SELECT 1 FROM "STY4authorized_editors" e WHERE lower(e.email) = lower(auth.jwt() ->> 'email')))
-  WITH CHECK (EXISTS (SELECT 1 FROM "STY4authorized_editors" e WHERE lower(e.email) = lower(auth.jwt() ->> 'email')));
+  USING (EXISTS (SELECT 1 FROM arcapp_authorized_users a WHERE lower(a.email) = lower(auth.jwt() ->> 'email') AND a.role = 'admin'))
+  WITH CHECK (EXISTS (SELECT 1 FROM arcapp_authorized_users a WHERE lower(a.email) = lower(auth.jwt() ->> 'email') AND a.role = 'admin'));
 
 
 -- =============================================================================
--- NOT YET APPLIED — arcapp_submittals (requested 2026-09-19). Viewable without signing in
--- (matches Checklists/Issues/Joint Pack Photos — status is useful to anyone on-site), writes
--- editor-gated (matches the old STY4Submittals reviewer's canEdit gate in the UI, now enforced
--- for real instead of just client-side).
+-- APPLIED — arcapp_submittals (requested 2026-09-19). Viewable without signing in (matches
+-- Checklists/Issues/Joint Pack Photos — status is useful to anyone on-site), writes require any
+-- authorized ArcApp user (admin or editor — Submittals isn't Settings, so no admin-only check).
 -- =============================================================================
 
 ALTER TABLE arcapp_submittals ENABLE ROW LEVEL SECURITY;
@@ -159,33 +159,33 @@ ALTER TABLE arcapp_submittals ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "submittals_select_public" ON arcapp_submittals
   FOR SELECT TO anon, authenticated USING (true);
 
-CREATE POLICY "submittals_write_editors" ON arcapp_submittals
+CREATE POLICY "submittals_write_authorized" ON arcapp_submittals
   FOR ALL TO authenticated
-  USING (EXISTS (SELECT 1 FROM "STY4authorized_editors" e WHERE lower(e.email) = lower(auth.jwt() ->> 'email')))
-  WITH CHECK (EXISTS (SELECT 1 FROM "STY4authorized_editors" e WHERE lower(e.email) = lower(auth.jwt() ->> 'email')));
+  USING (EXISTS (SELECT 1 FROM arcapp_authorized_users a WHERE lower(a.email) = lower(auth.jwt() ->> 'email')))
+  WITH CHECK (EXISTS (SELECT 1 FROM arcapp_authorized_users a WHERE lower(a.email) = lower(auth.jwt() ->> 'email')));
 
 -- Storage: the "submittals" bucket (created in schema.sql) is a PUBLIC bucket, so reading an
 -- uploaded file's public URL needs no policy at all — but writes to storage.objects always need
 -- one regardless of bucket visibility, or every upload gets rejected.
-CREATE POLICY "submittals_bucket_insert_editors" ON storage.objects
+CREATE POLICY "submittals_bucket_insert_authorized" ON storage.objects
   FOR INSERT TO authenticated
   WITH CHECK (
     bucket_id = 'submittals'
-    AND EXISTS (SELECT 1 FROM "STY4authorized_editors" e WHERE lower(e.email) = lower(auth.jwt() ->> 'email'))
+    AND EXISTS (SELECT 1 FROM arcapp_authorized_users a WHERE lower(a.email) = lower(auth.jwt() ->> 'email'))
   );
 
-CREATE POLICY "submittals_bucket_update_editors" ON storage.objects
+CREATE POLICY "submittals_bucket_update_authorized" ON storage.objects
   FOR UPDATE TO authenticated
   USING (
     bucket_id = 'submittals'
-    AND EXISTS (SELECT 1 FROM "STY4authorized_editors" e WHERE lower(e.email) = lower(auth.jwt() ->> 'email'))
+    AND EXISTS (SELECT 1 FROM arcapp_authorized_users a WHERE lower(a.email) = lower(auth.jwt() ->> 'email'))
   );
 
-CREATE POLICY "submittals_bucket_delete_editors" ON storage.objects
+CREATE POLICY "submittals_bucket_delete_authorized" ON storage.objects
   FOR DELETE TO authenticated
   USING (
     bucket_id = 'submittals'
-    AND EXISTS (SELECT 1 FROM "STY4authorized_editors" e WHERE lower(e.email) = lower(auth.jwt() ->> 'email'))
+    AND EXISTS (SELECT 1 FROM arcapp_authorized_users a WHERE lower(a.email) = lower(auth.jwt() ->> 'email'))
   );
 
 

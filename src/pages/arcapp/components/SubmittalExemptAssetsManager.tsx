@@ -72,7 +72,7 @@ export default function SubmittalExemptAssetsManager({ value, canEdit, loading, 
         <Save style={{ width: 15, height: 15 }} />
         Save
       </button>
-      <div className={msg.cls}>{msg.text || (!canEdit ? 'Only authorized editors can change settings.' : '')}</div>
+      <div className={msg.cls}>{msg.text || (!canEdit ? 'Only admins can change settings.' : '')}</div>
     </div>
   )
 }

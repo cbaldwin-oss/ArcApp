@@ -44,7 +44,12 @@ export type ShellContext = {
    * Joint Pack data itself (this is the only piece of it that lives on shared shell state). */
   jointPackFolder: string
 
+  /** Any signed-in, authorized ArcApp user (admin or editor) — governs Submittals, Asset
+   * Attributes, Workflow item catalog, etc. Settings specifically requires `isAdmin` instead. */
   canEdit: boolean
+  /** From arcapp_authorized_users.role === 'admin' — the only role that can change Settings
+   * (including managing the authorized-users list itself). See src/lib/useCurrentUser.ts. */
+  isAdmin: boolean
   canManageWorkflows: boolean
 
   checklistReadyStatuses: string[]

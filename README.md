@@ -613,16 +613,44 @@ duplicate of My Tasks, so it was merged in instead).
   "Open NETA Submissions" sections still showed all rows unfiltered, and switching to "All Tasks"
   showed none of the assigned items — confirming no leakage either direction.
 
-## Sign-in — Google OAuth + an authorized-users allowlist
+## Sign-in — a full-page gate, admins vs. editors, Google OAuth
 
-Sign-in is now a real modal (`SignInModal.tsx`, replacing the old `window.prompt()` hack) with
-**Google as the primary option** and the original magic-link email as a fallback. Either way, the
-result is gated: `src/lib/useCurrentUser.ts` checks the signed-in email against a new
-`arcapp_authorized_users` table (not `STY4authorized_editors` — a deliberately separate list, since
-sign-in eligibility and edit rights are different questions) and immediately signs back out anyone
-not on it, surfacing why in a banner. Manage the list from Settings → Authorized Users
-(editor-gated); it was seeded from `STY4authorized_editors` so turning this on doesn't lock out
-everyone who currently has edit rights — prune/extend it from there.
+**As of 2026-09-24, the entire site requires signing in.** `AppShell.tsx` renders nothing else —
+no sidebar, no data, no routes, zero Supabase queries fired — until there's a real, authorized
+session; `SignInPage.tsx` (a full page, not a dismissible modal — the old `SignInModal.tsx` is
+gone) is all that's shown otherwise. This is a deliberate reversal of how the app worked before:
+several features (Tamper Seals/RTFT logging, Joint Pack Photos, Workflows, To-Do) were previously
+built to work without signing in at all, by explicit request at the time. That's no longer true for
+any of them — being on the allowlist is now required just to see the app exists.
+
+**Google is the primary sign-in option**, with the original magic-link email as a fallback. Either
+way, the result is gated: `src/lib/useCurrentUser.ts` checks the signed-in email against
+`arcapp_authorized_users` and immediately signs back out anyone not on it, surfacing why directly
+on the sign-in page (no more small dismissible banner floating over content — there's no content
+to float over now).
+
+**Two roles, both on that same table** (`arcapp_authorized_users.role`, `'admin' | 'editor'`):
+- **Admin** — can change Settings (every field there, plus the Authorized Users list itself).
+- **Editor** — can do everything else (log Tamper Seals/RTFT, manage Workflows, review Submittals,
+  reassign Checklist/Issue/NETA To-Do items, etc.) but Settings is entirely read-only for them —
+  every field shows disabled with an "Only admins can change settings." hint.
+
+Manage the roster (add/remove people, change roles) from **Settings → Authorized Users**, admin-
+only. `saveAuthorizedUser`/`getAuthorizedUsers` in `src/lib/api.ts` carry the `role` column now;
+`useCurrentUser.ts` reads it into `CurrentUser.role` at sign-in, and `AppShell.tsx` derives
+`isAdmin`/`canEdit` from that alone.
+
+**Deliberately, completely independent of LaunchPad's `STY4authorized_editors` table** — that table
+has its own separate `is_admin`/`role` columns, but they mean something different (LaunchPad's own
+edit rights) and this was built to have zero dependency on it, in either direction. This used to be
+a bigger gap than just the client-side check: several RLS write policies (`arcapp_settings`,
+`arcapp_workflow_items`, `arcapp_submittals` + its storage bucket, and `arcapp_authorized_users`
+itself) were checking `STY4authorized_editors` server-side — meaning the actual database security
+boundary disagreed with whatever the new ArcApp-only role said. All of those were migrated to check
+`arcapp_authorized_users` instead (self-referentially, in that table's own case) as part of this
+change — see `supabase/policies.sql`. `arcapp_authorized_users` was seeded with exactly one admin
+(not bulk-imported from `STY4authorized_editors` this time, to keep the roster genuinely
+ArcApp-owned) — add everyone else via the new Settings UI.
 
 **Google sign-in needs one-time setup this repo can't do for you** — `supabase.auth.signInWithOAuth({ provider: 'google' })`
 is called from the app, but nothing happens until:
@@ -650,6 +678,14 @@ http://localhost:5173/**
 
 Leave **Site URL** as LaunchPad's — it's just the fallback when a `redirectTo` isn't on the allow-
 list above, and both sign-in paths here already pass their own (`window.location.origin`).
+
+**Verified** with a faked signed-in session (real Google OAuth needs a browser flow this can't
+automate) across four scenarios: signed out entirely (only the sign-in page renders, confirmed
+zero Supabase queries fire — not just zero visible UI); signed in as an editor (full app renders,
+Settings shows the read-only hint with every field disabled); signed in as an admin (Settings
+fully editable, Authorized Users list shows and lets you change roles); signed in but not on the
+allowlist (sign-in page shown again with the "isn't authorized" message, not the app). All four
+matched exactly. A production build was also run clean after the change.
 
 ## Workflow items
 

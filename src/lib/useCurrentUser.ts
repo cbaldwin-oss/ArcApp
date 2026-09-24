@@ -1,6 +1,7 @@
 import { useEffect, useState, useCallback, useRef } from 'react'
 import type { User as SupabaseUser } from '@supabase/supabase-js'
 import { supabase } from './supabaseClient'
+import type { UserRole } from './api'
 
 export type CurrentUser = {
   id: string
@@ -9,6 +10,11 @@ export type CurrentUser = {
   lastName: string
   /** Display name — from arcapp_authorized_users if an admin set one, else Google's profile name, else the email. */
   name: string
+  /** From arcapp_authorized_users.role — 'admin' can edit Settings, 'editor' can't. Deliberately
+   * ArcApp's own concept, not shared with LaunchPad's STY4authorized_editors table (which has its
+   * own separate is_admin/role columns for a different purpose — edit rights on the CxAlloy-shared
+   * side of things). */
+  role: UserRole
 }
 
 function toRawUser(u: SupabaseUser | null): { id: string; email: string; firstName: string; lastName: string; googleName: string } | null {
@@ -63,7 +69,7 @@ export function useCurrentUser(): {
       checking.current = true
       try {
         const email = base.email.toLowerCase().trim()
-        const res = await supabase.from('arcapp_authorized_users').select('name').ilike('email', email).limit(1).maybeSingle()
+        const res = await supabase.from('arcapp_authorized_users').select('name, role').ilike('email', email).limit(1).maybeSingle()
         if (cancelled) return
         if (res.error) throw new Error(res.error.message)
         if (!res.data) {
@@ -73,14 +79,15 @@ export function useCurrentUser(): {
           await supabase.auth.signOut()
           return
         }
-        const authorizedName = (res.data as { name: string | null }).name
+        const row = res.data as { name: string | null; role: string | null }
         setAuthError(null)
         setUser({
           id: base.id,
           email: base.email,
           firstName: base.firstName,
           lastName: base.lastName,
-          name: authorizedName || base.googleName || `${base.firstName} ${base.lastName}`.trim() || base.email,
+          name: row.name || base.googleName || `${base.firstName} ${base.lastName}`.trim() || base.email,
+          role: row.role === 'admin' ? 'admin' : 'editor',
         })
         setLoading(false)
       } catch (err) {

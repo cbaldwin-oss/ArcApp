@@ -19,6 +19,7 @@ export default function SettingsPage() {
       cxAlloyLinkBaseDetected={ctx.cxAlloyLinkBaseDetected}
       cxalloyLinkBaseOverride={ctx.cxalloyLinkBaseOverride}
       canEdit={ctx.canEdit}
+      isAdmin={ctx.isAdmin}
       canManageWorkflows={ctx.canManageWorkflows}
       loading={ctx.settingsLoading}
       onSaveSetting={ctx.onSaveSetting}

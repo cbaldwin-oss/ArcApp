@@ -27,7 +27,7 @@ import type { Team, TeamMember, Todo, TaskTag } from '../pages/arcapp/types'
 // (STY4dropdownoptions, STY4BackEndData, STY4authorized_editors, etc.) reads this instead of a
 // hardcoded 'STY4' literal now, so the whole file follows whichever project is currently
 // selected. Declared here (not near its original single use above cxAlloyChecklistUrl/
-// cxAlloyIssueUrl) since checkEditor() and the dropdown-options functions below need it too.
+// cxAlloyIssueUrl) since the dropdown-options functions below need it too.
 const CXALLOY_TABLE_PREFIX: string = CURRENT_PROJECT
 
 // ---------------------------------------------------------------------------
@@ -57,37 +57,11 @@ function unwrap<T>(res: { data: T | null; error: { message: string } | null }): 
   return res.data as T
 }
 
-// ---------------------------------------------------------------------------
-// checkEditor — mirrors backend/rno04/checkEditor.ts
-// ---------------------------------------------------------------------------
-
-export type EditorPermission = {
-  email: string | null
-  isAuthorized: boolean
-  role: string | null
-  company: string | null
-}
-
-async function checkEditor(): Promise<EditorPermission> {
-  const email = (await getCurrentUserEmail()).toLowerCase().trim()
-  if (!email) return { email: null, isAuthorized: false, role: null, company: null }
-
-  const res = await supabase
-    .from(`${CXALLOY_TABLE_PREFIX}authorized_editors`)
-    .select('is_admin, company, role')
-    .ilike('email', email)
-    .limit(1)
-    .maybeSingle()
-
-  if (res.error) throw new Error(res.error.message)
-  const row = res.data as { is_admin: boolean | null; company: string | null; role: string | null } | null
-  if (!row) return { email, isAuthorized: false, role: null, company: null }
-  const role = row.role || (row.is_admin ? 'admin' : 'editor')
-  return { email, isAuthorized: true, role, company: row.company }
-}
-export function useCheckEditor() {
-  return useApiFn(checkEditor)
-}
+// checkEditor (mirrored backend/rno04/checkEditor.ts, checked email against
+// `${CXALLOY_TABLE_PREFIX}authorized_editors` — LaunchPad's shared edit-rights table) was removed
+// 2026-09-24: canEdit/isAdmin now come entirely from arcapp_authorized_users (see
+// src/lib/useCurrentUser.ts and AppShell.tsx), ArcApp's own table, by explicit request to keep
+// ArcApp's permission model independent of LaunchPad's.
 
 // ---------------------------------------------------------------------------
 // dropdown options — mirrors getActivityOptions / getAssetOptions / getResultOptions
@@ -1790,30 +1764,35 @@ export function useDeleteTask() {
 }
 
 // ---------------------------------------------------------------------------
-// authorized users — who may sign in to ArcApp at all (arcapp_authorized_users). Separate from
-// STY4authorized_editors (edit rights) by request. The actual sign-in gate (checking a freshly
-// signed-in email against this table and signing back out if absent) lives in
-// src/lib/useCurrentUser.ts, not here — this section is just the admin management CRUD, editor-
-// gated the same way as everything else in Settings.
+// authorized users — who may sign in to ArcApp at all, and whether they're an admin or editor
+// (arcapp_authorized_users). As of 2026-09-24 this table is the entire access-control model for
+// ArcApp: no `role` here means no access to the site at all (see the `!user` gate in AppShell.tsx)
+// — deliberately its own table, never STY4authorized_editors (LaunchPad's shared edit-rights
+// table, with its own separate is_admin/role columns for a different purpose). The actual sign-in
+// gate (checking a freshly signed-in email against this table and signing back out if absent)
+// lives in src/lib/useCurrentUser.ts, not here — this section is just the admin management CRUD,
+// admin-gated (not just editor-gated) since managing who can sign in and who's an admin is itself
+// an admin-only action.
 // ---------------------------------------------------------------------------
 
-export type AuthorizedUser = { id: string; email: string; name: string }
+export type UserRole = 'admin' | 'editor'
+export type AuthorizedUser = { id: string; email: string; name: string; role: UserRole }
 
 async function getAuthorizedUsers(): Promise<AuthorizedUser[]> {
-  const res = await supabase.from('arcapp_authorized_users').select('id, email, name').order('email', { ascending: true })
-  const rows = unwrap(res) as Array<{ id: string; email: string; name: string | null }>
-  return rows.map((r) => ({ id: r.id, email: r.email, name: r.name ?? '' }))
+  const res = await supabase.from('arcapp_authorized_users').select('id, email, name, role').order('email', { ascending: true })
+  const rows = unwrap(res) as Array<{ id: string; email: string; name: string | null; role: string | null }>
+  return rows.map((r) => ({ id: r.id, email: r.email, name: r.name ?? '', role: r.role === 'admin' ? 'admin' : 'editor' }))
 }
 export function useGetAuthorizedUsers() {
   return useApiFn(getAuthorizedUsers)
 }
 
-async function saveAuthorizedUser(params: { id?: string; email: string; name: string }): Promise<{ id: string }> {
+async function saveAuthorizedUser(params: { id?: string; email: string; name: string; role: UserRole }): Promise<{ id: string }> {
   const email = params.email.trim().toLowerCase()
   if (!email) throw new Error('An email is required.')
   const who = (await getCurrentUserEmail()) || 'admin'
 
-  const record = { email, name: params.name.trim(), added_by: who }
+  const record = { email, name: params.name.trim(), role: params.role, added_by: who }
   const res = params.id
     ? await supabase.from('arcapp_authorized_users').update(record).eq('id', params.id).select('id').single()
     : await supabase.from('arcapp_authorized_users').insert(record).select('id').single()

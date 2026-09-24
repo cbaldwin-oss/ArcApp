@@ -1,14 +1,17 @@
 import { useEffect, useState } from 'react'
 import { Plus, Trash2 } from 'lucide-react'
 import { useGetAuthorizedUsers, useSaveAuthorizedUser, useDeleteAuthorizedUser } from '../../../lib/api'
-import type { AuthorizedUser } from '../../../lib/api'
+import type { AuthorizedUser, UserRole } from '../../../lib/api'
 
 type Props = { canEdit: boolean }
 
 /**
- * Manages arcapp_authorized_users — the sign-in allowlist (separate from the editor list this
- * Settings page is otherwise gated by). Anyone not on this list gets signed back out immediately
- * after Google/magic-link auth succeeds — see src/lib/useCurrentUser.ts.
+ * Manages arcapp_authorized_users — ArcApp's entire access-control list: who may sign in at all,
+ * AND whether they're an admin (can change Settings) or an editor (can't). `canEdit` here is
+ * actually `isAdmin` from the caller (SettingsPanel.tsx) — managing this list is itself an
+ * admin-only action, same reasoning as why an editor can't grant themselves adminship. Anyone not
+ * on this list gets signed back out immediately after Google/magic-link auth succeeds, before ever
+ * seeing the app at all — see src/lib/useCurrentUser.ts and AppShell.tsx's `!user` gate.
  */
 export default function AuthorizedUsersManager({ canEdit }: Props) {
   const listFn = useGetAuthorizedUsers()
@@ -17,9 +20,11 @@ export default function AuthorizedUsersManager({ canEdit }: Props) {
 
   const [email, setEmail] = useState('')
   const [name, setName] = useState('')
+  const [role, setRole] = useState<UserRole>('editor')
   const [formError, setFormError] = useState('')
   const [saving, setSaving] = useState(false)
   const [deleteId, setDeleteId] = useState<string | null>(null)
+  const [roleSavingId, setRoleSavingId] = useState<string | null>(null)
 
   // RLS only lets a non-editor read their OWN row (see policies.sql) — fetching this as a
   // non-editor would just come back empty, which reads as "the list is empty" rather than "you
@@ -41,14 +46,28 @@ export default function AuthorizedUsersManager({ canEdit }: Props) {
     setSaving(true)
     setFormError('')
     try {
-      await saveFn.trigger({ email: trimmed, name: name.trim() }).result
+      await saveFn.trigger({ email: trimmed, name: name.trim(), role }).result
       setEmail('')
       setName('')
+      setRole('editor')
       void listFn.trigger()
     } catch (err) {
       setFormError('Failed to add: ' + (err instanceof Error ? err.message : String(err)))
     } finally {
       setSaving(false)
+    }
+  }
+
+  async function changeRole(u: AuthorizedUser, nextRole: UserRole) {
+    if (nextRole === u.role) return
+    setRoleSavingId(u.id)
+    try {
+      await saveFn.trigger({ id: u.id, email: u.email, name: u.name, role: nextRole }).result
+      void listFn.trigger()
+    } catch (err) {
+      window.alert('Failed to change role: ' + (err instanceof Error ? err.message : String(err)))
+    } finally {
+      setRoleSavingId(null)
     }
   }
 
@@ -69,22 +88,26 @@ export default function AuthorizedUsersManager({ canEdit }: Props) {
     <div style={{ marginTop: 26 }}>
       <p className="wf-subtitle">Authorized Users</p>
       <div className="q-hint" style={{ marginTop: 0, marginBottom: 12 }}>
-        Only these emails can sign in to ArcApp at all (Google or magic link) — separate from who
-        can edit settings/workflows. Seeded from STY4authorized_editors when this table was
-        created; prune or extend it here.
+        Only these emails can sign in to ArcApp at all (Google or magic link) — this list, and each
+        person's role here, is the entire access-control model for the site now. <b style={{ color: 'var(--text)' }}>Admin</b> can
+        change Settings (including this list); <b style={{ color: 'var(--text)' }}>Editor</b> can do everything else but not that.
       </div>
 
       {!canEdit && (
         <div className="q-hint">
-          Sign in as an authorized editor to view or manage this list — it&apos;s not readable
-          otherwise, by design.
+          Sign in as an admin to view or manage this list — it&apos;s not readable otherwise, by
+          design.
         </div>
       )}
 
       {canEdit && (
-        <div className="seal-row3" style={{ gridTemplateColumns: '1.3fr 1fr auto', marginBottom: 8 }}>
+        <div className="seal-row3" style={{ gridTemplateColumns: '1.1fr 1fr auto auto', marginBottom: 8 }}>
           <input type="email" placeholder="email@company.com" value={email} onChange={(e) => setEmail(e.target.value)} />
           <input type="text" placeholder="Name (optional)" value={name} onChange={(e) => setName(e.target.value)} />
+          <select value={role} onChange={(e) => setRole(e.target.value as UserRole)}>
+            <option value="editor">Editor</option>
+            <option value="admin">Admin</option>
+          </select>
           <button
             className="seal-add-btn"
             style={{ width: 'auto', margin: 0, padding: '0 16px', display: 'flex', alignItems: 'center', gap: 6 }}
@@ -118,6 +141,21 @@ export default function AuthorizedUsersManager({ canEdit }: Props) {
                   {u.email}
                   {u.name ? <span className="q-hint" style={{ margin: '0 0 0 8px' }}>{u.name}</span> : null}
                 </span>
+                {canEdit ? (
+                  <select
+                    value={u.role}
+                    disabled={roleSavingId === u.id}
+                    onChange={(e) => void changeRole(u, e.target.value as UserRole)}
+                    style={{ marginRight: 8 }}
+                  >
+                    <option value="editor">Editor</option>
+                    <option value="admin">Admin</option>
+                  </select>
+                ) : (
+                  <span className="tag norm" style={{ marginRight: 8 }}>
+                    {u.role === 'admin' ? 'Admin' : 'Editor'}
+                  </span>
+                )}
                 {canEdit &&
                   (deleteId === u.id ? (
                     <div className="wf-confirm">

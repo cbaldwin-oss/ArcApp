@@ -112,33 +112,39 @@ SELECT * FROM (VALUES
 WHERE NOT EXISTS (SELECT 1 FROM arcapp_tasks);
 
 -- ---------------------------------------------------------------------------
--- NOT YET APPLIED — arcapp_authorized_users (requested 2026-09-18).
+-- APPLIED — arcapp_authorized_users (requested 2026-09-18; role column + full site gate added
+-- 2026-09-24).
 --
--- A dedicated, separate allowlist for who may actually SIGN IN to ArcApp at all — deliberately
--- not the same table as STY4authorized_editors (which governs edit rights and is shared with
--- other apps). Someone can be an authorized_user without being an editor, or vice versa.
+-- ArcApp's entire access-control model: who may sign in at all, and whether they're an admin
+-- (can change Settings, including this table) or an editor (can't) — deliberately NEVER
+-- STY4authorized_editors (LaunchPad's shared edit-rights table, with its own separate is_admin/
+-- role columns for a different purpose), by explicit request to keep ArcApp's permission system
+-- independent of it. Someone can be an ArcApp admin without being an editor on the LaunchPad side,
+-- or vice versa — the two are unrelated on purpose.
 --
 -- The sign-in gate itself lives in src/lib/useCurrentUser.ts: after any successful auth (Google
 -- or magic-link), it checks the signed-in email against this table and immediately signs back out
--- anyone not on it.
+-- anyone not on it. AppShell.tsx renders NOTHING else (no sidebar, no data fetches) until that
+-- check resolves to a real user — see its `!user` gate and SignInPage.tsx.
 -- ---------------------------------------------------------------------------
 
 CREATE TABLE IF NOT EXISTS arcapp_authorized_users (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   email text NOT NULL UNIQUE,
   name text NOT NULL DEFAULT '',
+  role text NOT NULL DEFAULT 'editor' CHECK (role IN ('admin', 'editor')),
   created_at timestamptz NOT NULL DEFAULT now(),
   added_by text
 );
 
--- Seed from STY4authorized_editors so turning this gate on doesn't lock out everyone who
--- currently has edit rights — review/prune the list from Settings afterward. ON CONFLICT DO
--- NOTHING makes this safe to re-run.
-INSERT INTO arcapp_authorized_users (email, added_by)
-SELECT DISTINCT lower(email), 'migration (seeded from STY4authorized_editors)'
-FROM "STY4authorized_editors"
-WHERE email IS NOT NULL AND email <> ''
-ON CONFLICT (email) DO NOTHING;
+-- Seed exactly one admin so someone can actually sign in and add everyone else via Settings —
+-- deliberately NOT bulk-seeded from STY4authorized_editors this time (that table seeded the
+-- allowlist itself back on 2026-09-18, before this table had a role column or the site required
+-- sign-in at all; re-running that seed now would import ~20 LaunchPad-side identities into what's
+-- meant to be a clean, independent ArcApp roster). ON CONFLICT keeps this safe to re-run.
+INSERT INTO arcapp_authorized_users (email, name, role, added_by)
+VALUES ('cbaldwin@criticalarccx.com', 'C Baldwin', 'admin', 'migration (initial admin, 2026-09-24)')
+ON CONFLICT (email) DO UPDATE SET role = 'admin';
 
 -- ---------------------------------------------------------------------------
 -- NOT YET APPLIED — arcapp_submittals (requested 2026-09-19).
