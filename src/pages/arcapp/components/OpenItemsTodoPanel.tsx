@@ -209,8 +209,8 @@ function OpenItemsSection({
         <div className="panel-body">
           {configuredEmpty && (
             <div className="q-hint">
-              No statuses configured yet — pick which raw CxAlloy statuses count as &quot;still open&quot; in Settings before
-              anything shows here.
+              Every known CxAlloy status is currently marked &quot;ready&quot;/&quot;for review&quot; in Settings, so
+              there&apos;s nothing left to count as still open.
             </div>
           )}
           {!configuredEmpty && loading && <div className="q-hint">Loading…</div>}
@@ -394,8 +394,6 @@ export function useOpenItemsData() {
   const {
     checklistTodoEnabled,
     issueTodoEnabled,
-    checklistOpenStatuses,
-    issueOpenStatuses,
     netaSubmissionsTodoEnabled,
     netaReturnedTodoEnabled,
     teams,
@@ -418,12 +416,12 @@ export function useOpenItemsData() {
   useEffect(() => {
     if (checklistTodoEnabled) void checklistsFn.trigger()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [checklistTodoEnabled, checklistOpenStatuses.join('|')])
+  }, [checklistTodoEnabled])
 
   useEffect(() => {
     if (issueTodoEnabled) void issuesFn.trigger()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [issueTodoEnabled, issueOpenStatuses.join('|')])
+  }, [issueTodoEnabled])
 
   // Both NETA sections read the same underlying fetch (one Apps Script call returns both tabs) —
   // triggering once here means "refresh" on either section refreshes both, which matches reality
@@ -495,8 +493,6 @@ export function useOpenItemsData() {
   return {
     checklistTodoEnabled,
     issueTodoEnabled,
-    checklistOpenStatuses,
-    issueOpenStatuses,
     netaSubmissionsOn,
     netaReturnedOn,
     checklistsFn,
@@ -527,8 +523,6 @@ export default function OpenItemsTodoPanel({ data, teams }: { data: OpenItemsDat
   const {
     checklistTodoEnabled,
     issueTodoEnabled,
-    checklistOpenStatuses,
-    issueOpenStatuses,
     netaSubmissionsOn,
     netaReturnedOn,
     checklistsFn,
@@ -557,7 +551,7 @@ export default function OpenItemsTodoPanel({ data, teams }: { data: OpenItemsDat
           loading={checklistsFn.loading}
           error={checklistsFn.error ?? ''}
           onRetry={() => void checklistsFn.trigger()}
-          configuredEmpty={!checklistOpenStatuses.length}
+          configuredEmpty={!!checklistsFn.data && checklistsFn.data.openStatuses.length === 0}
           assignmentsByItemId={checklistAssignments}
           teams={teams}
           onAssign={onAssign}
@@ -571,7 +565,7 @@ export default function OpenItemsTodoPanel({ data, teams }: { data: OpenItemsDat
           loading={issuesFn.loading}
           error={issuesFn.error ?? ''}
           onRetry={() => void issuesFn.trigger()}
-          configuredEmpty={!issueOpenStatuses.length}
+          configuredEmpty={!!issuesFn.data && issuesFn.data.openStatuses.length === 0}
           assignmentsByItemId={issueAssignments}
           teams={teams}
           onAssign={onAssign}

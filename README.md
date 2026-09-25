@@ -515,11 +515,12 @@ Still-open Checklists/Issues (read-only CxAlloy sheet data) now show up on the T
 own assignable sections, instead of only being manually copied into a task by hand.
 
 - **Two independent toggles in Settings** (`checklist_todo_enabled`/`issue_todo_enabled`) turn on
-  an "Open Checklists"/"Open Issues" section on the To-Do page. Each has its own status picker
-  (`checklist_open_statuses`/`issue_open_statuses`, pulled live from the CxAlloy Settings tab, same
-  picker component as Checklist Ready/Issues for Review above) — deliberately a **separate** status
-  list from those, since "still open" and "ready for review" are opposite framings of the same
-  data. Nothing shows on the To-Do page until at least one status is checked.
+  an "Open Checklists"/"Open Issues" section on the To-Do page. There's no separate status picker
+  for "still open" (there used to be — removed 2026-09-24 as a genuine duplicate, since "ready for
+  review" and "still open" are opposite ends of the exact same status list): "still open" is
+  derived as every live CxAlloy status NOT checked in Checklist Ready / Issues for Review, computed
+  client-side in `getOpenChecklists`/`getOpenIssues` (`src/lib/api.ts`). Nothing shows on the To-Do
+  page only in the edge case where literally every known status is marked ready/for-review.
 - Each section header shows a live count and is collapsed by default; expanding it lists every
   matching instance with a link back to CxAlloy, its asset/type/discipline, its raw status, and
   (for context only) whatever CxAlloy itself already has in its own free-text `assigned_name`

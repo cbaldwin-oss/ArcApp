@@ -133,8 +133,6 @@ export default function AppShell() {
         submittalExemptAssets?: string[]
         checklistTodoEnabled?: boolean
         issueTodoEnabled?: boolean
-        checklistOpenStatuses?: string[]
-        issueOpenStatuses?: string[]
         netaSubmissionsTodoEnabled?: boolean
         netaReturnedTodoEnabled?: boolean
         cxalloyLinkBaseOverride?: string
@@ -146,8 +144,6 @@ export default function AppShell() {
   const submittalExemptAssets = settingsData?.submittalExemptAssets ?? []
   const checklistTodoEnabled = settingsData?.checklistTodoEnabled ?? false
   const issueTodoEnabled = settingsData?.issueTodoEnabled ?? false
-  const checklistOpenStatuses = settingsData?.checklistOpenStatuses ?? []
-  const issueOpenStatuses = settingsData?.issueOpenStatuses ?? []
   const netaSubmissionsTodoEnabled = settingsData?.netaSubmissionsTodoEnabled ?? false
   const netaReturnedTodoEnabled = settingsData?.netaReturnedTodoEnabled ?? false
   const cxalloyLinkBaseOverride = settingsData?.cxalloyLinkBaseOverride ?? ''
@@ -322,8 +318,6 @@ export default function AppShell() {
     submittalExemptAssets,
     checklistTodoEnabled,
     issueTodoEnabled,
-    checklistOpenStatuses,
-    issueOpenStatuses,
     netaSubmissionsTodoEnabled,
     netaReturnedTodoEnabled,
     cxAlloyLinkBase,

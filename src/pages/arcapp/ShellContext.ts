@@ -57,8 +57,6 @@ export type ShellContext = {
   submittalExemptAssets: string[]
   checklistTodoEnabled: boolean
   issueTodoEnabled: boolean
-  checklistOpenStatuses: string[]
-  issueOpenStatuses: string[]
   netaSubmissionsTodoEnabled: boolean
   netaReturnedTodoEnabled: boolean
   /** Effective CxAlloy domain+project id for building checklist/issue deep links — the Settings

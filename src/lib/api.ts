@@ -289,13 +289,16 @@ export function useGetChecklists() {
   return useApiFn(getChecklists)
 }
 
-// Same sheet/action, filtered by a separate "open" status list (Settings → Checklist To-Do) —
-// distinct from checklistReadyStatuses above, which means "ready for CxA review", not "still
-// outstanding". Returns nothing (no request at all) until that list is configured, since the
-// Apps Script needs an explicit status filter — see fetchCxAlloySheet's header comment on why
+// Same sheet/action, filtered by "still open" — everything in the live CxAlloy status vocabulary
+// that ISN'T in checklistReadyStatuses (Settings → Checklist Ready). Ready and open are opposite
+// ends of the same status list by construction, so there's no separate "open" list to configure —
+// picking Ready statuses in Settings is enough to define both. Returns nothing (no request at all)
+// if that leaves zero open statuses (e.g. every known status is marked Ready), since the Apps
+// Script needs an explicit status filter — see fetchCxAlloySheet's header comment on why
 // Checklists/Issues never fetch unfiltered (15-20k+ rows each).
 async function getOpenChecklists(): Promise<{ rows: ChecklistRow[]; openStatuses: string[] }> {
-  const { checklistOpenStatuses: openStatuses } = await getSettings()
+  const [{ checklistReadyStatuses: readyStatuses }, { checklistStatuses: allStatuses }] = await Promise.all([getSettings(), getCxAlloySettingsSheet()])
+  const openStatuses = allStatuses.filter((s) => !readyStatuses.includes(s))
   if (!openStatuses.length) return { rows: [], openStatuses }
   const raw = await fetchCxAlloySheet('getChecklists', { status: openStatuses.join(',') })
   return { rows: mapChecklistRows(raw), openStatuses }
@@ -343,10 +346,11 @@ export function useGetIssues() {
   return useApiFn(getIssues)
 }
 
-// Same idea as getOpenChecklists above — a separate "open" status list (Settings → Issues
-// To-Do), distinct from issueReviewStatuses ("ready for review").
+// Same idea as getOpenChecklists above — "still open" is everything NOT in issueReviewStatuses
+// (Settings → Issues for Review), not a separately configured list.
 async function getOpenIssues(): Promise<{ rows: IssueRow[]; openStatuses: string[] }> {
-  const { issueOpenStatuses: openStatuses } = await getSettings()
+  const [{ issueReviewStatuses: reviewStatuses }, { issueStatuses: allStatuses }] = await Promise.all([getSettings(), getCxAlloySettingsSheet()])
+  const openStatuses = allStatuses.filter((s) => !reviewStatuses.includes(s))
   if (!openStatuses.length) return { rows: [], openStatuses }
   const raw = await fetchCxAlloySheet('getIssues', { status: openStatuses.join(',') })
   return { rows: mapIssueRows(raw), openStatuses }
@@ -1099,13 +1103,11 @@ export type AppSettings = {
   /** Assets marked "not reviewable" — excluded entirely from the Submittals page's missing-
    * coverage count (they'll never need a submittal, so they shouldn't count against the total). */
   submittalExemptAssets: string[]
-  /** Checklist/Issue To-Do (see arcapp_item_assignments) — off by default, and the open-status
-   * pickers default to empty so nothing shows until an editor explicitly configures which raw
-   * CxAlloy statuses should count as "still open" for assignment purposes. */
+  /** Checklist/Issue To-Do (see arcapp_item_assignments) — off by default. "Still open" isn't a
+   * separately configured list: it's derived as every live CxAlloy status NOT in
+   * checklistReadyStatuses/issueReviewStatuses above (see getOpenChecklists/getOpenIssues). */
   checklistTodoEnabled: boolean
   issueTodoEnabled: boolean
-  checklistOpenStatuses: string[]
-  issueOpenStatuses: string[]
   /** NETA Tracker To-Do — same assignment mechanism as Checklist/Issue To-Do, but "still open"
    * isn't a configurable status list here: it's the same fixed not-yet-completed definition the
    * NETA Tracker page itself uses (Submissions: not yet Submitted to Google; Returned Files: not
@@ -1123,8 +1125,6 @@ const SETTINGS_DEFAULTS = {
   checklistReadyStatuses: ['Finished'],
   issueReviewStatuses: ['Pending Verification'],
   submittalExemptAssets: [] as string[],
-  checklistOpenStatuses: [] as string[],
-  issueOpenStatuses: [] as string[],
 }
 function splitCsv(v: string | undefined, fallback: string[]): string[] {
   if (v === undefined || v === null) return fallback
@@ -1142,8 +1142,6 @@ async function getSettings(): Promise<AppSettings> {
     submittalExemptAssets: splitCsv(map.get('submittal_exempt_assets'), SETTINGS_DEFAULTS.submittalExemptAssets),
     checklistTodoEnabled: map.get('checklist_todo_enabled') === 'true',
     issueTodoEnabled: map.get('issue_todo_enabled') === 'true',
-    checklistOpenStatuses: splitCsv(map.get('checklist_open_statuses'), SETTINGS_DEFAULTS.checklistOpenStatuses),
-    issueOpenStatuses: splitCsv(map.get('issue_open_statuses'), SETTINGS_DEFAULTS.issueOpenStatuses),
     netaSubmissionsTodoEnabled: map.get('neta_submissions_todo_enabled') === 'true',
     netaReturnedTodoEnabled: map.get('neta_returned_todo_enabled') === 'true',
     cxalloyLinkBaseOverride: map.get('cxalloy_link_base_override') ?? '',
@@ -1160,8 +1158,6 @@ const ALLOWED_SETTING_KEYS = new Set([
   'submittal_exempt_assets',
   'checklist_todo_enabled',
   'issue_todo_enabled',
-  'checklist_open_statuses',
-  'issue_open_statuses',
   'neta_submissions_todo_enabled',
   'neta_returned_todo_enabled',
   'cxalloy_link_base_override',

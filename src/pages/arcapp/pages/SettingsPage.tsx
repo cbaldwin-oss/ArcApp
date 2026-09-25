@@ -12,8 +12,6 @@ export default function SettingsPage() {
       submittalExemptAssets={ctx.submittalExemptAssets}
       checklistTodoEnabled={ctx.checklistTodoEnabled}
       issueTodoEnabled={ctx.issueTodoEnabled}
-      checklistOpenStatuses={ctx.checklistOpenStatuses}
-      issueOpenStatuses={ctx.issueOpenStatuses}
       netaSubmissionsTodoEnabled={ctx.netaSubmissionsTodoEnabled}
       netaReturnedTodoEnabled={ctx.netaReturnedTodoEnabled}
       cxAlloyLinkBaseDetected={ctx.cxAlloyLinkBaseDetected}

@@ -13,8 +13,6 @@ type Props = {
   submittalExemptAssets: string[]
   checklistTodoEnabled: boolean
   issueTodoEnabled: boolean
-  checklistOpenStatuses: string[]
-  issueOpenStatuses: string[]
   netaSubmissionsTodoEnabled: boolean
   netaReturnedTodoEnabled: boolean
   cxAlloyLinkBaseDetected: { domain: string; projectId: string } | null
@@ -155,8 +153,6 @@ export default function SettingsPanel({
   submittalExemptAssets,
   checklistTodoEnabled,
   issueTodoEnabled,
-  checklistOpenStatuses,
-  issueOpenStatuses,
   netaSubmissionsTodoEnabled,
   netaReturnedTodoEnabled,
   cxAlloyLinkBaseDetected,
@@ -205,7 +201,7 @@ export default function SettingsPanel({
         />
         <CxAlloyStatusPicker
           label="Checklist Ready — status(es) that count as ready for CxA review"
-          hint="Pulled live from the CxAlloy Settings tab (STY4A API Database). Checked statuses show up on the Checklists page."
+          hint="Pulled live from the CxAlloy Settings tab (STY4A API Database). Checked statuses show up on the Checklists page. Also defines Checklist To-Do below: any status NOT checked here counts as still open."
           column="checklistStatuses"
           value={checklistReadyStatuses}
           canEdit={isAdmin}
@@ -214,7 +210,7 @@ export default function SettingsPanel({
         />
         <CxAlloyStatusPicker
           label="Issues for Review — status(es) that count as ready for review"
-          hint="Pulled live from the CxAlloy Settings tab (STY4A API Database). Checked statuses show up on the Issues page."
+          hint="Pulled live from the CxAlloy Settings tab (STY4A API Database). Checked statuses show up on the Issues page. Also defines Issues To-Do below: any status NOT checked here counts as still open."
           column="issueStatuses"
           value={issueReviewStatuses}
           canEdit={isAdmin}
@@ -229,7 +225,8 @@ export default function SettingsPanel({
           <div className="q-hint" style={{ marginBottom: 12 }}>
             Surfaces still-open Checklists/Issues on the To-Do page as assignable instances — each
             can be handed to a team or a specific person, individually or via multi-select, same as
-            a regular task.
+            a regular task. "Still open" isn't configured separately here — it's whatever's NOT
+            checked in Checklist Ready / Issues for Review above.
           </div>
           <ToggleField
             label="Checklist To-Do"
@@ -239,15 +236,6 @@ export default function SettingsPanel({
             loading={loading}
             onSave={(v) => onSaveSetting('checklist_todo_enabled', v ? 'true' : '')}
           />
-          <CxAlloyStatusPicker
-            label="Checklist To-Do — status(es) that count as still open"
-            hint="Pulled live from the CxAlloy Settings tab. Different from Checklist Ready above — this is 'still outstanding', not 'ready for CxA review'. Nothing shows on the To-Do page until at least one status is checked here."
-            column="checklistStatuses"
-            value={checklistOpenStatuses}
-            canEdit={isAdmin}
-            loading={loading}
-            onSave={(values) => onSaveSetting('checklist_open_statuses', values.join(', '))}
-          />
           <ToggleField
             label="Issues To-Do"
             hint="Shows an Open Issues section on the To-Do page."
@@ -255,15 +243,6 @@ export default function SettingsPanel({
             canEdit={isAdmin}
             loading={loading}
             onSave={(v) => onSaveSetting('issue_todo_enabled', v ? 'true' : '')}
-          />
-          <CxAlloyStatusPicker
-            label="Issues To-Do — status(es) that count as still open"
-            hint="Pulled live from the CxAlloy Settings tab. Different from Issues for Review above — this is 'still outstanding', not 'ready for review'. Nothing shows on the To-Do page until at least one status is checked here."
-            column="issueStatuses"
-            value={issueOpenStatuses}
-            canEdit={isAdmin}
-            loading={loading}
-            onSave={(values) => onSaveSetting('issue_open_statuses', values.join(', '))}
           />
         </div>
 
