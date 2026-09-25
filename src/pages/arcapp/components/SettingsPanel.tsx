@@ -4,7 +4,10 @@ import WorkflowsBuilder from './WorkflowsBuilder'
 import CxAlloyStatusPicker from './CxAlloyStatusPicker'
 import AuthorizedUsersManager from './AuthorizedUsersManager'
 import SubmittalExemptAssetsManager from './SubmittalExemptAssetsManager'
+import DefaultAssigneePicker from './DefaultAssigneePicker'
 import { hasCapability } from '../../../lib/project'
+import type { DefaultAssignee } from '../../../lib/api'
+import type { Team } from '../types'
 
 type Props = {
   jointPackFolder: string
@@ -15,6 +18,11 @@ type Props = {
   issueTodoEnabled: boolean
   netaSubmissionsTodoEnabled: boolean
   netaReturnedTodoEnabled: boolean
+  checklistDefaultAssignee: DefaultAssignee
+  issueDefaultAssignee: DefaultAssignee
+  netaSubmissionsDefaultAssignee: DefaultAssignee
+  netaReturnedDefaultAssignee: DefaultAssignee
+  teams: Team[]
   cxAlloyLinkBaseDetected: { domain: string; projectId: string } | null
   cxalloyLinkBaseOverride: string
   /** Broader than isAdmin — any signed-in, authorized ArcApp user. Only used here for Workflows
@@ -28,6 +36,7 @@ type Props = {
   canManageWorkflows: boolean
   loading: boolean
   onSaveSetting: (key: string, value: string) => Promise<void>
+  onSaveDefaultAssignee: (prefix: string, result: DefaultAssignee) => Promise<void>
 }
 
 function Field({
@@ -155,6 +164,11 @@ export default function SettingsPanel({
   issueTodoEnabled,
   netaSubmissionsTodoEnabled,
   netaReturnedTodoEnabled,
+  checklistDefaultAssignee,
+  issueDefaultAssignee,
+  netaSubmissionsDefaultAssignee,
+  netaReturnedDefaultAssignee,
+  teams,
   cxAlloyLinkBaseDetected,
   cxalloyLinkBaseOverride,
   canEdit,
@@ -162,6 +176,7 @@ export default function SettingsPanel({
   canManageWorkflows,
   loading,
   onSaveSetting,
+  onSaveDefaultAssignee,
 }: Props) {
   return (
     <section className="panel" id="settings">
@@ -236,6 +251,15 @@ export default function SettingsPanel({
             loading={loading}
             onSave={(v) => onSaveSetting('checklist_todo_enabled', v ? 'true' : '')}
           />
+          <DefaultAssigneePicker
+            label="Checklists — default assignee"
+            hint="When set and at least one checklist is still open, this team/person gets a single 'Checklists need to be reviewed' card in Your To-Dos — individual checklists aren't assigned to them one by one."
+            value={checklistDefaultAssignee}
+            teams={teams}
+            canEdit={isAdmin}
+            loading={loading}
+            onSave={(v) => onSaveDefaultAssignee('checklist_default_assignee', v)}
+          />
           <ToggleField
             label="Issues To-Do"
             hint="Shows an Open Issues section on the To-Do page."
@@ -243,6 +267,15 @@ export default function SettingsPanel({
             canEdit={isAdmin}
             loading={loading}
             onSave={(v) => onSaveSetting('issue_todo_enabled', v ? 'true' : '')}
+          />
+          <DefaultAssigneePicker
+            label="Issues — default assignee"
+            hint="When set and at least one issue is still open, this team/person gets a single 'Issues need to be reviewed' card in Your To-Dos — individual issues aren't assigned to them one by one."
+            value={issueDefaultAssignee}
+            teams={teams}
+            canEdit={isAdmin}
+            loading={loading}
+            onSave={(v) => onSaveDefaultAssignee('issue_default_assignee', v)}
           />
         </div>
 
@@ -265,6 +298,15 @@ export default function SettingsPanel({
               loading={loading}
               onSave={(v) => onSaveSetting('neta_submissions_todo_enabled', v ? 'true' : '')}
             />
+            <DefaultAssigneePicker
+              label="NETA Submissions — default assignee"
+              hint="When set and at least one submission is still open, this team/person gets a single 'NETA Submissions need to be reviewed' card in Your To-Dos."
+              value={netaSubmissionsDefaultAssignee}
+              teams={teams}
+              canEdit={isAdmin}
+              loading={loading}
+              onSave={(v) => onSaveDefaultAssignee('neta_submissions_default_assignee', v)}
+            />
             <ToggleField
               label="NETA Returned Files To-Do"
               hint="Shows an Open NETA Returned Files section on the To-Do page."
@@ -272,6 +314,15 @@ export default function SettingsPanel({
               canEdit={isAdmin}
               loading={loading}
               onSave={(v) => onSaveSetting('neta_returned_todo_enabled', v ? 'true' : '')}
+            />
+            <DefaultAssigneePicker
+              label="NETA Returned Files — default assignee"
+              hint="When set and at least one returned file is still open, this team/person gets a single 'NETA Returned Files need to be reviewed' card in Your To-Dos."
+              value={netaReturnedDefaultAssignee}
+              teams={teams}
+              canEdit={isAdmin}
+              loading={loading}
+              onSave={(v) => onSaveDefaultAssignee('neta_returned_default_assignee', v)}
             />
           </div>
         )}

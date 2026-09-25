@@ -4,10 +4,10 @@ import { useCurrentUser } from '../../lib/useCurrentUser'
 import { CURRENT_PROJECT } from '../../lib/project'
 import {
   useGetSchedule, useGetResultOptions, useSaveResult, useLogTamperSeals, useSubmitRtft,
-  useGetSettings, useSaveSetting, useGetWorkflows, useGetWorkflowItems, useGetCxAlloyLinkBase, parseCxAlloyLinkBase,
+  useGetSettings, useSaveSetting, useSaveDefaultAssignee, useGetWorkflows, useGetWorkflowItems, useGetCxAlloyLinkBase, parseCxAlloyLinkBase,
   useGetTasks, useSaveTask, useSetTaskDone, useDeleteTask, useGetTeams, useSaveTeam, useDeleteTeam,
 } from '../../lib/api'
-import type { TaskInput } from '../../lib/api'
+import type { TaskInput, DefaultAssignee } from '../../lib/api'
 import type { WorkflowItem } from './workflowItems'
 import type { ShellContext } from './ShellContext'
 import type { ScheduleRow, ScheduleState, ActivityAnswer, Todo, Team, TeamMember } from './types'
@@ -44,6 +44,7 @@ export default function AppShell() {
   const submitRtftFn = useSubmitRtft()
   const settingsFn = useGetSettings()
   const saveSettingFn = useSaveSetting()
+  const saveDefaultAssigneeFn = useSaveDefaultAssignee()
   const cxAlloyLinkBaseFn = useGetCxAlloyLinkBase()
   const workflowsFn = useGetWorkflows()
   const workflowItemsFn = useGetWorkflowItems()
@@ -135,6 +136,10 @@ export default function AppShell() {
         issueTodoEnabled?: boolean
         netaSubmissionsTodoEnabled?: boolean
         netaReturnedTodoEnabled?: boolean
+        checklistDefaultAssignee?: DefaultAssignee
+        issueDefaultAssignee?: DefaultAssignee
+        netaSubmissionsDefaultAssignee?: DefaultAssignee
+        netaReturnedDefaultAssignee?: DefaultAssignee
         cxalloyLinkBaseOverride?: string
       }
     | undefined
@@ -146,6 +151,10 @@ export default function AppShell() {
   const issueTodoEnabled = settingsData?.issueTodoEnabled ?? false
   const netaSubmissionsTodoEnabled = settingsData?.netaSubmissionsTodoEnabled ?? false
   const netaReturnedTodoEnabled = settingsData?.netaReturnedTodoEnabled ?? false
+  const checklistDefaultAssignee = settingsData?.checklistDefaultAssignee ?? { teamId: null, email: null, name: null }
+  const issueDefaultAssignee = settingsData?.issueDefaultAssignee ?? { teamId: null, email: null, name: null }
+  const netaSubmissionsDefaultAssignee = settingsData?.netaSubmissionsDefaultAssignee ?? { teamId: null, email: null, name: null }
+  const netaReturnedDefaultAssignee = settingsData?.netaReturnedDefaultAssignee ?? { teamId: null, email: null, name: null }
   const cxalloyLinkBaseOverride = settingsData?.cxalloyLinkBaseOverride ?? ''
   const cxAlloyLinkBaseDetected = (cxAlloyLinkBaseFn.data as { domain: string; projectId: string } | null | undefined) ?? null
   // A manual Settings override always wins over auto-detection — see getCxAlloyLinkBase in
@@ -264,6 +273,14 @@ export default function AppShell() {
     [saveSettingFn, settingsFn],
   )
 
+  const saveDefaultAssignee = useCallback(
+    async (prefix: string, result: DefaultAssignee) => {
+      await saveDefaultAssigneeFn.trigger({ prefix, ...result }).result
+      void settingsFn.trigger()
+    },
+    [saveDefaultAssigneeFn, settingsFn],
+  )
+
   const answeredIds = new Set<string | number>(
     Object.keys(answers).map((k) => {
       const match = rows.find((r) => String(r.id) === k)
@@ -320,11 +337,16 @@ export default function AppShell() {
     issueTodoEnabled,
     netaSubmissionsTodoEnabled,
     netaReturnedTodoEnabled,
+    checklistDefaultAssignee,
+    issueDefaultAssignee,
+    netaSubmissionsDefaultAssignee,
+    netaReturnedDefaultAssignee,
     cxAlloyLinkBase,
     cxAlloyLinkBaseDetected,
     cxalloyLinkBaseOverride,
     settingsLoading: settingsFn.loading,
     onSaveSetting: saveSetting,
+    onSaveDefaultAssignee: saveDefaultAssignee,
   }
 
   // Hard gate: nothing else in this component renders until there's a real, authorized session.

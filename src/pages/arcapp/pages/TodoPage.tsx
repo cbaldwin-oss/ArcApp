@@ -7,7 +7,7 @@ import type { Todo, TaskTag } from '../types'
 import { isTodoMine } from '../utils'
 import { TodoList } from '../components/TodoPanel'
 import TeamsManager from '../components/TeamsManager'
-import OpenItemsTodoPanel, { MyItemRow, useOpenItemsData } from '../components/OpenItemsTodoPanel'
+import OpenItemsTodoPanel, { MyItemRow, MySummaryCard, useOpenItemsData } from '../components/OpenItemsTodoPanel'
 
 type AssignMode = 'none' | 'team' | 'person'
 type FormState = {
@@ -51,10 +51,11 @@ export default function TodoPage() {
   const [saving, setSaving] = useState(false)
 
   const mineTodos = todos.filter((t) => isTodoMine(t, currentUserEmail, teams))
-  const mineCount = mineTodos.length + openItems.myItems.length
+  const mineCount = mineTodos.length + openItems.myItems.length + openItems.mySummaries.length
   const visible = tab === 'mine' ? mineTodos : todos
   const shownMyItems = tab === 'mine' ? openItems.myItems : []
-  const open = (tab === 'mine' ? openItems.myItems.length : 0) + visible.filter((t) => !t.done).length
+  const shownMySummaries = tab === 'mine' ? openItems.mySummaries : []
+  const open = (tab === 'mine' ? openItems.myItems.length + openItems.mySummaries.length : 0) + visible.filter((t) => !t.done).length
 
   function openNew() {
     setEditingId(null)
@@ -257,6 +258,16 @@ export default function TodoPage() {
               shown on the "My Tasks" tab — "All Tasks" stays exactly what it always was (manual
               tasks only), since every open Checklist/Issue/NETA item already has its own general,
               unfiltered home in the "Open ..." sections above. */}
+          {/* Category-level roll-up cards from Settings' per-category default assignee (e.g.
+              "Issues need to be reviewed") — not individual items, just a pointer down to the
+              matching "Open ..." section, which this expands and scrolls to on click. */}
+          {!ctx.tasksLoading && !ctx.tasksError && shownMySummaries.length > 0 && (
+            <div className="oi-rows" style={{ marginBottom: 14 }}>
+              {shownMySummaries.map((entry) => (
+                <MySummaryCard key={entry.itemType} entry={entry} onExpand={openItems.requestExpand} />
+              ))}
+            </div>
+          )}
           {!ctx.tasksLoading && !ctx.tasksError && shownMyItems.length > 0 && (
             <div className="oi-rows" style={{ marginBottom: visible.length > 0 ? 14 : 0 }}>
               {shownMyItems.map((entry) => (
@@ -264,7 +275,7 @@ export default function TodoPage() {
               ))}
             </div>
           )}
-          {!ctx.tasksLoading && !ctx.tasksError && visible.length === 0 && shownMyItems.length === 0 && (
+          {!ctx.tasksLoading && !ctx.tasksError && visible.length === 0 && shownMyItems.length === 0 && shownMySummaries.length === 0 && (
             <div className="q-hint">{tab === 'mine' ? 'Nothing assigned to you right now.' : 'No tasks yet.'}</div>
           )}
           {!ctx.tasksLoading && !ctx.tasksError && visible.length > 0 && (

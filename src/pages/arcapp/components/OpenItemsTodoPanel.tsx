@@ -10,7 +10,7 @@ import {
   useGetOpenIssues,
   useSaveItemAssignments,
 } from '../../../lib/api'
-import type { ChecklistRow, CxAlloyLinkBase, IssueRow, ItemAssignment, ItemType, NetaReturnedRow, NetaSubmissionRow } from '../../../lib/api'
+import type { ChecklistRow, CxAlloyLinkBase, DefaultAssignee, IssueRow, ItemAssignment, ItemType, NetaReturnedRow, NetaSubmissionRow } from '../../../lib/api'
 import { hasCapability } from '../../../lib/project'
 import type { ShellContext } from '../ShellContext'
 import type { Team } from '../types'
@@ -80,6 +80,12 @@ type PopoverState = { top: number; left: number; itemIds: string[]; initial?: As
  * assumes the list is to-do-sized. */
 const PAGE_SIZE = 100
 
+/** DOM id for each section — used by the "My Tasks" default-assignee summary cards to scroll to
+ * (and, via expandSignal below) auto-expand the matching section when clicked. */
+export function sectionDomId(itemType: ItemType): string {
+  return `oi-section-${itemType}`
+}
+
 function OpenItemsSection({
   title,
   itemType,
@@ -91,6 +97,7 @@ function OpenItemsSection({
   assignmentsByItemId,
   teams,
   onAssign,
+  expandSignal,
 }: {
   title: string
   itemType: ItemType
@@ -102,8 +109,17 @@ function OpenItemsSection({
   assignmentsByItemId: Map<string, ItemAssignment>
   teams: Team[]
   onAssign: (items: Array<{ itemType: ItemType; itemId: string }>, result: AssignResult) => Promise<void>
+  /** Bumped by a "My Tasks" summary card's click (see requestExpand in useOpenItemsData) to force
+   * this section open even though it's collapsed by default — an increasing number rather than a
+   * boolean so clicking it again while already expanded still registers as a fresh request. */
+  expandSignal?: number
 }) {
   const [expanded, setExpanded] = useState(false)
+
+  useEffect(() => {
+    if (expandSignal) setExpanded(true)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [expandSignal])
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [popover, setPopover] = useState<PopoverState | null>(null)
   const [busy, setBusy] = useState(false)
@@ -183,7 +199,7 @@ function OpenItemsSection({
   }
 
   return (
-    <section className="panel oi-section">
+    <section className="panel oi-section" id={sectionDomId(itemType)}>
       <div className="panel-header oi-clickable" onClick={() => setExpanded((v) => !v)}>
         <div className="panel-header-left">
           {expanded ? <ChevronDown style={{ width: 16, height: 16 }} /> : <ChevronRight style={{ width: 16, height: 16 }} />}
@@ -313,6 +329,10 @@ function OpenItemsSection({
 }
 
 export type MyItemEntry = { item: OItem; itemType: ItemType; typeLabel: string; assignment: ItemAssignment }
+/** A category-level roll-up card ("Issues need to be reviewed (12 open)") shown in "My Tasks" when
+ * that category's Settings-configured default assignee is you (or a team you're on) — see
+ * mySummaries in useOpenItemsData. Not tied to any individual item, so there's no `assignment`. */
+export type MySummaryEntry = { itemType: ItemType; title: string; count: number }
 type MyPopoverState = { top: number; left: number; itemType: ItemType; itemId: string; initial: AssignResult }
 
 /**
@@ -384,6 +404,32 @@ export function MyItemRow({ entry, teams, onAssign }: { entry: MyItemEntry; team
 }
 
 /**
+ * One category-level roll-up card ("Issues need to be reviewed · 12 open") — rendered in "My
+ * Tasks" when Settings has a default assignee configured for that category and it matches the
+ * signed-in user (or a team they're on). Unlike MyItemRow, this isn't a real, individually
+ * assignable item — clicking it just jumps to and expands the matching "Open ..." section below,
+ * where the actual items live (and can still be assigned to someone specific from there).
+ */
+export function MySummaryCard({ entry, onExpand }: { entry: MySummaryEntry; onExpand: (itemType: ItemType) => void }) {
+  function go() {
+    onExpand(entry.itemType)
+    document.getElementById(sectionDomId(entry.itemType))?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  }
+  return (
+    <div className="oi-row">
+      <div className="oi-main">
+        <button type="button" className="oi-title" style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', textAlign: 'left' }} onClick={go}>
+          {entry.title}
+        </button>
+        <div className="oi-meta">
+          <span className="tag norm">{entry.count.toLocaleString()} open</span>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+/**
  * All the data the four "Open ..." sections AND the "Assigned to You" rows inside "Your To-Dos"
  * need, fetched exactly once — TodoPage.tsx calls this and passes the result to both, so nothing
  * here gets fetched twice (an open-status pick can be thousands of rows; doubling that would be
@@ -396,10 +442,26 @@ export function useOpenItemsData() {
     issueTodoEnabled,
     netaSubmissionsTodoEnabled,
     netaReturnedTodoEnabled,
+    checklistDefaultAssignee,
+    issueDefaultAssignee,
+    netaSubmissionsDefaultAssignee,
+    netaReturnedDefaultAssignee,
     teams,
     currentUserEmail,
     cxAlloyLinkBase,
   } = ctx
+
+  // Bumped by a "My Tasks" summary card's click to force the matching "Open ..." section open
+  // (it's collapsed by default) — see sectionDomId/expandSignal on OpenItemsSection above.
+  const [expandSignals, setExpandSignals] = useState<Record<ItemType, number>>({
+    checklist: 0,
+    issue: 0,
+    neta_submission: 0,
+    neta_returned: 0,
+  })
+  function requestExpand(itemType: ItemType) {
+    setExpandSignals((prev) => ({ ...prev, [itemType]: prev[itemType] + 1 }))
+  }
   // NETA Tracker is STY4-only (see the `netaTracker` capability in src/lib/project.ts) — even
   // though the Settings toggles above are project-scoped and shouldn't stay on after a switch,
   // this is the same defense-in-depth every other NETA consumer applies.
@@ -490,6 +552,28 @@ export function useOpenItemsData() {
       ]
     : []
 
+  // Settings → per-category "default assignee" (requested 2026-09-24): a single roll-up card per
+  // category, not per-item assignment — shows only when that category's default is you (or a team
+  // you're on) AND there's at least one open item, so it disappears once the category's actually
+  // clear instead of lingering as a stale reminder.
+  const isDefaultMine = (a: DefaultAssignee) => isTodoMine({ assignedEmail: a.email, assignedTeamId: a.teamId }, currentUserEmail, teams)
+  const mySummaries: MySummaryEntry[] = currentUserEmail
+    ? [
+        ...(checklistTodoEnabled && checklistItems.length > 0 && isDefaultMine(checklistDefaultAssignee)
+          ? [{ itemType: 'checklist' as ItemType, title: 'Checklists need to be reviewed', count: checklistItems.length }]
+          : []),
+        ...(issueTodoEnabled && issueItems.length > 0 && isDefaultMine(issueDefaultAssignee)
+          ? [{ itemType: 'issue' as ItemType, title: 'Issues need to be reviewed', count: issueItems.length }]
+          : []),
+        ...(netaSubmissionsOn && netaSubmissionItems.length > 0 && isDefaultMine(netaSubmissionsDefaultAssignee)
+          ? [{ itemType: 'neta_submission' as ItemType, title: 'NETA Submissions need to be reviewed', count: netaSubmissionItems.length }]
+          : []),
+        ...(netaReturnedOn && netaReturnedItems.length > 0 && isDefaultMine(netaReturnedDefaultAssignee)
+          ? [{ itemType: 'neta_returned' as ItemType, title: 'NETA Returned Files need to be reviewed', count: netaReturnedItems.length }]
+          : []),
+      ]
+    : []
+
   return {
     checklistTodoEnabled,
     issueTodoEnabled,
@@ -507,6 +591,9 @@ export function useOpenItemsData() {
     netaSubmissionAssignments,
     netaReturnedAssignments,
     myItems,
+    mySummaries,
+    expandSignals,
+    requestExpand,
     onAssign,
   }
 }
@@ -536,6 +623,7 @@ export default function OpenItemsTodoPanel({ data, teams }: { data: OpenItemsDat
     issueAssignments,
     netaSubmissionAssignments,
     netaReturnedAssignments,
+    expandSignals,
     onAssign,
   } = data
 
@@ -555,6 +643,7 @@ export default function OpenItemsTodoPanel({ data, teams }: { data: OpenItemsDat
           assignmentsByItemId={checklistAssignments}
           teams={teams}
           onAssign={onAssign}
+          expandSignal={expandSignals.checklist}
         />
       )}
       {issueTodoEnabled && (
@@ -569,6 +658,7 @@ export default function OpenItemsTodoPanel({ data, teams }: { data: OpenItemsDat
           assignmentsByItemId={issueAssignments}
           teams={teams}
           onAssign={onAssign}
+          expandSignal={expandSignals.issue}
         />
       )}
       {netaSubmissionsOn && (
@@ -583,6 +673,7 @@ export default function OpenItemsTodoPanel({ data, teams }: { data: OpenItemsDat
           assignmentsByItemId={netaSubmissionAssignments}
           teams={teams}
           onAssign={onAssign}
+          expandSignal={expandSignals.neta_submission}
         />
       )}
       {netaReturnedOn && (
@@ -597,6 +688,7 @@ export default function OpenItemsTodoPanel({ data, teams }: { data: OpenItemsDat
           assignmentsByItemId={netaReturnedAssignments}
           teams={teams}
           onAssign={onAssign}
+          expandSignal={expandSignals.neta_returned}
         />
       )}
     </>

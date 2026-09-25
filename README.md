@@ -541,6 +541,18 @@ own assignable sections, instead of only being manually copied into a task by ha
 - `arcapp_item_assignments` is wide open (`anon` + `authenticated`, no editor check) — same
   pattern as `arcapp_tasks`/`arcapp_teams`, since this is the same assignment system extended to
   cover CxAlloy items instead of freeform tasks.
+- **Default assignee per category** (requested 2026-09-24) — a team-or-person picker in Settings
+  next to each category's toggle (`checklist_default_assignee_*`/`issue_default_assignee_*`/same
+  for both NETA categories, 3 keys each: `_team_id`/`_email`/`_name`, saved together via
+  `saveDefaultAssignee` in `src/lib/api.ts`). This is deliberately **not** the same as assigning
+  every individual open item to that team/person — with hundreds or thousands of open items in a
+  category, that would flood their My Tasks with one row per item. Instead, when the default
+  assignee matches the signed-in user (directly or via team membership) and the category has at
+  least one open item, they get a single roll-up card in "Your To-Dos" → My Tasks (e.g. "Issues
+  need to be reviewed · 12 open") — `MySummaryCard`/`mySummaries` in `OpenItemsTodoPanel.tsx`.
+  Clicking it expands and scrolls to the real "Open ..." section below, where items can still be
+  assigned to someone specific individually. The card disappears on its own once that category's
+  open count hits zero — nothing to dismiss or mark done.
 - Verified live: real CxAlloy status vocabulary (`Not Started`/`In Progress`/etc.) picked in
   Settings, ~9,400 real open checklists and ~270 real open issues loaded, search narrowing
   confirmed against real titles, pagination confirmed (100 → 200 rows on "Show more"), and the

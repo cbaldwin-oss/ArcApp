@@ -1096,6 +1096,12 @@ export function useSaveResult() {
 // settings — mirrors getSettings.ts / saveSetting.ts (now backed by Supabase, not Retool DB)
 // ---------------------------------------------------------------------------
 
+/** A team-or-person assignment target — same "at most one of team or person" shape as a task's own
+ * assignment fields (structurally identical to AssignPopover's AssignResult, so either can be
+ * passed where the other is expected without importing a UI component into this data layer). */
+export type DefaultAssignee = { teamId: string | null; email: string | null; name: string | null }
+const EMPTY_ASSIGNEE: DefaultAssignee = { teamId: null, email: null, name: null }
+
 export type AppSettings = {
   jointPackPhotosFolder: string
   checklistReadyStatuses: string[]
@@ -1114,6 +1120,14 @@ export type AppSettings = {
    * yet Uploaded to ACC), so there's no open-status picker to configure. Off by default. */
   netaSubmissionsTodoEnabled: boolean
   netaReturnedTodoEnabled: boolean
+  /** Default assignee per To-Do category (requested 2026-09-24) — when set and there's at least
+   * one open item in that category, the assigned team/person gets a single summary card in "Your
+   * To-Dos" (e.g. "Issues need to be reviewed (12 open)"), rather than every individual open item
+   * being assigned to them. Blank (no default) by default. */
+  checklistDefaultAssignee: DefaultAssignee
+  issueDefaultAssignee: DefaultAssignee
+  netaSubmissionsDefaultAssignee: DefaultAssignee
+  netaReturnedDefaultAssignee: DefaultAssignee
   /** Manual override for the auto-detected CxAlloy domain+project id (see getCxAlloyLinkBase in
    * this file) — "domain/projectId", e.g. "google.cxalloy.com/70". Blank by default; only needed
    * if auto-detection can't find one (no Equipment Tracker data synced yet for this project) or
@@ -1131,6 +1145,13 @@ function splitCsv(v: string | undefined, fallback: string[]): string[] {
   const parts = v.split(',').map((s) => s.trim()).filter(Boolean)
   return parts.length ? parts : fallback
 }
+function parseDefaultAssignee(map: Map<string, string>, prefix: string): DefaultAssignee {
+  return {
+    teamId: map.get(`${prefix}_team_id`) || null,
+    email: map.get(`${prefix}_email`) || null,
+    name: map.get(`${prefix}_name`) || null,
+  }
+}
 async function getSettings(): Promise<AppSettings> {
   const res = await supabase.from('arcapp_settings').select('setting_key, setting_value').eq('project_key', CURRENT_PROJECT)
   const rows = unwrap(res) as Array<{ setting_key: string; setting_value: string | null }>
@@ -1144,6 +1165,10 @@ async function getSettings(): Promise<AppSettings> {
     issueTodoEnabled: map.get('issue_todo_enabled') === 'true',
     netaSubmissionsTodoEnabled: map.get('neta_submissions_todo_enabled') === 'true',
     netaReturnedTodoEnabled: map.get('neta_returned_todo_enabled') === 'true',
+    checklistDefaultAssignee: parseDefaultAssignee(map, 'checklist_default_assignee'),
+    issueDefaultAssignee: parseDefaultAssignee(map, 'issue_default_assignee'),
+    netaSubmissionsDefaultAssignee: parseDefaultAssignee(map, 'neta_submissions_default_assignee'),
+    netaReturnedDefaultAssignee: parseDefaultAssignee(map, 'neta_returned_default_assignee'),
     cxalloyLinkBaseOverride: map.get('cxalloy_link_base_override') ?? '',
   }
 }
@@ -1160,6 +1185,18 @@ const ALLOWED_SETTING_KEYS = new Set([
   'issue_todo_enabled',
   'neta_submissions_todo_enabled',
   'neta_returned_todo_enabled',
+  'checklist_default_assignee_team_id',
+  'checklist_default_assignee_email',
+  'checklist_default_assignee_name',
+  'issue_default_assignee_team_id',
+  'issue_default_assignee_email',
+  'issue_default_assignee_name',
+  'neta_submissions_default_assignee_team_id',
+  'neta_submissions_default_assignee_email',
+  'neta_submissions_default_assignee_name',
+  'neta_returned_default_assignee_team_id',
+  'neta_returned_default_assignee_email',
+  'neta_returned_default_assignee_name',
   'cxalloy_link_base_override',
 ])
 async function saveSetting(params: { key: string; value: string }): Promise<{ key: string; value: string }> {
@@ -1176,6 +1213,22 @@ async function saveSetting(params: { key: string; value: string }): Promise<{ ke
 }
 export function useSaveSetting() {
   return useApiFn(saveSetting)
+}
+
+/** Saves all three fields of a default-assignee setting (Settings → per-category "default
+ * assignee") in one call, so the picker component doesn't have to sequence three separate
+ * onSaveSetting calls itself. `prefix` is the setting-key prefix, e.g. "checklist_default_assignee". */
+async function saveDefaultAssignee(params: { prefix: string } & DefaultAssignee): Promise<DefaultAssignee> {
+  const { prefix, teamId, email, name } = params
+  await Promise.all([
+    saveSetting({ key: `${prefix}_team_id`, value: teamId ?? '' }),
+    saveSetting({ key: `${prefix}_email`, value: email ?? '' }),
+    saveSetting({ key: `${prefix}_name`, value: name ?? '' }),
+  ])
+  return teamId || email || name ? { teamId, email, name } : EMPTY_ASSIGNEE
+}
+export function useSaveDefaultAssignee() {
+  return useApiFn(saveDefaultAssignee)
 }
 
 // ---------------------------------------------------------------------------

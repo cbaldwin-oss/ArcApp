@@ -1,5 +1,5 @@
 import type { ScheduleRow, ScheduleState, Team, TeamMember, Todo } from './types'
-import type { CxAlloyLinkBase, TaskInput } from '../../lib/api'
+import type { CxAlloyLinkBase, DefaultAssignee, TaskInput } from '../../lib/api'
 
 /**
  * Passed down via react-router's <Outlet context={...}> from AppShell to whichever page is
@@ -59,6 +59,12 @@ export type ShellContext = {
   issueTodoEnabled: boolean
   netaSubmissionsTodoEnabled: boolean
   netaReturnedTodoEnabled: boolean
+  /** Default assignee per To-Do category — see AppSettings in api.ts for the summary-card
+   * behavior this drives. Blank (all-null) when no default is set for that category. */
+  checklistDefaultAssignee: DefaultAssignee
+  issueDefaultAssignee: DefaultAssignee
+  netaSubmissionsDefaultAssignee: DefaultAssignee
+  netaReturnedDefaultAssignee: DefaultAssignee
   /** Effective CxAlloy domain+project id for building checklist/issue deep links — the Settings
    * override if one's set, else whatever was auto-detected from this project's Equipment Tracker
    * data. Null while still loading, or if neither is available yet (checklist/issue rows without
@@ -70,4 +76,5 @@ export type ShellContext = {
   cxalloyLinkBaseOverride: string
   settingsLoading: boolean
   onSaveSetting: (key: string, value: string) => Promise<void>
+  onSaveDefaultAssignee: (prefix: string, result: DefaultAssignee) => Promise<void>
 }

@@ -14,6 +14,11 @@ export default function SettingsPage() {
       issueTodoEnabled={ctx.issueTodoEnabled}
       netaSubmissionsTodoEnabled={ctx.netaSubmissionsTodoEnabled}
       netaReturnedTodoEnabled={ctx.netaReturnedTodoEnabled}
+      checklistDefaultAssignee={ctx.checklistDefaultAssignee}
+      issueDefaultAssignee={ctx.issueDefaultAssignee}
+      netaSubmissionsDefaultAssignee={ctx.netaSubmissionsDefaultAssignee}
+      netaReturnedDefaultAssignee={ctx.netaReturnedDefaultAssignee}
+      teams={ctx.teams}
       cxAlloyLinkBaseDetected={ctx.cxAlloyLinkBaseDetected}
       cxalloyLinkBaseOverride={ctx.cxalloyLinkBaseOverride}
       canEdit={ctx.canEdit}
@@ -21,6 +26,7 @@ export default function SettingsPage() {
       canManageWorkflows={ctx.canManageWorkflows}
       loading={ctx.settingsLoading}
       onSaveSetting={ctx.onSaveSetting}
+      onSaveDefaultAssignee={ctx.onSaveDefaultAssignee}
     />
   )
 }
