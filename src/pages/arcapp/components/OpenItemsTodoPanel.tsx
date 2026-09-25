@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useState } from 'react'
-import { ChevronDown, ChevronRight, RefreshCw } from 'lucide-react'
 import {
   cxAlloyChecklistUrl,
   cxAlloyIssueUrl,
+  useGetChecklists,
+  useGetIssues,
   useGetItemAssignments,
   useGetNetaTrackerData,
   useGetOpenChecklists,
@@ -72,274 +73,35 @@ function netaReturnedToItem(r: NetaReturnedRow): OItem {
   }
 }
 
-type PopoverState = { top: number; left: number; itemIds: string[]; initial?: AssignResult }
-
-/** How many rows render at a time before "Show more" — an open-status pick can realistically
- * match thousands of rows (a whole project's worth of "Not Started" checklists), so nothing here
- * assumes the list is to-do-sized. */
-const PAGE_SIZE = 100
-
-/** DOM id for each section — used by the "My Tasks" default-assignee summary cards to scroll to
- * (and, via expandSignal below) auto-expand the matching section when clicked. */
-export function sectionDomId(itemType: ItemType): string {
-  return `oi-section-${itemType}`
-}
-
-function OpenItemsSection({
-  title,
-  itemType,
-  items,
-  loading,
-  error,
-  onRetry,
-  configuredEmpty,
-  assignmentsByItemId,
-  teams,
-  onAssign,
-  expandSignal,
-}: {
-  title: string
-  itemType: ItemType
-  items: OItem[]
-  loading: boolean
-  error: string
-  onRetry: () => void
-  configuredEmpty: boolean
-  assignmentsByItemId: Map<string, ItemAssignment>
-  teams: Team[]
-  onAssign: (items: Array<{ itemType: ItemType; itemId: string }>, result: AssignResult) => Promise<void>
-  /** Bumped by a "My Tasks" summary card's click (see requestExpand in useOpenItemsData) to force
-   * this section open even though it's collapsed by default — an increasing number rather than a
-   * boolean so clicking it again while already expanded still registers as a fresh request. */
-  expandSignal?: number
-}) {
-  const [expanded, setExpanded] = useState(false)
-
-  useEffect(() => {
-    if (expandSignal) setExpanded(true)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [expandSignal])
-  const [selected, setSelected] = useState<Set<string>>(new Set())
-  const [popover, setPopover] = useState<PopoverState | null>(null)
-  const [busy, setBusy] = useState(false)
-  const [search, setSearch] = useState('')
-  const [unassignedOnly, setUnassignedOnly] = useState(false)
-  const [visibleCount, setVisibleCount] = useState(PAGE_SIZE)
-
-  // A real open-status pick can easily match several thousand rows (e.g. "Not Started" across a
-  // whole project) — filtering narrows what actually renders, and pagination caps the DOM cost of
-  // whatever's left after that instead of mounting every row at once.
-  const filtered = useMemo(() => {
-    const q = search.trim().toLowerCase()
-    return items.filter((item) => {
-      if (unassignedOnly && assignmentsByItemId.has(item.id)) return false
-      if (!q) return true
-      return (
-        item.title.toLowerCase().includes(q) ||
-        item.subtitle.toLowerCase().includes(q) ||
-        item.status.toLowerCase().includes(q) ||
-        item.cxAssignedName.toLowerCase().includes(q)
-      )
-    })
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [items, search, unassignedOnly, assignmentsByItemId])
-
-  useEffect(() => {
-    setVisibleCount(PAGE_SIZE)
-  }, [search, unassignedOnly])
-
-  const displayed = filtered.slice(0, visibleCount)
-  // "Select all" operates on the full filtered set, not just the currently-rendered page — so
-  // e.g. every "Not Started" checklist matching a search can be bulk-assigned in one go without
-  // having to page through and select them all by hand.
-  const allSelected = filtered.length > 0 && filtered.every((i) => selected.has(i.id))
-
-  function toggleAll(checked: boolean) {
-    setSelected(checked ? new Set(filtered.map((i) => i.id)) : new Set())
+/** Where a default-assignee summary card's click should take you — the dedicated page that
+ * already lists the real items (Checklists/Issues ready-for-review pages, NETA Tracker), since
+ * there's no inline "Open ..." list on the To-Do page to expand into anymore. */
+export function todoSummaryRoute(itemType: ItemType): string {
+  switch (itemType) {
+    case 'checklist':
+      return '/checklists'
+    case 'issue':
+      return '/issues'
+    case 'neta_submission':
+    case 'neta_returned':
+      return '/netatracker'
   }
-  function toggleOne(id: string, checked: boolean) {
-    setSelected((prev) => {
-      const next = new Set(prev)
-      if (checked) next.add(id)
-      else next.delete(id)
-      return next
-    })
-  }
-
-  function openBulkAssign(e: React.MouseEvent) {
-    if (!selected.size) return
-    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect()
-    setPopover({ top: rect.bottom + 6, left: rect.left, itemIds: Array.from(selected) })
-  }
-  function openRowAssign(e: React.MouseEvent, id: string) {
-    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect()
-    const a = assignmentsByItemId.get(id)
-    const initial: AssignResult | undefined = a ? { teamId: a.assignedTeamId, email: a.assignedEmail, name: a.assignedName } : undefined
-    let left = rect.left
-    if (left + 260 > window.innerWidth) left = window.innerWidth - 270
-    setPopover({ top: rect.bottom + 6, left, itemIds: [id], initial })
-  }
-
-  async function applyAssign(result: AssignResult) {
-    if (!popover) return
-    setBusy(true)
-    try {
-      await onAssign(
-        popover.itemIds.map((id) => ({ itemType, itemId: id })),
-        result,
-      )
-      if (popover.itemIds.length > 1) setSelected(new Set())
-      setPopover(null)
-    } catch (err) {
-      window.alert('Failed to assign: ' + (err instanceof Error ? err.message : String(err)))
-    } finally {
-      setBusy(false)
-    }
-  }
-
-  return (
-    <section className="panel oi-section" id={sectionDomId(itemType)}>
-      <div className="panel-header oi-clickable" onClick={() => setExpanded((v) => !v)}>
-        <div className="panel-header-left">
-          {expanded ? <ChevronDown style={{ width: 16, height: 16 }} /> : <ChevronRight style={{ width: 16, height: 16 }} />}
-          <h2 className="panel-title">{title}</h2>
-          <span className="panel-count">{loading ? '—' : `${items.length} open`}</span>
-        </div>
-        <div className="panel-header-right">
-          <button
-            className={loading ? 'icon-btn spin' : 'icon-btn'}
-            title="Refresh"
-            onClick={(e) => {
-              e.stopPropagation()
-              onRetry()
-            }}
-            aria-label={`Refresh ${title}`}
-          >
-            <RefreshCw />
-          </button>
-        </div>
-      </div>
-
-      {expanded && (
-        <div className="panel-body">
-          {configuredEmpty && (
-            <div className="q-hint">
-              Every known CxAlloy status is currently marked &quot;ready&quot;/&quot;for review&quot; in Settings, so
-              there&apos;s nothing left to count as still open.
-            </div>
-          )}
-          {!configuredEmpty && loading && <div className="q-hint">Loading…</div>}
-          {!configuredEmpty && error && (
-            <div className="table-error">
-              Couldn&apos;t load ({error}).{' '}
-              <button className="retry-btn" onClick={onRetry}>
-                Retry
-              </button>
-            </div>
-          )}
-          {!configuredEmpty && !loading && !error && items.length === 0 && <div className="q-hint">Nothing open right now.</div>}
-
-          {!configuredEmpty && !loading && !error && items.length > 0 && (
-            <>
-              <div className="oi-filters">
-                <input
-                  type="text"
-                  className="oi-search"
-                  placeholder={`Search ${items.length.toLocaleString()} open ${title.replace(/^Open\s*/i, '').toLowerCase() || 'items'}…`}
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                />
-                <label className="wf-check-row" style={{ marginBottom: 0 }}>
-                  <input type="checkbox" checked={unassignedOnly} onChange={(e) => setUnassignedOnly(e.target.checked)} />
-                  Unassigned only
-                </label>
-              </div>
-
-              {filtered.length === 0 ? (
-                <div className="q-hint">No items match.</div>
-              ) : (
-                <>
-                  <div className="oi-toolbar">
-                    <label className="wf-check-row" style={{ marginBottom: 0 }}>
-                      <input type="checkbox" checked={allSelected} onChange={(e) => toggleAll(e.target.checked)} />
-                      Select all {filtered.length !== items.length ? `(${filtered.length.toLocaleString()} matching)` : ''}
-                    </label>
-                    <span className="q-hint" style={{ margin: 0 }}>
-                      {selected.size.toLocaleString()} selected
-                    </span>
-                    <button type="button" className="panel-action-btn" disabled={!selected.size || busy} onClick={openBulkAssign}>
-                      Assign selected
-                    </button>
-                  </div>
-
-                  <div className="oi-rows">
-                    {displayed.map((item) => {
-                      const a = assignmentsByItemId.get(item.id)
-                      const label =
-                        todoAssignmentLabel({ assignedTeamId: a?.assignedTeamId ?? null, assignedEmail: a?.assignedEmail ?? null, assignedName: a?.assignedName ?? null }, teams) ||
-                        'Unassigned'
-                      return (
-                        <div className="oi-row" key={item.id}>
-                          <input type="checkbox" checked={selected.has(item.id)} onChange={(e) => toggleOne(item.id, e.target.checked)} />
-                          <div className="oi-main">
-                            <a className="oi-title" href={item.link} target="_blank" rel="noreferrer">
-                              {item.title}
-                            </a>
-                            <div className="oi-meta">
-                              {item.subtitle && <span>{item.subtitle}</span>}
-                              <span className="tag norm">{item.status}</span>
-                              {item.cxAssignedName && <span title="CxAlloy's own assignment, unrelated to ArcApp teams">CxAlloy: {item.cxAssignedName}</span>}
-                            </div>
-                          </div>
-                          <button type="button" className="oi-assign-chip" disabled={busy} onClick={(e) => openRowAssign(e, item.id)}>
-                            {label}
-                          </button>
-                        </div>
-                      )
-                    })}
-                  </div>
-
-                  {displayed.length < filtered.length && (
-                    <button type="button" className="retry-btn" style={{ marginTop: 12 }} onClick={() => setVisibleCount((n) => n + PAGE_SIZE)}>
-                      Show {Math.min(PAGE_SIZE, filtered.length - displayed.length).toLocaleString()} more (
-                      {(filtered.length - displayed.length).toLocaleString()} remaining)
-                    </button>
-                  )}
-                </>
-              )}
-            </>
-          )}
-        </div>
-      )}
-
-      {popover && (
-        <AssignPopover
-          top={popover.top}
-          left={popover.left}
-          teams={teams}
-          itemCount={popover.itemIds.length}
-          initial={popover.initial}
-          onApply={applyAssign}
-          onClose={() => setPopover(null)}
-        />
-      )}
-    </section>
-  )
 }
 
 export type MyItemEntry = { item: OItem; itemType: ItemType; typeLabel: string; assignment: ItemAssignment }
-/** A category-level roll-up card ("Issues need to be reviewed (12 open)") shown in "My Tasks" when
+/** A category-level roll-up card ("Issues need to be reviewed · 12") shown in "My Tasks" when
  * that category's Settings-configured default assignee is you (or a team you're on) — see
  * mySummaries in useOpenItemsData. Not tied to any individual item, so there's no `assignment`. */
 export type MySummaryEntry = { itemType: ItemType; title: string; count: number }
 type MyPopoverState = { top: number; left: number; itemType: ItemType; itemId: string; initial: AssignResult }
 
 /**
- * Renders one "assigned to me" row — used inline inside "Your To-Dos" (TodoPage.tsx) under the
- * "My Tasks" tab, NOT as its own separate section (a standalone "Assigned to You" panel next to
- * "Your To-Dos" read as a duplicate "my stuff" list — this folds into the one that already
- * existed instead). Reassigning from here still uses the normal AssignPopover, so a person can
- * hand something off to someone else or a team without leaving their own to-do list.
+ * Renders one "assigned to me" row — used inline inside "Your To-Dos" (TodoPage.tsx and the
+ * Dashboard widget) under the "My Tasks" tab, NOT as its own separate section (a standalone
+ * "Assigned to You" panel next to "Your To-Dos" read as a duplicate "my stuff" list — this folds
+ * into the one that already existed instead). Reassigning from here still uses the normal
+ * AssignPopover, so a person can hand something off to someone else or a team without leaving
+ * their own to-do list.
  */
 export function MyItemRow({ entry, teams, onAssign }: { entry: MyItemEntry; teams: Team[]; onAssign: (items: Array<{ itemType: ItemType; itemId: string }>, result: AssignResult) => Promise<void> }) {
   const [popover, setPopover] = useState<MyPopoverState | null>(null)
@@ -403,21 +165,22 @@ export function MyItemRow({ entry, teams, onAssign }: { entry: MyItemEntry; team
 }
 
 /**
- * One category-level roll-up card ("Issues need to be reviewed · 12 open") — rendered in "My
- * Tasks" when Settings has a default assignee configured for that category and it matches the
- * signed-in user (or a team they're on). Unlike MyItemRow, this isn't a real, individually
- * assignable item — clicking it just jumps to and expands the matching "Open ..." section below,
- * where the actual items live (and can still be assigned to someone specific from there).
+ * One category-level roll-up card ("Issues need to be reviewed · 12") — rendered in "My Tasks"
+ * when Settings has a default assignee configured for that category and it matches the signed-in
+ * user (or a team they're on). Unlike MyItemRow, this isn't a real, individually assignable item —
+ * clicking it navigates to that category's own page (see todoSummaryRoute), where the actual
+ * ready-for-review items are listed.
  */
-export function MySummaryCard({ entry, onExpand }: { entry: MySummaryEntry; onExpand: (itemType: ItemType) => void }) {
-  function go() {
-    onExpand(entry.itemType)
-    document.getElementById(sectionDomId(entry.itemType))?.scrollIntoView({ behavior: 'smooth', block: 'start' })
-  }
+export function MySummaryCard({ entry, onView }: { entry: MySummaryEntry; onView: (itemType: ItemType) => void }) {
   return (
     <div className="oi-row">
       <div className="oi-main">
-        <button type="button" className="oi-title" style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', textAlign: 'left' }} onClick={go}>
+        <button
+          type="button"
+          className="oi-title"
+          style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', textAlign: 'left' }}
+          onClick={() => onView(entry.itemType)}
+        >
           {entry.title}
         </button>
         <div className="oi-meta">
@@ -444,12 +207,18 @@ export type OpenItemsDataInput = Pick<
 >
 
 /**
- * All the data the four "Open ..." sections AND the "Assigned to You"/summary-card rows inside
- * "Your To-Dos" (both on the To-Do page and the Dashboard widget) need. Called exactly once, in
- * AppShell.tsx, and handed down via ShellContext (`ctx.openItems`) — rather than each page calling
- * this itself — so the data loads once at sign-in and is already warm by the time someone opens
- * the To-Do page or Dashboard, instead of only starting the fetch once the To-Do page mounts (an
- * open-status pick can be thousands of rows; doubling that per page would be wasteful too).
+ * Everything the "Your To-Dos" widget (Dashboard + To-Do page) needs for Checklist/Issue/NETA
+ * markers: individually-assigned "My Tasks" rows, and the default-assignee summary cards. Called
+ * exactly once, in AppShell.tsx, and handed down via ShellContext (`ctx.openItems`) so the data
+ * loads once at sign-in and is already warm by the time someone opens either page.
+ *
+ * There used to also be four big "Open Checklists/Issues/NETA ..." browsable list sections here —
+ * removed 2026-09-24 by request (redundant with the Checklists/Issues/NETA Tracker pages
+ * themselves): summary-card counts switched from "still open" to "ready for review"
+ * (checklistReadyStatuses/issueReviewStatuses — the same definition the Checklists/Issues pages
+ * use) to match, since a reviewer cares about what's ready for them, not everything outstanding
+ * project-wide. NETA's counts are unchanged (no equivalent "ready" status exists there — still
+ * open is still "not yet Submitted to Google" / "not yet Uploaded to ACC").
  */
 export function useOpenItemsData(input: OpenItemsDataInput) {
   const {
@@ -466,17 +235,6 @@ export function useOpenItemsData(input: OpenItemsDataInput) {
     cxAlloyLinkBase,
   } = input
 
-  // Bumped by a "My Tasks" summary card's click to force the matching "Open ..." section open
-  // (it's collapsed by default) — see sectionDomId/expandSignal on OpenItemsSection above.
-  const [expandSignals, setExpandSignals] = useState<Record<ItemType, number>>({
-    checklist: 0,
-    issue: 0,
-    neta_submission: 0,
-    neta_returned: 0,
-  })
-  function requestExpand(itemType: ItemType) {
-    setExpandSignals((prev) => ({ ...prev, [itemType]: prev[itemType] + 1 }))
-  }
   // NETA Tracker is STY4-only (see the `netaTracker` capability in src/lib/project.ts) — even
   // though the Settings toggles above are project-scoped and shouldn't stay on after a switch,
   // this is the same defense-in-depth every other NETA consumer applies.
@@ -484,19 +242,32 @@ export function useOpenItemsData(input: OpenItemsDataInput) {
   const netaSubmissionsOn = netaSubmissionsTodoEnabled && netaAvailable
   const netaReturnedOn = netaReturnedTodoEnabled && netaAvailable
 
+  // "Still open" fetches — power the individually-assigned "My Tasks" rows (myItems below). An
+  // assignment made while the old Open-list UI existed is keyed by CxAlloy/NETA id regardless of
+  // which list it came from, so these stay around to keep any existing assignment visible/
+  // reassignable even though there's no more UI to create a brand new one.
   const checklistsFn = useGetOpenChecklists()
   const issuesFn = useGetOpenIssues()
+  // "Ready for review" fetches — power the default-assignee summary cards' counts.
+  const checklistsReadyFn = useGetChecklists()
+  const issuesReviewFn = useGetIssues()
   const netaFn = useGetNetaTrackerData()
   const assignmentsFn = useGetItemAssignments()
   const saveFn = useSaveItemAssignments()
 
   useEffect(() => {
-    if (checklistTodoEnabled) void checklistsFn.trigger()
+    if (checklistTodoEnabled) {
+      void checklistsFn.trigger()
+      void checklistsReadyFn.trigger()
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [checklistTodoEnabled])
 
   useEffect(() => {
-    if (issueTodoEnabled) void issuesFn.trigger()
+    if (issueTodoEnabled) {
+      void issuesFn.trigger()
+      void issuesReviewFn.trigger()
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [issueTodoEnabled])
 
@@ -539,9 +310,9 @@ export function useOpenItemsData(input: OpenItemsDataInput) {
   const netaSubmissionItems = (netaFn.data?.submissions ?? []).filter((r) => !r.submittedToGoogle).map(netaSubmissionToItem)
   const netaReturnedItems = (netaFn.data?.returnedFiles ?? []).filter((r) => r.uploadedToAcc !== true).map(netaReturnedToItem)
 
-  // "Assigned to You" (rendered inside "Your To-Dos") is a personalized re-filter of these same
-  // four lists — it changes nothing about what the four "Open ..." sections below show everyone
-  // else; an item assigned to someone stays fully visible there too, unfiltered.
+  // "Assigned to You" (rendered inside "Your To-Dos") is a personalized re-filter of the "still
+  // open" lists — whether or not an item is currently ready for review, an existing assignment on
+  // it stays visible to whoever it's assigned to.
   const myItems: MyItemEntry[] = currentUserEmail
     ? [
         ...checklistItems.flatMap((item) => {
@@ -567,18 +338,21 @@ export function useOpenItemsData(input: OpenItemsDataInput) {
       ]
     : []
 
-  // Settings → per-category "default assignee" (requested 2026-09-24): a single roll-up card per
-  // category, not per-item assignment — shows only when that category's default is you (or a team
-  // you're on) AND there's at least one open item, so it disappears once the category's actually
-  // clear instead of lingering as a stale reminder.
+  // Settings → per-category "default assignee": a single roll-up card per category, not per-item
+  // assignment — shows only when that category's default is you (or a team you're on) AND there's
+  // at least one item counted for it, so it disappears once that count hits zero instead of
+  // lingering as a stale reminder. Checklist/Issue count "ready for review" (matches the
+  // Checklists/Issues pages); NETA counts "still open" (no "ready" concept exists there).
   const isDefaultMine = (a: DefaultAssignee) => isTodoMine({ assignedEmail: a.email, assignedTeamId: a.teamId }, currentUserEmail, teams)
+  const checklistReadyCount = checklistsReadyFn.data?.rows.length ?? 0
+  const issueReviewCount = issuesReviewFn.data?.rows.length ?? 0
   const mySummaries: MySummaryEntry[] = currentUserEmail
     ? [
-        ...(checklistTodoEnabled && checklistItems.length > 0 && isDefaultMine(checklistDefaultAssignee)
-          ? [{ itemType: 'checklist' as ItemType, title: 'Checklists need to be reviewed', count: checklistItems.length }]
+        ...(checklistTodoEnabled && checklistReadyCount > 0 && isDefaultMine(checklistDefaultAssignee)
+          ? [{ itemType: 'checklist' as ItemType, title: 'Checklists need to be reviewed', count: checklistReadyCount }]
           : []),
-        ...(issueTodoEnabled && issueItems.length > 0 && isDefaultMine(issueDefaultAssignee)
-          ? [{ itemType: 'issue' as ItemType, title: 'Issues need to be reviewed', count: issueItems.length }]
+        ...(issueTodoEnabled && issueReviewCount > 0 && isDefaultMine(issueDefaultAssignee)
+          ? [{ itemType: 'issue' as ItemType, title: 'Issues need to be reviewed', count: issueReviewCount }]
           : []),
         ...(netaSubmissionsOn && netaSubmissionItems.length > 0 && isDefaultMine(netaSubmissionsDefaultAssignee)
           ? [{ itemType: 'neta_submission' as ItemType, title: 'NETA Submissions need to be reviewed', count: netaSubmissionItems.length }]
@@ -590,122 +364,10 @@ export function useOpenItemsData(input: OpenItemsDataInput) {
     : []
 
   return {
-    checklistTodoEnabled,
-    issueTodoEnabled,
-    netaSubmissionsOn,
-    netaReturnedOn,
-    checklistsFn,
-    issuesFn,
-    netaFn,
-    checklistItems,
-    issueItems,
-    netaSubmissionItems,
-    netaReturnedItems,
-    checklistAssignments,
-    issueAssignments,
-    netaSubmissionAssignments,
-    netaReturnedAssignments,
     myItems,
     mySummaries,
-    expandSignals,
-    requestExpand,
     onAssign,
   }
 }
 
 export type OpenItemsData = ReturnType<typeof useOpenItemsData>
-
-/** Auto-generated to-do sections for still-open Checklists/Issues (read-only CxAlloy sheet data)
- * — each toggled on independently in Settings, each expandable to show/reassign every instance,
- * individually or via multi-select. Assignment itself is stored in arcapp_item_assignments,
- * keyed by CxAlloy id, since the sheet data itself can't be written back to. Data comes in as a
- * prop (from useOpenItemsData, called once in TodoPage.tsx) rather than being fetched here, so
- * "Assigned to You" inside "Your To-Dos" can share it without a second, duplicate fetch. */
-export default function OpenItemsTodoPanel({ data, teams }: { data: OpenItemsData; teams: Team[] }) {
-  const {
-    checklistTodoEnabled,
-    issueTodoEnabled,
-    netaSubmissionsOn,
-    netaReturnedOn,
-    checklistsFn,
-    issuesFn,
-    netaFn,
-    checklistItems,
-    issueItems,
-    netaSubmissionItems,
-    netaReturnedItems,
-    checklistAssignments,
-    issueAssignments,
-    netaSubmissionAssignments,
-    netaReturnedAssignments,
-    expandSignals,
-    onAssign,
-  } = data
-
-  if (!checklistTodoEnabled && !issueTodoEnabled && !netaSubmissionsOn && !netaReturnedOn) return null
-
-  return (
-    <>
-      {checklistTodoEnabled && (
-        <OpenItemsSection
-          title="Open Checklists"
-          itemType="checklist"
-          items={checklistItems}
-          loading={checklistsFn.loading}
-          error={checklistsFn.error ?? ''}
-          onRetry={() => void checklistsFn.trigger()}
-          configuredEmpty={!!checklistsFn.data && checklistsFn.data.openStatuses.length === 0}
-          assignmentsByItemId={checklistAssignments}
-          teams={teams}
-          onAssign={onAssign}
-          expandSignal={expandSignals.checklist}
-        />
-      )}
-      {issueTodoEnabled && (
-        <OpenItemsSection
-          title="Open Issues"
-          itemType="issue"
-          items={issueItems}
-          loading={issuesFn.loading}
-          error={issuesFn.error ?? ''}
-          onRetry={() => void issuesFn.trigger()}
-          configuredEmpty={!!issuesFn.data && issuesFn.data.openStatuses.length === 0}
-          assignmentsByItemId={issueAssignments}
-          teams={teams}
-          onAssign={onAssign}
-          expandSignal={expandSignals.issue}
-        />
-      )}
-      {netaSubmissionsOn && (
-        <OpenItemsSection
-          title="Open NETA Submissions"
-          itemType="neta_submission"
-          items={netaSubmissionItems}
-          loading={netaFn.loading}
-          error={netaFn.error ?? ''}
-          onRetry={() => void netaFn.trigger()}
-          configuredEmpty={false}
-          assignmentsByItemId={netaSubmissionAssignments}
-          teams={teams}
-          onAssign={onAssign}
-          expandSignal={expandSignals.neta_submission}
-        />
-      )}
-      {netaReturnedOn && (
-        <OpenItemsSection
-          title="Open NETA Returned Files"
-          itemType="neta_returned"
-          items={netaReturnedItems}
-          loading={netaFn.loading}
-          error={netaFn.error ?? ''}
-          onRetry={() => void netaFn.trigger()}
-          configuredEmpty={false}
-          assignmentsByItemId={netaReturnedAssignments}
-          teams={teams}
-          onAssign={onAssign}
-          expandSignal={expandSignals.neta_returned}
-        />
-      )}
-    </>
-  )
-}

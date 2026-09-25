@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useOutletContext } from 'react-router-dom'
+import { useNavigate, useOutletContext } from 'react-router-dom'
 import { Plus } from 'lucide-react'
 import type { ShellContext } from '../ShellContext'
 import type { TaskInput } from '../../../lib/api'
@@ -7,7 +7,7 @@ import type { Todo, TaskTag } from '../types'
 import { isTodoMine } from '../utils'
 import { TodoList } from '../components/TodoPanel'
 import TeamsManager from '../components/TeamsManager'
-import OpenItemsTodoPanel, { MyItemRow, MySummaryCard } from '../components/OpenItemsTodoPanel'
+import { MyItemRow, MySummaryCard, todoSummaryRoute } from '../components/OpenItemsTodoPanel'
 
 type AssignMode = 'none' | 'team' | 'person'
 type FormState = {
@@ -41,6 +41,7 @@ type Tab = 'mine' | 'all'
 export default function TodoPage() {
   const ctx = useOutletContext<ShellContext>()
   const { todos, teams, currentUserEmail, openItems } = ctx
+  const navigate = useNavigate()
 
   const [tab, setTab] = useState<Tab>(currentUserEmail ? 'mine' : 'all')
   const [formOpen, setFormOpen] = useState(false)
@@ -124,8 +125,6 @@ export default function TodoPage() {
   return (
     <>
       <TeamsManager teams={teams} tasks={todos} onSave={ctx.onSaveTeam} onDelete={ctx.onDeleteTeam} />
-
-      <OpenItemsTodoPanel data={openItems} teams={teams} />
 
       <section className="panel" id="todo">
         <div className="panel-header">
@@ -250,23 +249,22 @@ export default function TodoPage() {
               Couldn&apos;t load tasks ({ctx.tasksError}).
             </div>
           )}
-          {/* Checklist/Issue/NETA items assigned to you or a team you're on — folded directly into
-              "My Tasks" rather than a separate section, since a second "my stuff" list next to this
-              one read as a duplicate. Reassigning here doesn't touch this list's manual tasks below;
-              it's the exact same underlying assignment popover used everywhere else. Only ever
-              shown on the "My Tasks" tab — "All Tasks" stays exactly what it always was (manual
-              tasks only), since every open Checklist/Issue/NETA item already has its own general,
-              unfiltered home in the "Open ..." sections above. */}
           {/* Category-level roll-up cards from Settings' per-category default assignee (e.g.
-              "Issues need to be reviewed") — not individual items, just a pointer down to the
-              matching "Open ..." section, which this expands and scrolls to on click. */}
+              "Issues need to be reviewed · 12") — counts ready-for-review Checklists/Issues and
+              still-open NETA docs; clicking one navigates to that category's own page (Checklists/
+              Issues/NETA Tracker), which already lists the real items. Only ever shown on the "My
+              Tasks" tab, same as the individual rows below. */}
           {!ctx.tasksLoading && !ctx.tasksError && shownMySummaries.length > 0 && (
             <div className="oi-rows" style={{ marginBottom: 14 }}>
               {shownMySummaries.map((entry) => (
-                <MySummaryCard key={entry.itemType} entry={entry} onExpand={openItems.requestExpand} />
+                <MySummaryCard key={entry.itemType} entry={entry} onView={(itemType) => navigate(todoSummaryRoute(itemType))} />
               ))}
             </div>
           )}
+          {/* Checklist/Issue/NETA items individually assigned to you or a team you're on, from
+              before the browsable "Open ..." list sections were removed — folded directly into
+              "My Tasks" rather than a separate section. Reassigning here doesn't touch this list's
+              manual tasks below. */}
           {!ctx.tasksLoading && !ctx.tasksError && shownMyItems.length > 0 && (
             <div className="oi-rows" style={{ marginBottom: visible.length > 0 ? 14 : 0 }}>
               {shownMyItems.map((entry) => (

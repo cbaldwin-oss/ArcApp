@@ -509,128 +509,43 @@ Workflows — see `supabase/schema.sql`/`policies.sql`.
 - The old sample-data To-Dos were carried over as real seed rows in `schema.sql` so the list isn't
   empty on first load.
 
-### Checklist & Issue To-Do — auto-surfaced from CxAlloy, assignable like a task
+### Checklist/Issue/NETA markers in "Your To-Dos" — summary cards + individually-assigned items
 
-Still-open Checklists/Issues (read-only CxAlloy sheet data) now show up on the To-Do page as their
-own assignable sections, instead of only being manually copied into a task by hand.
+The To-Do page and Dashboard's "Your To-Dos" widget both surface two kinds of Checklist/Issue/NETA
+markers, computed once by `useOpenItemsData()` (`OpenItemsTodoPanel.tsx`), called once in
+`AppShell.tsx`, and handed down as `ctx.openItems` so neither page triggers its own fetch.
 
-- **Fetched once at sign-in, not lazily on the To-Do page** (fixed 2026-09-24 — this data used to
-  only start loading once TodoPage mounted, so its "assigned to you" rows and default-assignee
-  summary cards were invisible anywhere else, including the Dashboard). `useOpenItemsData` (in
-  `OpenItemsTodoPanel.tsx`) is now called once in `AppShell.tsx` and handed down as `ctx.openItems`
-  — both `TodoPage.tsx` and `DashboardPage.tsx`'s "Your To-Dos" widget read from that same already-
-  warm data instead of either page triggering its own fetch.
-- **Two independent toggles in Settings** (`checklist_todo_enabled`/`issue_todo_enabled`) turn on
-  an "Open Checklists"/"Open Issues" section on the To-Do page. There's no separate status picker
-  for "still open" (there used to be — removed 2026-09-24 as a genuine duplicate, since "ready for
-  review" and "still open" are opposite ends of the exact same status list): "still open" is
-  derived as every live CxAlloy status NOT checked in Checklist Ready / Issues for Review, computed
-  client-side in `getOpenChecklists`/`getOpenIssues` (`src/lib/api.ts`). Nothing shows on the To-Do
-  page only in the edge case where literally every known status is marked ready/for-review.
-- Each section header shows a live count and is collapsed by default; expanding it lists every
-  matching instance with a link back to CxAlloy, its asset/type/discipline, its raw status, and
-  (for context only) whatever CxAlloy itself already has in its own free-text `assigned_name`
-  field — unrelated to ArcApp's own assignment below.
-- **Assignment** is ArcApp's own, stored in a new table (`arcapp_item_assignments`, keyed by
-  CxAlloy id — the sheet data itself can't be written back to) since Checklists/Issues are
-  read-only. Click any item's assignment chip to reassign it to a team or a specific person via a
-  popover (same team-select/name+email fields as a regular task's assign-to form); check several
-  items and use **Assign selected** to bulk-apply the same target to all of them at once (one
-  round trip, not one request per item).
-- **Scale**: an open-status pick can realistically match thousands of rows (e.g. "Not Started"
-  across a whole project — confirmed live at ~9,400 open checklists). Each section has its own
-  search box (matches title/asset/status/CxAlloy-assigned-name) and paginates what actually
-  renders (100 rows at a time, "Show more" to extend) — "Select all" still operates on the full
-  filtered set even if it's larger than what's currently rendered, so bulk-assigning e.g. every
-  matching row doesn't require scrolling through all of them first. An "Unassigned only" checkbox
-  narrows to what still needs a first assignment.
+- **There is no browsable "Open Checklists/Issues/NETA ..." list on the To-Do page** (removed
+  2026-09-24, by request — the Checklists, Issues, and NETA Tracker pages already list the real
+  items; duplicating that as a fourth place to browse them wasn't needed). The To-Do module's job
+  here is purely notification: tell the right person something needs their attention, and point
+  them at the page where it actually lives.
+- **Default assignee per category** — a team-or-person picker in Settings next to each category's
+  toggle (`checklist_default_assignee_*`/`issue_default_assignee_*`/same for both NETA categories,
+  3 keys each: `_team_id`/`_email`/`_name`, saved together via `saveDefaultAssignee` in
+  `src/lib/api.ts`; the "specific person" option is a dropdown of `arcapp_authorized_users`, not
+  free text — only someone who can actually sign in can usefully be a default assignee). When the
+  default matches the signed-in user (directly or via team membership) and the category's count is
+  above zero, they get a single roll-up card in "Your To-Dos" → My Tasks (`MySummaryCard`/
+  `mySummaries` in `OpenItemsTodoPanel.tsx`) — e.g. "Issues need to be reviewed · 12". Clicking it
+  navigates to that category's own page (`todoSummaryRoute`: Checklists → `/checklists`, Issues →
+  `/issues`, either NETA category → `/netatracker`). The card disappears on its own once the count
+  hits zero — nothing to dismiss or mark done.
+- **What the count counts differs by category** (changed 2026-09-24 — it used to be "still open"
+  for all four, matching what the removed list sections showed): Checklists/Issues count what's
+  **ready for review** — the same `checklistReadyStatuses`/`issueReviewStatuses` Settings lists and
+  `getChecklists`/`getIssues` calls the Checklists/Issues pages themselves use — since a reviewer
+  cares about what's ready for them specifically, not everything outstanding project-wide. NETA
+  categories are unchanged: still "still open" (Submissions: not yet Submitted to Google; Returned
+  Files: not yet Uploaded to ACC), since NETA has no equivalent "ready" status to switch to.
+- **Individually-assigned items** (`arcapp_item_assignments`, keyed by CxAlloy id / NETA document
+  name) still fold into "Your To-Dos" → My Tasks as their own rows (`MyItemRow`) if any exist from
+  before the browsable list was removed — a type badge (Checklist/Issue/NETA Submission/NETA
+  Returned), a link back to the source, and a reassign chip (`AssignPopover`, same one used
+  elsewhere). There's no remaining UI to create a *new* individual assignment now that the list
+  sections are gone; this only keeps existing ones visible and reassignable.
 - `arcapp_item_assignments` is wide open (`anon` + `authenticated`, no editor check) — same
-  pattern as `arcapp_tasks`/`arcapp_teams`, since this is the same assignment system extended to
-  cover CxAlloy items instead of freeform tasks.
-- **Default assignee per category** (requested 2026-09-24) — a team-or-person picker in Settings
-  next to each category's toggle (`checklist_default_assignee_*`/`issue_default_assignee_*`/same
-  for both NETA categories, 3 keys each: `_team_id`/`_email`/`_name`, saved together via
-  `saveDefaultAssignee` in `src/lib/api.ts`). This is deliberately **not** the same as assigning
-  every individual open item to that team/person — with hundreds or thousands of open items in a
-  category, that would flood their My Tasks with one row per item. Instead, when the default
-  assignee matches the signed-in user (directly or via team membership) and the category has at
-  least one open item, they get a single roll-up card in "Your To-Dos" → My Tasks (e.g. "Issues
-  need to be reviewed · 12 open") — `MySummaryCard`/`mySummaries` in `OpenItemsTodoPanel.tsx`.
-  Clicking it expands and scrolls to the real "Open ..." section below, where items can still be
-  assigned to someone specific individually. The card disappears on its own once that category's
-  open count hits zero — nothing to dismiss or mark done.
-- Verified live: real CxAlloy status vocabulary (`Not Started`/`In Progress`/etc.) picked in
-  Settings, ~9,400 real open checklists and ~270 real open issues loaded, search narrowing
-  confirmed against real titles, pagination confirmed (100 → 200 rows on "Show more"), and the
-  full assign flow exercised end-to-end — both a 2-item bulk-assign to a team and a single-row
-  reassign to a person, each correctly upserting one row per item keyed by CxAlloy id. The
-  read/write calls involved in that last check were intercepted rather than run against the live
-  (currently empty) table, so no test data was left behind in production.
-
-### NETA Tracker To-Do — same mechanism, applied to NETA Submissions/Returned Files
-
-Same pattern as Checklist/Issue To-Do above, applied to the two NETA Tracker tabs (see the "NETA
-Tracker" section above) instead of CxAlloy data — built in `OpenItemsTodoPanel.tsx` alongside it,
-reusing the exact same `OpenItemsSection` component (search, pagination, multi-select, bulk-assign,
-"Unassigned only") unchanged.
-
-- **Two independent toggles in Settings** (`neta_submissions_todo_enabled`/
-  `neta_returned_todo_enabled`) turn on an "Open NETA Submissions"/"Open NETA Returned Files"
-  section on the To-Do page. Unlike Checklist/Issue To-Do, there's **no open-status picker to
-  configure** — "still open" here is the same fixed, non-configurable definition the NETA Tracker
-  page itself already uses (Submissions: not yet Submitted to Google; Returned Files: not yet
-  Uploaded to ACC), not a freeform CxAlloy status vocabulary.
-- A Returned Files row whose Uploaded to ACC is "N/A" (an open issue — see the N/A-handling note
-  under "NETA Tracker" above) still counts as open here (`!== true`, not a falsy check) — it needs
-  *more* attention, not less, so it isn't filtered out by mistake the way a naive truthy check on
-  the string "N/A" would (a real bug caught and fixed in the NETA Tracker page itself; this To-Do
-  panel was built with that fix already in mind).
-- **Item identity uses the document name, not the sheet row number** — a re-import from the sheet's
-  own "Document Importer" menu rebuilds and re-sorts the whole grid, so row 5 today can be a
-  completely different document after that runs. The filename is what's actually stable.
-- Both sections share one underlying fetch (`useGetNetaTrackerData` — one Apps Script call already
-  returns both tabs), so refreshing either section refreshes both.
-- The assign chip's link now points at the row's real Drive file (`documentLinkUrl`, the same
-  `=HYPERLINK(...)`-parsed URL the NETA Tracker page itself links to) rather than a deep link into
-  a separate system, since that's what already exists for this data.
-- Gated behind the `netaTracker` capability the same way every other NETA Tracker consumer is —
-  the Settings toggles themselves are hidden entirely for SAN-NT1B, and the To-Do panel
-  additionally re-checks the capability itself before rendering or fetching, so a toggle stuck on
-  from a prior state can't cause a wasted fetch or a broken section after switching projects.
-- Verified with mocked NETA data: both sections render with correct open counts (excluding
-  already-completed rows), the N/A-row-still-counts-as-open behavior confirmed, a real assign
-  flow exercised end-to-end (upserts `{item_type: 'neta_returned', item_id: '<documentName>', ...}`
-  correctly), and the SAN-NT1B capability gate confirmed to suppress both rendering and fetching
-  even with the toggles forced on — zero console errors throughout.
-
-### Assigned Checklist/Issue/NETA items surface in "My Tasks" — without changing anyone else's view
-
-The four "Open ..." sections are deliberately **not** filtered by assignee — everyone sees every
-open Checklist/Issue/NETA item regardless of who it's assigned to, same as before any of this
-existed. What an assignee gets *in addition* is their own items folded directly into the existing
-"Your To-Dos" → **My Tasks** tab, alongside their manually-created tasks — not a second, separate
-"my stuff" section next to it (an earlier version of this did exactly that and it read as a
-duplicate of My Tasks, so it was merged in instead).
-
-- `useOpenItemsData()` (`OpenItemsTodoPanel.tsx`) is now the single hook that fetches Checklists/
-  Issues/NETA data and computes `myItems` — called once, in `TodoPage.tsx`, and passed down to
-  `OpenItemsTodoPanel` (which renders just the four "Open ..." sections from it) so nothing is
-  fetched twice between that and "Your To-Dos". `myItems` reuses `isTodoMine` (the same function
-  already powering "My Tasks" for manual tasks), generalized to accept just `{ assignedEmail,
-  assignedTeamId }` instead of a full `Todo` so it works unchanged on `ItemAssignment` records too.
-- Rendered only on the **My Tasks** tab (never **All Tasks** — that stays exactly what it always
-  was, manual tasks only, since every open Checklist/Issue/NETA item already has its own general,
-  unfiltered home in the "Open ..." sections above) and only when signed in, same as manual "My
-  Tasks" already required.
-- Each row (`MyItemRow`) shows a type badge (Checklist / Issue / NETA Submission / NETA Returned)
-  since this is the one place items from all four sources mix together, plus a chip showing the
-  current assignment that doubles as a reassign button — same `AssignPopover` as everywhere else.
-- The "My Tasks (N)" count and the panel's "N open" header both include these alongside manual
-  tasks, so the badge reflects everything actually shown under that tab.
-- Verified with a faked signed-in session: the merged list correctly showed only the assigned
-  items (not ones assigned to someone else or left unassigned), the general "Open Checklists" and
-  "Open NETA Submissions" sections still showed all rows unfiltered, and switching to "All Tasks"
-  showed none of the assigned items — confirming no leakage either direction.
+  pattern as `arcapp_tasks`/`arcapp_teams`.
 
 ## Sign-in — a full-page gate, admins vs. editors, Google OAuth
 

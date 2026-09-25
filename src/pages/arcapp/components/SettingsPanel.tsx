@@ -238,14 +238,14 @@ export default function SettingsPanel({
             Checklist &amp; Issue To-Do
           </label>
           <div className="q-hint" style={{ marginBottom: 12 }}>
-            Surfaces still-open Checklists/Issues on the To-Do page as assignable instances — each
-            can be handed to a team or a specific person, individually or via multi-select, same as
-            a regular task. "Still open" isn't configured separately here — it's whatever's NOT
-            checked in Checklist Ready / Issues for Review above.
+            Powers the "Your To-Dos" widget's Checklist/Issue markers — a default-assignee summary
+            card below, plus any individually-assigned item still shows in "My Tasks". Doesn't add a
+            browsable list to the To-Do page itself; the real items live on the Checklists/Issues
+            pages.
           </div>
           <ToggleField
             label="Checklist To-Do"
-            hint="Shows an Open Checklists section on the To-Do page."
+            hint="Turns on the Checklists default-assignee summary card and My Tasks entries below."
             initial={checklistTodoEnabled}
             canEdit={isAdmin}
             loading={loading}
@@ -253,7 +253,7 @@ export default function SettingsPanel({
           />
           <DefaultAssigneePicker
             label="Checklists — default assignee"
-            hint="When set and at least one checklist is still open, this team/person gets a single 'Checklists need to be reviewed' card in Your To-Dos — individual checklists aren't assigned to them one by one."
+            hint="When set and at least one checklist is ready for review (per Checklist Ready above), this team/person gets a single 'Checklists need to be reviewed' card in Your To-Dos, linking to the Checklists page."
             value={checklistDefaultAssignee}
             teams={teams}
             canEdit={isAdmin}
@@ -262,7 +262,7 @@ export default function SettingsPanel({
           />
           <ToggleField
             label="Issues To-Do"
-            hint="Shows an Open Issues section on the To-Do page."
+            hint="Turns on the Issues default-assignee summary card and My Tasks entries below."
             initial={issueTodoEnabled}
             canEdit={isAdmin}
             loading={loading}
@@ -270,7 +270,7 @@ export default function SettingsPanel({
           />
           <DefaultAssigneePicker
             label="Issues — default assignee"
-            hint="When set and at least one issue is still open, this team/person gets a single 'Issues need to be reviewed' card in Your To-Dos — individual issues aren't assigned to them one by one."
+            hint="When set and at least one issue is ready for review (per Issues for Review above), this team/person gets a single 'Issues need to be reviewed' card in Your To-Dos, linking to the Issues page."
             value={issueDefaultAssignee}
             teams={teams}
             canEdit={isAdmin}
@@ -285,14 +285,14 @@ export default function SettingsPanel({
               NETA Tracker To-Do
             </label>
             <div className="q-hint" style={{ marginBottom: 12 }}>
-              Surfaces still-open NETA Tracker documents on the To-Do page as assignable instances,
-              same as Checklist/Issue To-Do above. "Still open" isn't configurable here — it's the
-              same not-yet-completed definition the NETA Tracker page itself uses (Submissions: not
-              yet Submitted to Google; Returned Files: not yet Uploaded to ACC).
+              Same idea as Checklist/Issue To-Do above, for the NETA Tracker's two tabs. "Still
+              open" isn't configurable here — it's the same not-yet-completed definition the NETA
+              Tracker page itself uses (Submissions: not yet Submitted to Google; Returned Files:
+              not yet Uploaded to ACC).
             </div>
             <ToggleField
               label="NETA Submissions To-Do"
-              hint="Shows an Open NETA Submissions section on the To-Do page."
+              hint="Turns on the NETA Submissions default-assignee summary card and My Tasks entries below."
               initial={netaSubmissionsTodoEnabled}
               canEdit={isAdmin}
               loading={loading}
@@ -300,7 +300,7 @@ export default function SettingsPanel({
             />
             <DefaultAssigneePicker
               label="NETA Submissions — default assignee"
-              hint="When set and at least one submission is still open, this team/person gets a single 'NETA Submissions need to be reviewed' card in Your To-Dos."
+              hint="When set and at least one submission is still open, this team/person gets a single 'NETA Submissions need to be reviewed' card in Your To-Dos, linking to the NETA Tracker page."
               value={netaSubmissionsDefaultAssignee}
               teams={teams}
               canEdit={isAdmin}
@@ -309,7 +309,7 @@ export default function SettingsPanel({
             />
             <ToggleField
               label="NETA Returned Files To-Do"
-              hint="Shows an Open NETA Returned Files section on the To-Do page."
+              hint="Turns on the NETA Returned Files default-assignee summary card and My Tasks entries below."
               initial={netaReturnedTodoEnabled}
               canEdit={isAdmin}
               loading={loading}
@@ -317,7 +317,7 @@ export default function SettingsPanel({
             />
             <DefaultAssigneePicker
               label="NETA Returned Files — default assignee"
-              hint="When set and at least one returned file is still open, this team/person gets a single 'NETA Returned Files need to be reviewed' card in Your To-Dos."
+              hint="When set and at least one returned file is still open, this team/person gets a single 'NETA Returned Files need to be reviewed' card in Your To-Dos, linking to the NETA Tracker page."
               value={netaReturnedDefaultAssignee}
               teams={teams}
               canEdit={isAdmin}

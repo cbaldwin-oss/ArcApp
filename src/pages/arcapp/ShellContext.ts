@@ -79,9 +79,9 @@ export type ShellContext = {
   onSaveSetting: (key: string, value: string) => Promise<void>
   onSaveDefaultAssignee: (prefix: string, result: DefaultAssignee) => Promise<void>
 
-  /** Checklist/Issue/NETA "open items" — fetched once at sign-in (see useOpenItemsData in
-   * AppShell.tsx) rather than lazily when the To-Do page mounts, so the Dashboard's "Your To-Dos"
-   * widget and the To-Do page's own sections/summary cards read from the same already-warm data
-   * instead of each triggering their own fetch. */
+  /** Checklist/Issue/NETA "My Tasks" rows + default-assignee summary cards — fetched once at
+   * sign-in (see useOpenItemsData in AppShell.tsx) rather than lazily when the To-Do page mounts,
+   * so the Dashboard's "Your To-Dos" widget and the To-Do page's "My Tasks" tab read from the same
+   * already-warm data instead of each triggering their own fetch. */
   openItems: OpenItemsData
 }
