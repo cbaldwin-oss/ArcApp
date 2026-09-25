@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Save } from 'lucide-react'
-import type { DefaultAssignee } from '../../../lib/api'
+import { useGetAuthorizedUsers } from '../../../lib/api'
+import type { AuthorizedUser, DefaultAssignee } from '../../../lib/api'
 import type { Team } from '../types'
 
 type Mode = 'none' | 'team' | 'person'
@@ -25,44 +26,67 @@ type Props = {
  * Inline "team or person" picker for a Settings-level default assignee — same at-most-one-of
  * team-or-person shape as AssignPopover (used for individual Checklist/Issue/task assignment),
  * but rendered inline (no popover/portal) since Settings has no anchor row to position against.
+ *
+ * "A specific person" is a dropdown of arcapp_authorized_users, not a free-text name/email — the
+ * whole point of a default assignee is that they can sign in and see the resulting summary card in
+ * their own To-Dos, which requires being on that list in the first place, so there's no legitimate
+ * case for typing someone who isn't on it.
  */
 export default function DefaultAssigneePicker({ label, hint, value, teams, canEdit, loading, onSave }: Props) {
+  const usersFn = useGetAuthorizedUsers()
   const [mode, setMode] = useState<Mode>(() => modeOf(value))
   const [teamId, setTeamId] = useState(value.teamId ?? '')
-  const [personName, setPersonName] = useState(value.name ?? '')
   const [personEmail, setPersonEmail] = useState(value.email ?? '')
   const [msg, setMsg] = useState<{ text: string; cls: string }>({ text: '', cls: 'q-hint' })
   const [busy, setBusy] = useState(false)
 
+  // Same RLS shape as AuthorizedUsersManager — a non-admin can only read their own row, so don't
+  // even ask until canEdit (isAdmin) is true; this control is disabled for them anyway.
+  useEffect(() => {
+    if (canEdit) void usersFn.trigger()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [canEdit])
+
   useEffect(() => {
     setMode(modeOf(value))
     setTeamId(value.teamId ?? '')
-    setPersonName(value.name ?? '')
     setPersonEmail(value.email ?? '')
   }, [value])
+
+  const users = (usersFn.data as AuthorizedUser[] | undefined) ?? []
+  const selectedUser = users.find((u) => u.email.toLowerCase() === personEmail.toLowerCase())
+  // The saved email might belong to someone since removed from the authorized list (or seeded
+  // before this dropdown existed) — still shown, selected, and savable as-is, just flagged, rather
+  // than silently losing track of who it was pointing at.
+  const stale = mode === 'person' && personEmail && !selectedUser
 
   const dirty =
     mode !== modeOf(value) ||
     (mode === 'team' && teamId !== (value.teamId ?? '')) ||
-    (mode === 'person' && (personName.trim() !== (value.name ?? '') || personEmail.trim() !== (value.email ?? '')))
+    (mode === 'person' && personEmail !== (value.email ?? ''))
   const disabled = !canEdit || busy || loading
+
+  function pickPerson(email: string) {
+    setPersonEmail(email)
+  }
 
   async function save() {
     if (mode === 'team' && !teamId) {
       setMsg({ text: 'Pick a team, or switch to No default.', cls: 'q-hint err' })
       return
     }
-    if (mode === 'person' && !personName.trim()) {
-      setMsg({ text: 'Enter a name for the default person.', cls: 'q-hint err' })
+    if (mode === 'person' && !personEmail) {
+      setMsg({ text: 'Pick a person, or switch to No default.', cls: 'q-hint err' })
       return
     }
+    const person = users.find((u) => u.email.toLowerCase() === personEmail.toLowerCase())
     setBusy(true)
     setMsg({ text: 'Saving…', cls: 'q-hint' })
     try {
       await onSave({
         teamId: mode === 'team' ? teamId : null,
-        name: mode === 'person' ? personName.trim() : null,
-        email: mode === 'person' ? personEmail.trim() : null,
+        name: mode === 'person' ? person?.name || value.name || '' : null,
+        email: mode === 'person' ? personEmail : null,
       })
       setMsg({ text: 'Saved.', cls: 'q-hint ok' })
     } catch (err) {
@@ -100,9 +124,27 @@ export default function DefaultAssigneePicker({ label, hint, value, teams, canEd
         </select>
       )}
       {mode === 'person' && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 8 }}>
-          <input type="text" placeholder="Name" value={personName} disabled={disabled} onChange={(e) => setPersonName(e.target.value)} />
-          <input type="email" placeholder="Email (optional)" value={personEmail} disabled={disabled} onChange={(e) => setPersonEmail(e.target.value)} />
+        <div style={{ marginBottom: 8 }}>
+          {usersFn.loading && <div className="q-hint">Loading authorized users…</div>}
+          {usersFn.error && (
+            <div className="q-hint err">
+              Couldn&apos;t load authorized users ({usersFn.error}).{' '}
+              <button className="retry-btn" onClick={() => void usersFn.trigger()}>
+                Retry
+              </button>
+            </div>
+          )}
+          {usersFn.data && (
+            <select value={personEmail} disabled={disabled} onChange={(e) => pickPerson(e.target.value)}>
+              <option value="">— Select a person —</option>
+              {users.map((u) => (
+                <option key={u.id} value={u.email}>
+                  {u.name ? `${u.name} (${u.email})` : u.email}
+                </option>
+              ))}
+              {stale && <option value={personEmail}>{(value.name ? `${value.name} (${personEmail})` : personEmail) + ' — not in Authorized Users'}</option>}
+            </select>
+          )}
         </div>
       )}
       <button
