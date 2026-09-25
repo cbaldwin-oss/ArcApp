@@ -67,7 +67,9 @@ export type Capability = 'siteLogging' | 'cxAlloyActions'
 
 const CAPABILITIES: Record<ProjectKey, Record<Capability, boolean>> = {
   STY4: { siteLogging: true, cxAlloyActions: true },
-  SANNT1B: { siteLogging: false, cxAlloyActions: false },
+  // cxAlloyActions flipped on 2026-09-25 — SAN-NT1B's Apps Script now has getChecklists/
+  // getIssues/getCxAlloySettings added (see AppendToCxAlloyScript.gs), confirmed deployed.
+  SANNT1B: { siteLogging: false, cxAlloyActions: true },
 }
 
 export function hasCapability(cap: Capability, project: ProjectKey = CURRENT_PROJECT): boolean {
