@@ -679,13 +679,30 @@ http://localhost:5173/**
 Leave **Site URL** as LaunchPad's — it's just the fallback when a `redirectTo` isn't on the allow-
 list above, and both sign-in paths here already pass their own (`window.location.origin`).
 
-**Verified** with a faked signed-in session (real Google OAuth needs a browser flow this can't
-automate) across four scenarios: signed out entirely (only the sign-in page renders, confirmed
-zero Supabase queries fire — not just zero visible UI); signed in as an editor (full app renders,
-Settings shows the read-only hint with every field disabled); signed in as an admin (Settings
-fully editable, Authorized Users list shows and lets you change roles); signed in but not on the
-allowlist (sign-in page shown again with the "isn't authorized" message, not the app). All four
-matched exactly. A production build was also run clean after the change.
+**Verified client-side** with a faked signed-in session (real Google OAuth needs a browser flow
+this can't automate) across four scenarios: signed out entirely (only the sign-in page renders,
+confirmed zero Supabase queries fire — not just zero visible UI); signed in as an editor (full app
+renders, Settings shows the read-only hint with every field disabled); signed in as an admin
+(Settings fully editable, Authorized Users list shows and lets you change roles); signed in but not
+on the allowlist (sign-in page shown again with the "isn't authorized" message, not the app). All
+four matched exactly. A production build was also run clean after the change.
+
+**That faked-session testing missed a real server-side bug**, because faking the session mocks the
+Supabase REST layer entirely and never exercises real Postgres RLS evaluation. The first actual
+Google OAuth sign-in failed with `infinite recursion detected in policy for relation
+"arcapp_authorized_users"` — every write policy above (`settings_write_admins`,
+`workflow_items_write_authorized`, `submittals_write_authorized`, the submittals storage-bucket
+policies, and `authorized_users_write_admins` itself) had been written as a raw
+`EXISTS (SELECT 1 FROM arcapp_authorized_users ...)` subquery, and Postgres re-applies that table's
+own RLS policies every time any policy's subquery selects from it — including the subquery inside
+`arcapp_authorized_users`' own policy, which recurses forever. Fixed by moving the check into two
+`SECURITY DEFINER` functions (`is_arcapp_admin()`, `is_arcapp_authorized()` — SECURITY DEFINER runs
+as the function owner and bypasses RLS inside the function body, so the lookup no longer re-enters
+the calling policy) and pointing every affected policy at one of those instead of an inline
+subquery — see the top of `supabase/policies.sql`. Confirmed live via `pg_policies` that all 7
+affected policies now reference the functions and no raw self-referential subquery remains. Real
+Google sign-in has not yet been re-confirmed end-to-end after this fix — that still needs a live
+retry.
 
 ## Workflow items
 

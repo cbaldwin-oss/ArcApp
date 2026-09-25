@@ -4,6 +4,29 @@
 -- the policy already exists — drop it first if you need to redefine one).
 -- =============================================================================
 
+-- APPLIED 2026-09-24, fixing a real outage: every "authorized/admin" write policy below was
+-- originally written as a raw `EXISTS (SELECT 1 FROM arcapp_authorized_users a WHERE ...)`
+-- subquery. The very first real Google OAuth sign-in hit
+-- `infinite recursion detected in policy for relation "arcapp_authorized_users"` — because
+-- Postgres re-applies arcapp_authorized_users' own RLS policies every time ANY policy's subquery
+-- selects from that table, including a subquery inside arcapp_authorized_users' own policy, which
+-- recurses forever. This wasn't caught by this repo's Playwright sign-in tests because those mock
+-- the Supabase REST layer entirely and never exercise real Postgres RLS evaluation.
+--
+-- Fix: two SECURITY DEFINER functions. SECURITY DEFINER runs as the function's owner (a role with
+-- table access), bypassing RLS *inside* the function body, so the lookup no longer re-triggers the
+-- calling policy. Every policy that used to inline the subquery now calls one of these instead.
+CREATE OR REPLACE FUNCTION is_arcapp_admin() RETURNS boolean
+LANGUAGE sql SECURITY DEFINER STABLE SET search_path = public
+AS $$ SELECT EXISTS (SELECT 1 FROM arcapp_authorized_users a WHERE lower(a.email) = lower(auth.jwt() ->> 'email') AND a.role = 'admin') $$;
+
+CREATE OR REPLACE FUNCTION is_arcapp_authorized() RETURNS boolean
+LANGUAGE sql SECURITY DEFINER STABLE SET search_path = public
+AS $$ SELECT EXISTS (SELECT 1 FROM arcapp_authorized_users a WHERE lower(a.email) = lower(auth.jwt() ->> 'email')) $$;
+
+GRANT EXECUTE ON FUNCTION is_arcapp_admin() TO authenticated, anon;
+GRANT EXECUTE ON FUNCTION is_arcapp_authorized() TO authenticated, anon;
+
 ALTER TABLE arcapp_workflows ENABLE ROW LEVEL SECURITY;
 ALTER TABLE arcapp_settings ENABLE ROW LEVEL SECURITY;
 
@@ -40,8 +63,8 @@ CREATE POLICY "workflows_write_public" ON arcapp_workflows
 -- arcapp_authorized_users below.
 CREATE POLICY "settings_write_admins" ON arcapp_settings
   FOR ALL TO authenticated
-  USING (EXISTS (SELECT 1 FROM arcapp_authorized_users a WHERE lower(a.email) = lower(auth.jwt() ->> 'email') AND a.role = 'admin'))
-  WITH CHECK (EXISTS (SELECT 1 FROM arcapp_authorized_users a WHERE lower(a.email) = lower(auth.jwt() ->> 'email') AND a.role = 'admin'));
+  USING (is_arcapp_admin())
+  WITH CHECK (is_arcapp_admin());
 
 
 
@@ -60,8 +83,8 @@ CREATE POLICY "workflow_items_select_public" ON arcapp_workflow_items
 
 CREATE POLICY "workflow_items_write_authorized" ON arcapp_workflow_items
   FOR ALL TO authenticated
-  USING (EXISTS (SELECT 1 FROM arcapp_authorized_users a WHERE lower(a.email) = lower(auth.jwt() ->> 'email')))
-  WITH CHECK (EXISTS (SELECT 1 FROM arcapp_authorized_users a WHERE lower(a.email) = lower(auth.jwt() ->> 'email')));
+  USING (is_arcapp_authorized())
+  WITH CHECK (is_arcapp_authorized());
 
 
 -- =============================================================================
@@ -131,9 +154,11 @@ CREATE POLICY "tasks_write_public" ON arcapp_tasks
 -- anon read at all and no way for a signed-in user to see the whole roster. Admins additionally
 -- get full read+write (for the management UI in Settings) via the second, ALL-scoped policy —
 -- Postgres RLS ORs multiple permissive policies for the same command together, so both apply at
--- once. This is self-referential (checks THIS table to decide who can write to THIS table) rather
--- than deferring to STY4authorized_editors — by explicit request, so ArcApp's access control has
--- no dependency on LaunchPad's shared table at all, in either direction.
+-- once. This checks THIS table to decide who can write to THIS table rather than deferring to
+-- STY4authorized_editors — by explicit request, so ArcApp's access control has no dependency on
+-- LaunchPad's shared table at all, in either direction. The write policy goes through
+-- is_arcapp_admin() (see top of file) rather than an inline subquery, specifically because a
+-- same-table subquery here recurses infinitely — this table is the one that surfaced the bug.
 -- =============================================================================
 
 ALTER TABLE arcapp_authorized_users ENABLE ROW LEVEL SECURITY;
@@ -144,8 +169,8 @@ CREATE POLICY "authorized_users_select_own" ON arcapp_authorized_users
 
 CREATE POLICY "authorized_users_write_admins" ON arcapp_authorized_users
   FOR ALL TO authenticated
-  USING (EXISTS (SELECT 1 FROM arcapp_authorized_users a WHERE lower(a.email) = lower(auth.jwt() ->> 'email') AND a.role = 'admin'))
-  WITH CHECK (EXISTS (SELECT 1 FROM arcapp_authorized_users a WHERE lower(a.email) = lower(auth.jwt() ->> 'email') AND a.role = 'admin'));
+  USING (is_arcapp_admin())
+  WITH CHECK (is_arcapp_admin());
 
 
 -- =============================================================================
@@ -161,32 +186,23 @@ CREATE POLICY "submittals_select_public" ON arcapp_submittals
 
 CREATE POLICY "submittals_write_authorized" ON arcapp_submittals
   FOR ALL TO authenticated
-  USING (EXISTS (SELECT 1 FROM arcapp_authorized_users a WHERE lower(a.email) = lower(auth.jwt() ->> 'email')))
-  WITH CHECK (EXISTS (SELECT 1 FROM arcapp_authorized_users a WHERE lower(a.email) = lower(auth.jwt() ->> 'email')));
+  USING (is_arcapp_authorized())
+  WITH CHECK (is_arcapp_authorized());
 
 -- Storage: the "submittals" bucket (created in schema.sql) is a PUBLIC bucket, so reading an
 -- uploaded file's public URL needs no policy at all — but writes to storage.objects always need
 -- one regardless of bucket visibility, or every upload gets rejected.
 CREATE POLICY "submittals_bucket_insert_authorized" ON storage.objects
   FOR INSERT TO authenticated
-  WITH CHECK (
-    bucket_id = 'submittals'
-    AND EXISTS (SELECT 1 FROM arcapp_authorized_users a WHERE lower(a.email) = lower(auth.jwt() ->> 'email'))
-  );
+  WITH CHECK (bucket_id = 'submittals' AND is_arcapp_authorized());
 
 CREATE POLICY "submittals_bucket_update_authorized" ON storage.objects
   FOR UPDATE TO authenticated
-  USING (
-    bucket_id = 'submittals'
-    AND EXISTS (SELECT 1 FROM arcapp_authorized_users a WHERE lower(a.email) = lower(auth.jwt() ->> 'email'))
-  );
+  USING (bucket_id = 'submittals' AND is_arcapp_authorized());
 
 CREATE POLICY "submittals_bucket_delete_authorized" ON storage.objects
   FOR DELETE TO authenticated
-  USING (
-    bucket_id = 'submittals'
-    AND EXISTS (SELECT 1 FROM arcapp_authorized_users a WHERE lower(a.email) = lower(auth.jwt() ->> 'email'))
-  );
+  USING (bucket_id = 'submittals' AND is_arcapp_authorized());
 
 
 -- =============================================================================
