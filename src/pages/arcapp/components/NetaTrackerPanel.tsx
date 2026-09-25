@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useState } from 'react'
+import { useOutletContext } from 'react-router-dom'
 import { ChevronDown, ChevronRight, RefreshCw } from 'lucide-react'
 import { useGetNetaTrackerData, useUpdateNetaField } from '../../../lib/api'
 import type { NetaReturnedRow, NetaSubmissionRow, NetaTab } from '../../../lib/api'
-import { hasCapability } from '../../../lib/project'
+import type { ShellContext } from '../ShellContext'
 import CapabilityNotice from './CapabilityNotice'
 
 type TabKey = 'submissions' | 'returned'
@@ -276,10 +277,12 @@ function ReturnedRow({ row }: { row: NetaReturnedRow }) {
  * Mimics the "STY4 NETA Tracker" Google Sheet's Submissions/Returned Files tabs — same Zone >
  * Area > Asset Category grouping, same checkboxes, same Comments field — with every edit here
  * writing straight back to that live sheet (see updateNetaField in api.ts) instead of ArcApp
- * keeping a separate copy. STY4-only today; see the `netaTracker` capability in src/lib/project.ts.
+ * keeping a separate copy. Gated by the per-project `netaTrackerEnabled` Settings toggle (see
+ * ShellContext) rather than a project.ts capability, so an admin can turn it on for a new site.
  */
 export default function NetaTrackerPanel() {
-  const available = hasCapability('netaTracker')
+  const ctx = useOutletContext<ShellContext>()
+  const available = ctx.netaTrackerEnabled
   const fn = useGetNetaTrackerData()
 
   useEffect(() => {

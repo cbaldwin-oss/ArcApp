@@ -11,7 +11,6 @@ import {
   useSaveItemAssignments,
 } from '../../../lib/api'
 import type { ChecklistRow, CxAlloyLinkBase, DefaultAssignee, IssueRow, ItemAssignment, ItemType, NetaReturnedRow, NetaSubmissionRow } from '../../../lib/api'
-import { hasCapability } from '../../../lib/project'
 import type { ShellContext } from '../ShellContext'
 import type { Team } from '../types'
 import { isTodoMine, todoAssignmentLabel } from '../utils'
@@ -195,6 +194,7 @@ export type OpenItemsDataInput = Pick<
   ShellContext,
   | 'checklistTodoEnabled'
   | 'issueTodoEnabled'
+  | 'netaTrackerEnabled'
   | 'netaSubmissionsTodoEnabled'
   | 'netaReturnedTodoEnabled'
   | 'checklistDefaultAssignee'
@@ -224,6 +224,7 @@ export function useOpenItemsData(input: OpenItemsDataInput) {
   const {
     checklistTodoEnabled,
     issueTodoEnabled,
+    netaTrackerEnabled,
     netaSubmissionsTodoEnabled,
     netaReturnedTodoEnabled,
     checklistDefaultAssignee,
@@ -235,12 +236,11 @@ export function useOpenItemsData(input: OpenItemsDataInput) {
     cxAlloyLinkBase,
   } = input
 
-  // NETA Tracker is STY4-only (see the `netaTracker` capability in src/lib/project.ts) — even
-  // though the Settings toggles above are project-scoped and shouldn't stay on after a switch,
-  // this is the same defense-in-depth every other NETA consumer applies.
-  const netaAvailable = hasCapability('netaTracker')
-  const netaSubmissionsOn = netaSubmissionsTodoEnabled && netaAvailable
-  const netaReturnedOn = netaReturnedTodoEnabled && netaAvailable
+  // NETA Tracker's per-project on/off Settings toggle — even though the Submissions/Returned
+  // toggles above are project-scoped too and shouldn't stay on after a switch, this is the same
+  // defense-in-depth every other NETA consumer applies.
+  const netaSubmissionsOn = netaSubmissionsTodoEnabled && netaTrackerEnabled
+  const netaReturnedOn = netaReturnedTodoEnabled && netaTrackerEnabled
 
   // "Still open" fetches — power the individually-assigned "My Tasks" rows (myItems below). An
   // assignment made while the old Open-list UI existed is keyed by CxAlloy/NETA id regardless of

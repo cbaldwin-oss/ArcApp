@@ -5,12 +5,12 @@ import CxAlloyStatusPicker from './CxAlloyStatusPicker'
 import AuthorizedUsersManager from './AuthorizedUsersManager'
 import SubmittalExemptAssetsManager from './SubmittalExemptAssetsManager'
 import DefaultAssigneePicker from './DefaultAssigneePicker'
-import { hasCapability } from '../../../lib/project'
 import type { DefaultAssignee } from '../../../lib/api'
 import type { Team } from '../types'
 
 type Props = {
   jointPackFolder: string
+  netaTrackerEnabled: boolean
   checklistReadyStatuses: string[]
   issueReviewStatuses: string[]
   submittalExemptAssets: string[]
@@ -157,6 +157,7 @@ function ToggleField({
 
 export default function SettingsPanel({
   jointPackFolder,
+  netaTrackerEnabled,
   checklistReadyStatuses,
   issueReviewStatuses,
   submittalExemptAssets,
@@ -279,53 +280,63 @@ export default function SettingsPanel({
           />
         </div>
 
-        {hasCapability('netaTracker') && (
-          <div style={{ marginBottom: 22, maxWidth: 560 }}>
-            <label style={{ display: 'block', marginBottom: 4, fontFamily: 'var(--font-display)', fontSize: 13, fontWeight: 700, letterSpacing: '0.4px', textTransform: 'uppercase', color: 'var(--text)' }}>
-              NETA Tracker To-Do
-            </label>
-            <div className="q-hint" style={{ marginBottom: 12 }}>
-              Same idea as Checklist/Issue To-Do above, for the NETA Tracker's two tabs. "Still
-              open" isn't configurable here — it's the same not-yet-completed definition the NETA
-              Tracker page itself uses (Submissions: not yet Submitted to Google; Returned Files:
-              not yet Uploaded to ACC).
-            </div>
-            <ToggleField
-              label="NETA Submissions To-Do"
-              hint="Turns on the NETA Submissions default-assignee summary card and My Tasks entries below."
-              initial={netaSubmissionsTodoEnabled}
-              canEdit={isAdmin}
-              loading={loading}
-              onSave={(v) => onSaveSetting('neta_submissions_todo_enabled', v ? 'true' : '')}
-            />
-            <DefaultAssigneePicker
-              label="NETA Submissions — default assignee"
-              hint="When set and at least one submission is still open, this team/person gets a single 'NETA Submissions need to be reviewed' card in Your To-Dos, linking to the NETA Tracker page."
-              value={netaSubmissionsDefaultAssignee}
-              teams={teams}
-              canEdit={isAdmin}
-              loading={loading}
-              onSave={(v) => onSaveDefaultAssignee('neta_submissions_default_assignee', v)}
-            />
-            <ToggleField
-              label="NETA Returned Files To-Do"
-              hint="Turns on the NETA Returned Files default-assignee summary card and My Tasks entries below."
-              initial={netaReturnedTodoEnabled}
-              canEdit={isAdmin}
-              loading={loading}
-              onSave={(v) => onSaveSetting('neta_returned_todo_enabled', v ? 'true' : '')}
-            />
-            <DefaultAssigneePicker
-              label="NETA Returned Files — default assignee"
-              hint="When set and at least one returned file is still open, this team/person gets a single 'NETA Returned Files need to be reviewed' card in Your To-Dos, linking to the NETA Tracker page."
-              value={netaReturnedDefaultAssignee}
-              teams={teams}
-              canEdit={isAdmin}
-              loading={loading}
-              onSave={(v) => onSaveDefaultAssignee('neta_returned_default_assignee', v)}
-            />
-          </div>
-        )}
+        <div style={{ marginBottom: 22, maxWidth: 560 }}>
+          <label style={{ display: 'block', marginBottom: 4, fontFamily: 'var(--font-display)', fontSize: 13, fontWeight: 700, letterSpacing: '0.4px', textTransform: 'uppercase', color: 'var(--text)' }}>
+            NETA Tracker
+          </label>
+          <ToggleField
+            label="NETA Tracker enabled for this project"
+            hint="Turns on the NETA Tracker page, its Sidebar nav item, and the To-Do settings below. Requires this project's own NETA Sheet + Apps Script to already be deployed (see README) — turning this on before that's ready shows a clean 'not wired up yet' error instead of breaking anything."
+            initial={netaTrackerEnabled}
+            canEdit={isAdmin}
+            loading={loading}
+            onSave={(v) => onSaveSetting('neta_tracker_enabled', v ? 'true' : '')}
+          />
+          {netaTrackerEnabled && (
+            <>
+              <div className="q-hint" style={{ marginTop: 12, marginBottom: 12 }}>
+                Same idea as Checklist/Issue To-Do above, for the NETA Tracker's two tabs. "Still
+                open" isn't configurable here — it's the same not-yet-completed definition the NETA
+                Tracker page itself uses (Submissions: not yet Submitted to Google; Returned Files:
+                not yet Uploaded to ACC).
+              </div>
+              <ToggleField
+                label="NETA Submissions To-Do"
+                hint="Turns on the NETA Submissions default-assignee summary card and My Tasks entries below."
+                initial={netaSubmissionsTodoEnabled}
+                canEdit={isAdmin}
+                loading={loading}
+                onSave={(v) => onSaveSetting('neta_submissions_todo_enabled', v ? 'true' : '')}
+              />
+              <DefaultAssigneePicker
+                label="NETA Submissions — default assignee"
+                hint="When set and at least one submission is still open, this team/person gets a single 'NETA Submissions need to be reviewed' card in Your To-Dos, linking to the NETA Tracker page."
+                value={netaSubmissionsDefaultAssignee}
+                teams={teams}
+                canEdit={isAdmin}
+                loading={loading}
+                onSave={(v) => onSaveDefaultAssignee('neta_submissions_default_assignee', v)}
+              />
+              <ToggleField
+                label="NETA Returned Files To-Do"
+                hint="Turns on the NETA Returned Files default-assignee summary card and My Tasks entries below."
+                initial={netaReturnedTodoEnabled}
+                canEdit={isAdmin}
+                loading={loading}
+                onSave={(v) => onSaveSetting('neta_returned_todo_enabled', v ? 'true' : '')}
+              />
+              <DefaultAssigneePicker
+                label="NETA Returned Files — default assignee"
+                hint="When set and at least one returned file is still open, this team/person gets a single 'NETA Returned Files need to be reviewed' card in Your To-Dos, linking to the NETA Tracker page."
+                value={netaReturnedDefaultAssignee}
+                teams={teams}
+                canEdit={isAdmin}
+                loading={loading}
+                onSave={(v) => onSaveDefaultAssignee('neta_returned_default_assignee', v)}
+              />
+            </>
+          )}
+        </div>
 
         <WorkflowsBuilder canEdit={canManageWorkflows} canEditItems={canEdit} />
 

@@ -785,13 +785,16 @@ export function useLogJointPackPhotos() {
 // sheet uses in place of native row grouping (e.g. "ZONE HEADER: ZONE 1", "------ AREA: EY09
 // ------", "[ ASSET CATEGORY: ATX-A ]") — the script parses these while walking the sheet and
 // stamps every data row with the nearest one above it, so this file never needs to know that
-// convention itself. STY4-only — see the `netaTracker` capability in src/lib/project.ts.
+// convention itself. Gated by `netaTrackerEnabled` (AppSettings, below) rather than a
+// project.ts capability — an admin flips this on per-project from Settings once that project's
+// own NETA Sheet/script is ready, no ArcApp code change/redeploy needed.
 // ---------------------------------------------------------------------------
 
 const NETA_SCRIPT_SETTING_KEY = 'neta_tracker_script_url'
 
 async function getNetaScriptUrl(): Promise<string> {
-  if (!hasCapability('netaTracker')) throw new Error('NETA Tracker isn’t available for this project.')
+  const { netaTrackerEnabled } = await getSettings()
+  if (!netaTrackerEnabled) throw new Error('NETA Tracker isn’t enabled for this project.')
   const res = await supabase
     .from('arcapp_settings')
     .select('setting_value')
@@ -1104,6 +1107,11 @@ const EMPTY_ASSIGNEE: DefaultAssignee = { teamId: null, email: null, name: null 
 
 export type AppSettings = {
   jointPackPhotosFolder: string
+  /** Per-project on/off switch for the whole NETA Tracker module (page, nav item, and its To-Do
+   * integration) — moved here from a project.ts capability constant on 2026-09-25 so an admin can
+   * turn it on for a newly-onboarded site themselves, once that site's own NETA Sheet/script is
+   * ready, without a code change/redeploy. Off by default for any project until set. */
+  netaTrackerEnabled: boolean
   checklistReadyStatuses: string[]
   issueReviewStatuses: string[]
   /** Assets marked "not reviewable" — excluded entirely from the Submittals page's missing-
@@ -1158,6 +1166,7 @@ async function getSettings(): Promise<AppSettings> {
   const map = new Map(rows.map((r) => [r.setting_key, r.setting_value ?? '']))
   return {
     jointPackPhotosFolder: map.get('joint_pack_photos_folder') ?? '',
+    netaTrackerEnabled: map.get('neta_tracker_enabled') === 'true',
     checklistReadyStatuses: splitCsv(map.get('checklist_ready_statuses'), SETTINGS_DEFAULTS.checklistReadyStatuses),
     issueReviewStatuses: splitCsv(map.get('issue_review_statuses'), SETTINGS_DEFAULTS.issueReviewStatuses),
     submittalExemptAssets: splitCsv(map.get('submittal_exempt_assets'), SETTINGS_DEFAULTS.submittalExemptAssets),
@@ -1178,6 +1187,7 @@ export function useGetSettings() {
 
 const ALLOWED_SETTING_KEYS = new Set([
   'joint_pack_photos_folder',
+  'neta_tracker_enabled',
   'checklist_ready_statuses',
   'issue_review_statuses',
   'submittal_exempt_assets',

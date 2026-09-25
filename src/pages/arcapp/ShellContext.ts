@@ -53,6 +53,10 @@ export type ShellContext = {
   isAdmin: boolean
   canManageWorkflows: boolean
 
+  /** Per-project on/off switch for the whole NETA Tracker module — see AppSettings in api.ts.
+   * Drives the Sidebar nav item, the page itself, its Settings section, and its To-Do
+   * integration, replacing what used to be a project.ts capability constant. */
+  netaTrackerEnabled: boolean
   checklistReadyStatuses: string[]
   issueReviewStatuses: string[]
   submittalExemptAssets: string[]

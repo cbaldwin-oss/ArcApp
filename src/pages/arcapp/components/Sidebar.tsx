@@ -29,13 +29,20 @@ const NAV: Array<{ to: string; label: string; icon: typeof LayoutDashboard; requ
   { to: '/tamperseals', label: 'Tamper Seals', icon: ShieldAlert, requires: 'siteLogging' },
   { to: '/rtft', label: 'RTFT', icon: ClipboardCheck, requires: 'siteLogging' },
   { to: '/attributes', label: 'Asset Attributes', icon: Tag, requires: 'cxAlloyActions' },
-  { to: '/netatracker', label: 'NETA Tracker', icon: FileSpreadsheet, requires: 'netaTracker' },
   { to: '/equipmenttracker', label: 'Equipment Tracker', icon: Grid3x3 },
   { to: '/settings', label: 'Settings', icon: SettingsIcon },
 ]
 
-export default function Sidebar() {
+/** NETA Tracker isn't in the static NAV list above — unlike the other gated items, its
+ * availability is a per-project Settings toggle (`netaTrackerEnabled`), not a project.ts
+ * capability, so it's spliced in conditionally instead of filtered via `requires`. */
+const NETA_NAV_ITEM = { to: '/netatracker', label: 'NETA Tracker', icon: FileSpreadsheet }
+
+export default function Sidebar({ netaTrackerEnabled }: { netaTrackerEnabled: boolean }) {
   const items = NAV.filter((item) => !item.requires || hasCapability(item.requires))
+  // Slotted after "Attributes" / before "Equipment Tracker", matching where it used to sit in NAV.
+  const equipmentTrackerIdx = items.findIndex((i) => i.to === '/equipmenttracker')
+  if (netaTrackerEnabled) items.splice(equipmentTrackerIdx, 0, NETA_NAV_ITEM)
   return (
     <nav className="arcapp-sidebar" aria-label="Main">
       <div className="arcapp-sidebar-nav">

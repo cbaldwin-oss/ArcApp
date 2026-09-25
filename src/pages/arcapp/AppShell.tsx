@@ -130,6 +130,7 @@ export default function AppShell() {
   const settingsData = settingsFn.data as
     | {
         jointPackPhotosFolder?: string
+        netaTrackerEnabled?: boolean
         checklistReadyStatuses?: string[]
         issueReviewStatuses?: string[]
         submittalExemptAssets?: string[]
@@ -145,6 +146,7 @@ export default function AppShell() {
       }
     | undefined
   const jointPackFolder = settingsData?.jointPackPhotosFolder ?? ''
+  const netaTrackerEnabled = settingsData?.netaTrackerEnabled ?? false
   const checklistReadyStatuses = settingsData?.checklistReadyStatuses ?? []
   const issueReviewStatuses = settingsData?.issueReviewStatuses ?? []
   const submittalExemptAssets = settingsData?.submittalExemptAssets ?? []
@@ -172,6 +174,7 @@ export default function AppShell() {
   const openItems = useOpenItemsData({
     checklistTodoEnabled: checklistTodoEnabled && !!user,
     issueTodoEnabled: issueTodoEnabled && !!user,
+    netaTrackerEnabled,
     netaSubmissionsTodoEnabled: netaSubmissionsTodoEnabled && !!user,
     netaReturnedTodoEnabled: netaReturnedTodoEnabled && !!user,
     checklistDefaultAssignee,
@@ -346,6 +349,7 @@ export default function AppShell() {
     onScheduleRetry: () => void scheduleFn.trigger({ date: selectedDate }),
 
     jointPackFolder,
+    netaTrackerEnabled,
 
     canEdit,
     isAdmin,
@@ -395,7 +399,7 @@ export default function AppShell() {
       <ContextStrip />
 
       <div className="arcapp-layout">
-        <Sidebar />
+        <Sidebar netaTrackerEnabled={netaTrackerEnabled} />
 
         <main className={isFullBleed ? 'main-full' : undefined}>
           <Outlet context={outletContext} />

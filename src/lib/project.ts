@@ -41,10 +41,9 @@ export function projectLabel(key: ProjectKey): string {
 }
 
 /**
- * Two independent capability gaps found while wiring up SAN-NT1B, both requiring manual setup on
- * the LaunchPad/Sheet side that this app can't do for you — pages depending on either show an
- * "unavailable for this project" notice instead of silently erroring or (worse) rendering broken
- * data:
+ * Capability gaps found while wiring up SAN-NT1B, requiring manual setup on the LaunchPad/Sheet
+ * side that this app can't do for you — pages depending on either show an "unavailable for this
+ * project" notice instead of silently erroring or (worse) rendering broken data:
  *
  *  - `siteLogging`: Tamper Seals and RTFT write to <prefix>Assets/<prefix>RTFT — those tables
  *    only exist for STY4 today.
@@ -56,14 +55,19 @@ export function projectLabel(key: ProjectKey): string {
  *    unrecognized `action` param there currently falls through to a different, equipment-tracker-
  *    shaped default response instead of an error, which would otherwise render as a page full of
  *    blank/malformed rows rather than fail cleanly.
- *  - `netaTracker`: mirrors the "STY4 NETA Tracker" Google Sheet (see NetaTrackerPanel.tsx) via
- *    its own dedicated Apps Script — that sheet, and its script, only exist for STY4 today.
+ *
+ * NETA Tracker used to be a third capability here (`netaTracker`) but moved to a per-project
+ * Settings toggle instead (`netaTrackerEnabled` in AppSettings, `neta_tracker_enabled` in
+ * arcapp_settings — see api.ts/SettingsPanel.tsx) as of 2026-09-25, by request: unlike the two
+ * gaps above, NETA Tracker's Sheet/script is a brand-new per-site build every time (not just "add
+ * an action to an existing script"), so an admin turning it on for a newly-onboarded site
+ * shouldn't need a code change and redeploy of ArcApp itself.
  */
-export type Capability = 'siteLogging' | 'cxAlloyActions' | 'netaTracker'
+export type Capability = 'siteLogging' | 'cxAlloyActions'
 
 const CAPABILITIES: Record<ProjectKey, Record<Capability, boolean>> = {
-  STY4: { siteLogging: true, cxAlloyActions: true, netaTracker: true },
-  SANNT1B: { siteLogging: false, cxAlloyActions: false, netaTracker: false },
+  STY4: { siteLogging: true, cxAlloyActions: true },
+  SANNT1B: { siteLogging: false, cxAlloyActions: false },
 }
 
 export function hasCapability(cap: Capability, project: ProjectKey = CURRENT_PROJECT): boolean {

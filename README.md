@@ -275,9 +275,16 @@ Pack Photo's) — `useGetNetaTrackerData`/`useUpdateNetaField` in `src/lib/api.t
   (Found and fixed a related bug live: the "Show completed" filter's `r.uploadedToAcc` truthiness
   check treated the *string* `"N/A"` as truthy, hiding open-issue rows behind that toggle by
   mistake — changed to `r.uploadedToAcc === true`.)
-- STY4-only today — gated by the `netaTracker` capability in `src/lib/project.ts`; SAN-NT1B shows
-  the standard "not available for this project" notice since it has no NETA Tracker sheet or
-  script of its own.
+- **Gated by a per-project Settings toggle, not a project.ts capability** (changed 2026-09-25 —
+  `netaTracker` used to be a third hardcoded capability alongside `siteLogging`/`cxAlloyActions`,
+  requiring a code change/redeploy to turn on for a new site). Settings → NETA Tracker → "NETA
+  Tracker enabled for this project" (`neta_tracker_enabled` in `arcapp_settings`,
+  `netaTrackerEnabled` in `AppSettings`/`ShellContext`) is admin-toggleable per project — flip it on
+  once that project's own NETA Sheet + Apps Script are actually deployed, no ArcApp code change
+  needed. Off shows the standard "not available for this project" notice, same as before; the
+  toggle itself always renders (even while off) so an admin can find and flip it. STY4 was seeded
+  with this on (`neta_tracker_enabled = 'true'`) to preserve its existing behavior across the
+  change; SAN-NT1B starts off, same as before.
 - No sign-in required to toggle checkboxes or edit comments, same as Tamper Seal/RTFT logging.
 - **Verified against the real deployed script and real sheet data** (778 Submissions / 119 Returned
   Files rows): `getNetaData`'s shape and row counts match a direct workbook inspection exactly; a

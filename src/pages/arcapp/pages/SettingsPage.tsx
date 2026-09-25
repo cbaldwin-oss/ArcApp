@@ -7,6 +7,7 @@ export default function SettingsPage() {
   return (
     <SettingsPanel
       jointPackFolder={ctx.jointPackFolder}
+      netaTrackerEnabled={ctx.netaTrackerEnabled}
       checklistReadyStatuses={ctx.checklistReadyStatuses}
       issueReviewStatuses={ctx.issueReviewStatuses}
       submittalExemptAssets={ctx.submittalExemptAssets}
