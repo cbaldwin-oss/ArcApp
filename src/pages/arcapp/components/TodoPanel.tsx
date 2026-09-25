@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react'
 import { Maximize2, Pencil, Trash2 } from 'lucide-react'
 import type { Team, Todo } from '../types'
 import { todoTagLabel, todoDueDisplay, todoAssignmentLabel } from '../utils'
@@ -55,10 +56,17 @@ type TodoPanelProps = {
   todos: Todo[]
   onToggle: (id: string) => void
   onExpand: () => void
+  /** Checklist/Issue/NETA "My Tasks" rows + default-assignee summary cards (see useOpenItemsData
+   * in AppShell.tsx) — rendered above the manual task list, same as the full To-Do page does, so
+   * these notices show up here too instead of only appearing once you open the To-Do page. */
+  extraRows?: ReactNode
+  /** How many of the above count toward the header's "N open" — kept separate from `todos.length`
+   * since these aren't Todo records and have no `done` state to filter on. */
+  extraOpenCount?: number
 }
 
-export default function TodoPanel({ todos, onToggle, onExpand }: TodoPanelProps) {
-  const open = todos.filter((t) => !t.done).length
+export default function TodoPanel({ todos, onToggle, onExpand, extraRows, extraOpenCount = 0 }: TodoPanelProps) {
+  const open = todos.filter((t) => !t.done).length + extraOpenCount
   return (
     <section className="panel" id="todo">
       <div className="panel-header">
@@ -73,6 +81,7 @@ export default function TodoPanel({ todos, onToggle, onExpand }: TodoPanelProps)
         </div>
       </div>
       <div className="panel-body">
+        {extraRows}
         <TodoList todos={todos} onToggle={onToggle} />
       </div>
     </section>

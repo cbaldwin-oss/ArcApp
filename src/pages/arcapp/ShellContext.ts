@@ -1,5 +1,6 @@
 import type { ScheduleRow, ScheduleState, Team, TeamMember, Todo } from './types'
 import type { CxAlloyLinkBase, DefaultAssignee, TaskInput } from '../../lib/api'
+import type { OpenItemsData } from './components/OpenItemsTodoPanel'
 
 /**
  * Passed down via react-router's <Outlet context={...}> from AppShell to whichever page is
@@ -77,4 +78,10 @@ export type ShellContext = {
   settingsLoading: boolean
   onSaveSetting: (key: string, value: string) => Promise<void>
   onSaveDefaultAssignee: (prefix: string, result: DefaultAssignee) => Promise<void>
+
+  /** Checklist/Issue/NETA "open items" — fetched once at sign-in (see useOpenItemsData in
+   * AppShell.tsx) rather than lazily when the To-Do page mounts, so the Dashboard's "Your To-Dos"
+   * widget and the To-Do page's own sections/summary cards read from the same already-warm data
+   * instead of each triggering their own fetch. */
+  openItems: OpenItemsData
 }

@@ -17,6 +17,7 @@ import Sidebar from './components/Sidebar'
 import ContextStrip from './components/ContextStrip'
 import ActivityDrawer from './components/ActivityDrawer'
 import SignInPage from './components/SignInPage'
+import { useOpenItemsData } from './components/OpenItemsTodoPanel'
 import type { SealPayloadRow } from './components/TamperSealSection'
 import type { RtftPayload } from './components/RtftSection'
 
@@ -161,6 +162,26 @@ export default function AppShell() {
   // api.ts for why auto-detection alone can come back null (no Equipment Tracker data synced yet
   // for this project) or, in principle, find the wrong thing.
   const cxAlloyLinkBase = parseCxAlloyLinkBase(cxalloyLinkBaseOverride) ?? cxAlloyLinkBaseDetected
+  const currentUserEmail = user?.email ?? null
+
+  // Fetched once here rather than lazily inside TodoPage, so Checklist/Issue/NETA To-Do markers —
+  // both the "My Tasks" rows and the Settings-driven summary cards — are already loaded by the
+  // time someone opens the To-Do page or Dashboard, instead of only starting once the To-Do page
+  // itself mounts. `&& !!user` on each enabled flag keeps this from firing before sign-in resolves
+  // (AppShell's hooks all run before the `!user` gate below, same as every other fetch here).
+  const openItems = useOpenItemsData({
+    checklistTodoEnabled: checklistTodoEnabled && !!user,
+    issueTodoEnabled: issueTodoEnabled && !!user,
+    netaSubmissionsTodoEnabled: netaSubmissionsTodoEnabled && !!user,
+    netaReturnedTodoEnabled: netaReturnedTodoEnabled && !!user,
+    checklistDefaultAssignee,
+    issueDefaultAssignee,
+    netaSubmissionsDefaultAssignee,
+    netaReturnedDefaultAssignee,
+    teams,
+    currentUserEmail,
+    cxAlloyLinkBase,
+  })
 
   const userName = user?.name ?? null
   const initials = user
@@ -306,7 +327,7 @@ export default function AppShell() {
     onSaveTeam: saveTeamRecord,
     onDeleteTeam: deleteTeamRecord,
 
-    currentUserEmail: user?.email ?? null,
+    currentUserEmail,
 
     scheduleState,
     rows,
@@ -347,6 +368,7 @@ export default function AppShell() {
     settingsLoading: settingsFn.loading,
     onSaveSetting: saveSetting,
     onSaveDefaultAssignee: saveDefaultAssignee,
+    openItems,
   }
 
   // Hard gate: nothing else in this component renders until there's a real, authorized session.

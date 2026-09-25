@@ -514,6 +514,12 @@ Workflows — see `supabase/schema.sql`/`policies.sql`.
 Still-open Checklists/Issues (read-only CxAlloy sheet data) now show up on the To-Do page as their
 own assignable sections, instead of only being manually copied into a task by hand.
 
+- **Fetched once at sign-in, not lazily on the To-Do page** (fixed 2026-09-24 — this data used to
+  only start loading once TodoPage mounted, so its "assigned to you" rows and default-assignee
+  summary cards were invisible anywhere else, including the Dashboard). `useOpenItemsData` (in
+  `OpenItemsTodoPanel.tsx`) is now called once in `AppShell.tsx` and handed down as `ctx.openItems`
+  — both `TodoPage.tsx` and `DashboardPage.tsx`'s "Your To-Dos" widget read from that same already-
+  warm data instead of either page triggering its own fetch.
 - **Two independent toggles in Settings** (`checklist_todo_enabled`/`issue_todo_enabled`) turn on
   an "Open Checklists"/"Open Issues" section on the To-Do page. There's no separate status picker
   for "still open" (there used to be — removed 2026-09-24 as a genuine duplicate, since "ready for

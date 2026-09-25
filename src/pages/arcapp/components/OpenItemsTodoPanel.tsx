@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useState } from 'react'
-import { useOutletContext } from 'react-router-dom'
 import { ChevronDown, ChevronRight, RefreshCw } from 'lucide-react'
 import {
   cxAlloyChecklistUrl,
@@ -429,14 +428,30 @@ export function MySummaryCard({ entry, onExpand }: { entry: MySummaryEntry; onEx
   )
 }
 
+export type OpenItemsDataInput = Pick<
+  ShellContext,
+  | 'checklistTodoEnabled'
+  | 'issueTodoEnabled'
+  | 'netaSubmissionsTodoEnabled'
+  | 'netaReturnedTodoEnabled'
+  | 'checklistDefaultAssignee'
+  | 'issueDefaultAssignee'
+  | 'netaSubmissionsDefaultAssignee'
+  | 'netaReturnedDefaultAssignee'
+  | 'teams'
+  | 'currentUserEmail'
+  | 'cxAlloyLinkBase'
+>
+
 /**
- * All the data the four "Open ..." sections AND the "Assigned to You" rows inside "Your To-Dos"
- * need, fetched exactly once — TodoPage.tsx calls this and passes the result to both, so nothing
- * here gets fetched twice (an open-status pick can be thousands of rows; doubling that would be
- * wasteful, not just untidy).
+ * All the data the four "Open ..." sections AND the "Assigned to You"/summary-card rows inside
+ * "Your To-Dos" (both on the To-Do page and the Dashboard widget) need. Called exactly once, in
+ * AppShell.tsx, and handed down via ShellContext (`ctx.openItems`) — rather than each page calling
+ * this itself — so the data loads once at sign-in and is already warm by the time someone opens
+ * the To-Do page or Dashboard, instead of only starting the fetch once the To-Do page mounts (an
+ * open-status pick can be thousands of rows; doubling that per page would be wasteful too).
  */
-export function useOpenItemsData() {
-  const ctx = useOutletContext<ShellContext>()
+export function useOpenItemsData(input: OpenItemsDataInput) {
   const {
     checklistTodoEnabled,
     issueTodoEnabled,
@@ -449,7 +464,7 @@ export function useOpenItemsData() {
     teams,
     currentUserEmail,
     cxAlloyLinkBase,
-  } = ctx
+  } = input
 
   // Bumped by a "My Tasks" summary card's click to force the matching "Open ..." section open
   // (it's collapsed by default) — see sectionDomId/expandSignal on OpenItemsSection above.

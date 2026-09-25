@@ -7,7 +7,7 @@ import type { Todo, TaskTag } from '../types'
 import { isTodoMine } from '../utils'
 import { TodoList } from '../components/TodoPanel'
 import TeamsManager from '../components/TeamsManager'
-import OpenItemsTodoPanel, { MyItemRow, MySummaryCard, useOpenItemsData } from '../components/OpenItemsTodoPanel'
+import OpenItemsTodoPanel, { MyItemRow, MySummaryCard } from '../components/OpenItemsTodoPanel'
 
 type AssignMode = 'none' | 'team' | 'person'
 type FormState = {
@@ -40,8 +40,7 @@ type Tab = 'mine' | 'all'
 
 export default function TodoPage() {
   const ctx = useOutletContext<ShellContext>()
-  const { todos, teams, currentUserEmail } = ctx
-  const openItems = useOpenItemsData()
+  const { todos, teams, currentUserEmail, openItems } = ctx
 
   const [tab, setTab] = useState<Tab>(currentUserEmail ? 'mine' : 'all')
   const [formOpen, setFormOpen] = useState(false)
