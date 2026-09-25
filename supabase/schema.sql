@@ -142,6 +142,10 @@ CREATE TABLE IF NOT EXISTS arcapp_authorized_users (
 -- allowlist itself back on 2026-09-18, before this table had a role column or the site required
 -- sign-in at all; re-running that seed now would import ~20 LaunchPad-side identities into what's
 -- meant to be a clean, independent ArcApp roster). ON CONFLICT keeps this safe to re-run.
+--
+-- The ~19 rows the 2026-09-18 bulk-seed had left in this table (from before this comment's own
+-- migration existed) were pruned by hand on 2026-09-24, by request, down to just this one row —
+-- if you're restoring this table from scratch, this INSERT is genuinely all you start with.
 INSERT INTO arcapp_authorized_users (email, name, role, added_by)
 VALUES ('cbaldwin@criticalarccx.com', 'C Baldwin', 'admin', 'migration (initial admin, 2026-09-24)')
 ON CONFLICT (email) DO UPDATE SET role = 'admin';
