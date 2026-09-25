@@ -44,6 +44,9 @@ export type ShellContext = {
   /** Google Drive folder ID photos upload into — see JointPackPhotosPanel, which fetches/logs
    * Joint Pack data itself (this is the only piece of it that lives on shared shell state). */
   jointPackFolder: string
+  /** Per-project on/off switch for the whole Joint Pack Photos module — see AppSettings in
+   * api.ts. Drives the Sidebar nav item and the page itself, same pattern as netaTrackerEnabled. */
+  jointPackEnabled: boolean
 
   /** Any signed-in, authorized ArcApp user (admin or editor) — governs Submittals, Asset
    * Attributes, Workflow item catalog, etc. Settings specifically requires `isAdmin` instead. */
@@ -57,8 +60,16 @@ export type ShellContext = {
    * Drives the Sidebar nav item, the page itself, its Settings section, and its To-Do
    * integration, replacing what used to be a project.ts capability constant. */
   netaTrackerEnabled: boolean
+  /** Apps Script Web App URLs, editable from Settings — only read there (as a Field's `initial`),
+   * not used elsewhere in the app (every actual request goes through api.ts, which reads these
+   * straight from Supabase itself rather than being passed them). */
+  jointPackScriptUrl: string
+  netaTrackerScriptUrl: string
   checklistReadyStatuses: string[]
   issueReviewStatuses: string[]
+  /** See AppSettings in api.ts — only read in Settings (as a Field's `initial`); the actual
+   * filtering happens inside getIssues/getOpenIssues, not here. */
+  issueCreatorCompanyFilter: string
   submittalExemptAssets: string[]
   checklistTodoEnabled: boolean
   issueTodoEnabled: boolean

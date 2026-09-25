@@ -10,9 +10,13 @@ import type { Team } from '../types'
 
 type Props = {
   jointPackFolder: string
+  jointPackEnabled: boolean
+  jointPackScriptUrl: string
   netaTrackerEnabled: boolean
+  netaTrackerScriptUrl: string
   checklistReadyStatuses: string[]
   issueReviewStatuses: string[]
+  issueCreatorCompanyFilter: string
   submittalExemptAssets: string[]
   checklistTodoEnabled: boolean
   issueTodoEnabled: boolean
@@ -157,9 +161,13 @@ function ToggleField({
 
 export default function SettingsPanel({
   jointPackFolder,
+  jointPackEnabled,
+  jointPackScriptUrl,
   netaTrackerEnabled,
+  netaTrackerScriptUrl,
   checklistReadyStatuses,
   issueReviewStatuses,
+  issueCreatorCompanyFilter,
   submittalExemptAssets,
   checklistTodoEnabled,
   issueTodoEnabled,
@@ -207,14 +215,39 @@ export default function SettingsPanel({
           loading={loading}
           onSave={(v) => onSaveSetting('cxalloy_link_base_override', v)}
         />
-        <Field
-          label="Joint Pack Photos — Google Drive destination folder ID"
-          hint="Open the destination folder in Drive and copy the ID from its URL (.../folders/<THIS PART>). Must be a folder the Joint Pack Apps Script's account can write to."
-          initial={jointPackFolder}
-          canEdit={isAdmin}
-          loading={loading}
-          onSave={(v) => onSaveSetting('joint_pack_photos_folder', v)}
-        />
+        <div style={{ marginBottom: 22, maxWidth: 560 }}>
+          <label style={{ display: 'block', marginBottom: 4, fontFamily: 'var(--font-display)', fontSize: 13, fontWeight: 700, letterSpacing: '0.4px', textTransform: 'uppercase', color: 'var(--text)' }}>
+            Joint Pack Photos
+          </label>
+          <ToggleField
+            label="Joint Pack Photos enabled for this project"
+            hint="Turns on the Joint Packs page and its Sidebar nav item. Requires this project's own Joint Pack Sheet + Apps Script to already be deployed (see README) — turning this on before that's ready shows a clean 'not wired up yet' error instead of breaking anything."
+            initial={jointPackEnabled}
+            canEdit={isAdmin}
+            loading={loading}
+            onSave={(v) => onSaveSetting('joint_pack_enabled', v ? 'true' : '')}
+          />
+          {jointPackEnabled && (
+            <>
+              <Field
+                label="Joint Pack Photos — Apps Script Web App URL"
+                hint="The /exec URL from that project's Joint Pack Apps Script deployment (Deploy > Manage deployments)."
+                initial={jointPackScriptUrl}
+                canEdit={isAdmin}
+                loading={loading}
+                onSave={(v) => onSaveSetting('joint_pack_script_url', v)}
+              />
+              <Field
+                label="Joint Pack Photos — Google Drive destination folder ID"
+                hint="Open the destination folder in Drive and copy the ID from its URL (.../folders/<THIS PART>). Must be a folder the Joint Pack Apps Script's account can write to."
+                initial={jointPackFolder}
+                canEdit={isAdmin}
+                loading={loading}
+                onSave={(v) => onSaveSetting('joint_pack_photos_folder', v)}
+              />
+            </>
+          )}
+        </div>
         <CxAlloyStatusPicker
           label="Checklist Ready — status(es) that count as ready for CxA review"
           hint="Pulled live from the CxAlloy Settings tab (STY4A API Database). Checked statuses show up on the Checklists page. Also defines Checklist To-Do below: any status NOT checked here counts as still open."
@@ -232,6 +265,18 @@ export default function SettingsPanel({
           canEdit={isAdmin}
           loading={loading}
           onSave={(values) => onSaveSetting('issue_review_statuses', values.join(', '))}
+        />
+        <Field
+          label="Issues — creator company filter"
+          hint={
+            'Only shows issues created by this exact company name, or by a person listed under it in the "People" tab (columns: Name, Company) of this project\'s API Database sheet. ' +
+            'Blank shows every issue regardless of creator (default). Requires the getPeople Apps Script action (AppendPeopleAction.gs) to already be deployed — turning this on before that\'s ' +
+            'in place will show zero issues instead of erroring, since an empty People list matches nobody.'
+          }
+          initial={issueCreatorCompanyFilter}
+          canEdit={isAdmin}
+          loading={loading}
+          onSave={(v) => onSaveSetting('issue_creator_company_filter', v)}
         />
 
         <div style={{ marginBottom: 22, maxWidth: 560 }}>
@@ -294,6 +339,14 @@ export default function SettingsPanel({
           />
           {netaTrackerEnabled && (
             <>
+              <Field
+                label="NETA Tracker — Apps Script Web App URL"
+                hint="The /exec URL from that project's NETA Tracker Apps Script deployment (Deploy > Manage deployments)."
+                initial={netaTrackerScriptUrl}
+                canEdit={isAdmin}
+                loading={loading}
+                onSave={(v) => onSaveSetting('neta_tracker_script_url', v)}
+              />
               <div className="q-hint" style={{ marginTop: 12, marginBottom: 12 }}>
                 Same idea as Checklist/Issue To-Do above, for the NETA Tracker's two tabs. "Still
                 open" isn't configurable here — it's the same not-yet-completed definition the NETA

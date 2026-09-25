@@ -130,9 +130,13 @@ export default function AppShell() {
   const settingsData = settingsFn.data as
     | {
         jointPackPhotosFolder?: string
+        jointPackEnabled?: boolean
+        jointPackScriptUrl?: string
         netaTrackerEnabled?: boolean
+        netaTrackerScriptUrl?: string
         checklistReadyStatuses?: string[]
         issueReviewStatuses?: string[]
+        issueCreatorCompanyFilter?: string
         submittalExemptAssets?: string[]
         checklistTodoEnabled?: boolean
         issueTodoEnabled?: boolean
@@ -146,9 +150,13 @@ export default function AppShell() {
       }
     | undefined
   const jointPackFolder = settingsData?.jointPackPhotosFolder ?? ''
+  const jointPackEnabled = settingsData?.jointPackEnabled ?? false
+  const jointPackScriptUrl = settingsData?.jointPackScriptUrl ?? ''
   const netaTrackerEnabled = settingsData?.netaTrackerEnabled ?? false
+  const netaTrackerScriptUrl = settingsData?.netaTrackerScriptUrl ?? ''
   const checklistReadyStatuses = settingsData?.checklistReadyStatuses ?? []
   const issueReviewStatuses = settingsData?.issueReviewStatuses ?? []
+  const issueCreatorCompanyFilter = settingsData?.issueCreatorCompanyFilter ?? ''
   const submittalExemptAssets = settingsData?.submittalExemptAssets ?? []
   const checklistTodoEnabled = settingsData?.checklistTodoEnabled ?? false
   const issueTodoEnabled = settingsData?.issueTodoEnabled ?? false
@@ -349,7 +357,10 @@ export default function AppShell() {
     onScheduleRetry: () => void scheduleFn.trigger({ date: selectedDate }),
 
     jointPackFolder,
+    jointPackEnabled,
+    jointPackScriptUrl,
     netaTrackerEnabled,
+    netaTrackerScriptUrl,
 
     canEdit,
     isAdmin,
@@ -357,6 +368,7 @@ export default function AppShell() {
 
     checklistReadyStatuses,
     issueReviewStatuses,
+    issueCreatorCompanyFilter,
     submittalExemptAssets,
     checklistTodoEnabled,
     issueTodoEnabled,
@@ -399,7 +411,7 @@ export default function AppShell() {
       <ContextStrip />
 
       <div className="arcapp-layout">
-        <Sidebar netaTrackerEnabled={netaTrackerEnabled} />
+        <Sidebar jointPackEnabled={jointPackEnabled} netaTrackerEnabled={netaTrackerEnabled} />
 
         <main className={isFullBleed ? 'main-full' : undefined}>
           <Outlet context={outletContext} />

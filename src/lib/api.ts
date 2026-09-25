@@ -254,6 +254,33 @@ export function useGetCxAlloySettingsSheet() {
   return useApiFn(getCxAlloySettingsSheet)
 }
 
+// ---- People — Name/Company lookup, used to filter Issues down to CriticalArc-created ones ----
+
+export type PersonRow = { name: string; company: string }
+/** Header lookup is case-insensitive (unlike distinctColumn's exact-match "Checklist Status Name"
+ * style above) since this is a brand-new tab someone exports by hand — "Name"/"name" and
+ * "Company"/"company" both work rather than silently returning nothing over a casing mismatch. */
+function findCaseInsensitive(row: Record<string, string>, key: string): string {
+  const match = Object.keys(row).find((k) => k.toLowerCase() === key)
+  return match ? (row[match] ?? '').toString().trim() : ''
+}
+function mapPeopleRows(raw: Array<Record<string, string>>): PersonRow[] {
+  return raw.map((r) => ({ name: findCaseInsensitive(r, 'name'), company: findCaseInsensitive(r, 'company') }))
+}
+/** Reads the "People" tab (Name/Company columns) — added for the Issues creator-company filter
+ * below. Requires the `getPeople` Apps Script action (see AppendPeopleAction.gs); on a project
+ * whose script doesn't have it yet, this comes back empty rather than erroring (same fallback
+ * fetchCxAlloySheet already has for any unrecognized action), which is why
+ * issueCreatorCompanyFilter defaults to off — turning it on before the action exists would filter
+ * every issue out instead of showing an error. */
+async function getPeople(): Promise<PersonRow[]> {
+  const raw = await fetchCxAlloySheet('getPeople')
+  return mapPeopleRows(raw)
+}
+export function useGetPeople() {
+  return useApiFn(getPeople)
+}
+
 // ---- Checklists ----
 
 export type ChecklistRow = {
@@ -337,10 +364,28 @@ function mapIssueRows(raw: Array<Record<string, string>>): IssueRow[] {
     date_created: (r.date_created ?? '').toString(),
   }))
 }
+/** Settings → "Issues — creator company filter" (blank = off, shows every issue regardless of
+ * creator). When set, keeps only issues whose Created By is either that exact company name (an
+ * issue created by a shared/org account rather than a person) or a person listed in the People
+ * tab (see getPeople above) under that company — applied to both getIssues and getOpenIssues so
+ * the main Issues page and every To-Do view of issues agree on what counts. */
+async function filterByCreatorCompany(rows: IssueRow[]): Promise<IssueRow[]> {
+  const { issueCreatorCompanyFilter } = await getSettings()
+  const filter = issueCreatorCompanyFilter.trim().toLowerCase()
+  if (!filter) return rows
+  const people = await getPeople()
+  const companyNames = new Set(people.filter((p) => p.company.toLowerCase() === filter).map((p) => p.name.toLowerCase()))
+  return rows.filter((r) => {
+    const createdBy = r.created_by.trim().toLowerCase()
+    return createdBy === filter || companyNames.has(createdBy)
+  })
+}
+
 async function getIssues(): Promise<{ rows: IssueRow[]; reviewStatuses: string[] }> {
   const { issueReviewStatuses: reviewStatuses } = await getSettings()
   const raw = await fetchCxAlloySheet('getIssues', { status: reviewStatuses.join(',') })
-  return { rows: mapIssueRows(raw), reviewStatuses }
+  const rows = await filterByCreatorCompany(mapIssueRows(raw))
+  return { rows, reviewStatuses }
 }
 export function useGetIssues() {
   return useApiFn(getIssues)
@@ -353,7 +398,8 @@ async function getOpenIssues(): Promise<{ rows: IssueRow[]; openStatuses: string
   const openStatuses = allStatuses.filter((s) => !reviewStatuses.includes(s))
   if (!openStatuses.length) return { rows: [], openStatuses }
   const raw = await fetchCxAlloySheet('getIssues', { status: openStatuses.join(',') })
-  return { rows: mapIssueRows(raw), openStatuses }
+  const rows = await filterByCreatorCompany(mapIssueRows(raw))
+  return { rows, openStatuses }
 }
 export function useGetOpenIssues() {
   return useApiFn(getOpenIssues)
@@ -672,19 +718,11 @@ export function useGetEquipmentTrackerData() {
 // same as CxAlloy's script isn't) for the doGet/doPost implementation.
 // ---------------------------------------------------------------------------
 
-const JOINT_PACK_SCRIPT_SETTING_KEY = 'joint_pack_script_url'
-
 async function getJointPackScriptUrl(): Promise<string> {
-  const res = await supabase
-    .from('arcapp_settings')
-    .select('setting_value')
-    .eq('project_key', CURRENT_PROJECT)
-    .eq('setting_key', JOINT_PACK_SCRIPT_SETTING_KEY)
-    .maybeSingle()
-  if (res.error) throw new Error(res.error.message)
-  const url = (res.data as { setting_value: string | null } | null)?.setting_value
-  if (!url) throw new Error('Joint Pack Photo logging isn\'t wired up yet — no Apps Script URL configured.')
-  return url
+  const { jointPackEnabled, jointPackScriptUrl } = await getSettings()
+  if (!jointPackEnabled) throw new Error('Joint Pack Photos isn’t enabled for this project.')
+  if (!jointPackScriptUrl) throw new Error('Joint Pack Photo logging isn\'t wired up yet — set the Apps Script URL in Settings.')
+  return jointPackScriptUrl
 }
 
 async function fetchJointPackScript(action: string, params: Record<string, string> = {}): Promise<Record<string, unknown>> {
@@ -775,8 +813,9 @@ export function useLogJointPackPhotos() {
 // Files) via its own dedicated Apps Script web app — a third spreadsheet/script, separate from
 // both CxAlloy's and Joint Pack Photo's (see NetaTrackerScript.gs, given to the user to deploy;
 // not committed to this repo, same as the other two scripts aren't). Its URL lives in
-// arcapp_settings under 'neta_tracker_script_url' — set directly in the DB, not exposed as an
-// editable Settings field, same as joint_pack_script_url isn't.
+// arcapp_settings under 'neta_tracker_script_url' — editable from Settings (as of 2026-09-25;
+// used to be DB-only) so an admin can wire up a new project's deployment without needing a
+// migration run for them.
 //
 // Unlike everything else that reads from a Sheet, this one writes BACK to it: toggling a
 // checkbox or editing Comments in ArcApp calls updateNetaField, which sets that exact cell in the
@@ -790,21 +829,11 @@ export function useLogJointPackPhotos() {
 // own NETA Sheet/script is ready, no ArcApp code change/redeploy needed.
 // ---------------------------------------------------------------------------
 
-const NETA_SCRIPT_SETTING_KEY = 'neta_tracker_script_url'
-
 async function getNetaScriptUrl(): Promise<string> {
-  const { netaTrackerEnabled } = await getSettings()
+  const { netaTrackerEnabled, netaTrackerScriptUrl } = await getSettings()
   if (!netaTrackerEnabled) throw new Error('NETA Tracker isn’t enabled for this project.')
-  const res = await supabase
-    .from('arcapp_settings')
-    .select('setting_value')
-    .eq('project_key', CURRENT_PROJECT)
-    .eq('setting_key', NETA_SCRIPT_SETTING_KEY)
-    .maybeSingle()
-  if (res.error) throw new Error(res.error.message)
-  const url = (res.data as { setting_value: string | null } | null)?.setting_value
-  if (!url) throw new Error('NETA Tracker isn’t wired up yet — no Apps Script URL configured.')
-  return url
+  if (!netaTrackerScriptUrl) throw new Error('NETA Tracker isn’t wired up yet — set the Apps Script URL in Settings.')
+  return netaTrackerScriptUrl
 }
 
 export type NetaTab = 'Submissions' | 'Returned Files'
@@ -1107,13 +1136,31 @@ const EMPTY_ASSIGNEE: DefaultAssignee = { teamId: null, email: null, name: null 
 
 export type AppSettings = {
   jointPackPhotosFolder: string
+  /** Per-project on/off switch for the whole Joint Pack Photos module (page, nav item) — added
+   * 2026-09-25 alongside making its Apps Script URL Settings-editable (jointPackScriptUrl below),
+   * since a newly-onboarded project shouldn't show the page (and error on load) before its own
+   * Sheet/script exists. Off by default for any project until set — including STY4, seeded on so
+   * its existing behavior doesn't change. */
+  jointPackEnabled: boolean
+  /** Apps Script Web App /exec URL for Joint Pack Photos — editable from Settings as of
+   * 2026-09-25 (used to be DB-only), same reasoning as netaTrackerScriptUrl below. */
+  jointPackScriptUrl: string
   /** Per-project on/off switch for the whole NETA Tracker module (page, nav item, and its To-Do
    * integration) — moved here from a project.ts capability constant on 2026-09-25 so an admin can
    * turn it on for a newly-onboarded site themselves, once that site's own NETA Sheet/script is
    * ready, without a code change/redeploy. Off by default for any project until set. */
   netaTrackerEnabled: boolean
+  /** Apps Script Web App /exec URL for NETA Tracker — editable from Settings as of 2026-09-25
+   * (used to be DB-only, set directly in Supabase for every new project). */
+  netaTrackerScriptUrl: string
   checklistReadyStatuses: string[]
   issueReviewStatuses: string[]
+  /** Company name to keep issues from, matched against Created By (either directly, for a shared
+   * org account, or via the People tab's Name/Company columns for an individual) — see
+   * filterByCreatorCompany. Blank (off, shows every issue) by default; requires the `getPeople`
+   * Apps Script action (AppendPeopleAction.gs) to be deployed before turning this on, or every
+   * issue gets filtered out instead of erroring (see getPeople's own comment). */
+  issueCreatorCompanyFilter: string
   /** Assets marked "not reviewable" — excluded entirely from the Submittals page's missing-
    * coverage count (they'll never need a submittal, so they shouldn't count against the total). */
   submittalExemptAssets: string[]
@@ -1166,9 +1213,13 @@ async function getSettings(): Promise<AppSettings> {
   const map = new Map(rows.map((r) => [r.setting_key, r.setting_value ?? '']))
   return {
     jointPackPhotosFolder: map.get('joint_pack_photos_folder') ?? '',
+    jointPackEnabled: map.get('joint_pack_enabled') === 'true',
+    jointPackScriptUrl: map.get('joint_pack_script_url') ?? '',
     netaTrackerEnabled: map.get('neta_tracker_enabled') === 'true',
+    netaTrackerScriptUrl: map.get('neta_tracker_script_url') ?? '',
     checklistReadyStatuses: splitCsv(map.get('checklist_ready_statuses'), SETTINGS_DEFAULTS.checklistReadyStatuses),
     issueReviewStatuses: splitCsv(map.get('issue_review_statuses'), SETTINGS_DEFAULTS.issueReviewStatuses),
+    issueCreatorCompanyFilter: map.get('issue_creator_company_filter') ?? '',
     submittalExemptAssets: splitCsv(map.get('submittal_exempt_assets'), SETTINGS_DEFAULTS.submittalExemptAssets),
     checklistTodoEnabled: map.get('checklist_todo_enabled') === 'true',
     issueTodoEnabled: map.get('issue_todo_enabled') === 'true',
@@ -1187,9 +1238,13 @@ export function useGetSettings() {
 
 const ALLOWED_SETTING_KEYS = new Set([
   'joint_pack_photos_folder',
+  'joint_pack_enabled',
+  'joint_pack_script_url',
   'neta_tracker_enabled',
+  'neta_tracker_script_url',
   'checklist_ready_statuses',
   'issue_review_statuses',
+  'issue_creator_company_filter',
   'submittal_exempt_assets',
   'checklist_todo_enabled',
   'issue_todo_enabled',

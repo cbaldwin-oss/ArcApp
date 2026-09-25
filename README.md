@@ -69,17 +69,18 @@ picked project.
   - **`cxAlloyActions`** — Checklists, Issues, Asset Attributes (+ its photo-crop OCR), the
     Checklist/Issue To-Do sections, and the CxAlloy status pickers in Settings all call custom
     Apps Script actions (`getChecklists`/`getIssues`/`getCxAlloySettings`/
-    `getEquipmentAttributes`/`saveAttributes`/`saveImageOnly`/`ocrImage`) that were added
-    specifically to STY4's script deployment. SAN-NT1B's separately-deployed script doesn't have
-    them yet — confirmed live: `action=getChecklists` against it falls through to a different,
-    equipment-tracker-shaped default response instead of an error, which would otherwise have
-    rendered as a page of blank/malformed rows rather than failing cleanly. Adding those same
-    actions to SAN-NT1B's script (mirroring whatever was added to STY4's — not committed to this
-    repo, per the Checklists/Asset Attributes sections above) would close this gap.
-- **What already works for SAN-NT1B with zero extra setup**: Activities (`SANNT1BBackEndData`,
-  confirmed live), dropdown options, Equipment Status Tracker (reads Supabase directly, not Apps
-  Script — confirmed live with 837 real assets), Submittals, To-Do (manual tasks/teams), Joint
-  Packs (once its own Sheet/script is set up, same as any new project), and Settings.
+    `getEquipmentAttributes`/`saveAttributes`/`saveImageOnly`/`ocrImage`). SAN-NT1B's
+    separately-deployed script didn't have them yet — confirmed live: `action=getChecklists`
+    against it fell through to a different, equipment-tracker-shaped default response instead of
+    an error, which would otherwise have rendered as a page of blank/malformed rows rather than
+    failing cleanly. **Resolved 2026-09-25**: `AppendToCxAlloyScript.gs` was added to SAN-NT1B's
+    own deployment and `cxAlloyActions` flipped on for it in `CAPABILITIES`.
+- **What already works for SAN-NT1B**: Activities (`SANNT1BBackEndData`, confirmed live), dropdown
+  options, Equipment Status Tracker (reads Supabase directly, not Apps Script — confirmed live with
+  837 real assets), Submittals, To-Do (manual tasks/teams), Settings, and — as of 2026-09-25 —
+  Checklists/Issues/Asset Attributes (`cxAlloyActions`, see above). Joint Pack Photos and NETA
+  Tracker are both admin-toggleable per project now (see their own sections above) but still need
+  their own Sheet/Apps Script deployed for SAN-NT1B before flipping on.
 - Verified live end-to-end: switching STY4 → SAN-NT1B updates the site pill and localStorage,
   hides the five gated Sidebar items, shows real SAN-NT1B data on Activities/Equipment Tracker,
   shows the clean unavailable notice on Tamper Seals/Checklists (both direct-URL and Sidebar-
@@ -145,6 +146,29 @@ directly:
   - Checklist/Issue rows render as plain text instead of a broken link while `cxAlloyLinkBase` is
     null (still loading, or nothing detected and no override set) — same "degrade gracefully, no
     dead link" approach as everything else CxAlloy-related.
+- **Issues — creator company filter** (added 2026-09-25): Settings → "Issues — creator company
+  filter" (`issue_creator_company_filter` in `arcapp_settings`) restricts Issues to ones created by
+  a specific company — either the exact string itself (an issue created by a shared/org account,
+  where Created By literally *is* the company name) or a person listed under that company in a
+  "People" tab (columns `Name`/`Company`, header casing doesn't matter) on the same API Database
+  sheet. Applied inside `getIssues`/`getOpenIssues` (`filterByCreatorCompany` in `src/lib/api.ts`),
+  so the main Issues page and every To-Do view of issues (summary card count, individually-assigned
+  items) agree on the same filtered set. Blank (the default — nothing changes until this is set)
+  shows every issue regardless of creator, same as before this existed.
+  - The **People tab is synced straight from CxAlloy's own `GET /person?project_id=...` endpoint**
+    (paginated the same way `/equipment` already is, via the existing `fetchPaginatedData` helper),
+    not hand-maintained — `fetchAndUpdatePeopleData(projectId)` in `AppendPeopleAction.gs` (shared
+    separately, not committed to this repo) writes `{first_name} {last_name}` + `company` from each
+    record into the tab. Run it the same way the existing `fetchAndUpdateCxAlloySettings` sync is
+    already run (it's likewise not called from the main `fetchAndUpdateCxAlloyData()` orchestrator)
+    — re-running it just re-syncs from CxAlloy, the tab is never hand-edited.
+  - Reading that tab from ArcApp needs one new Apps Script action, `getPeople`, reusing the
+    `readFilteredSheet_`/`jsonResponse_` helpers `AppendToCxAlloyScript.gs` already added — see
+    `AppendPeopleAction.gs` for the exact one-line addition to `doGet`.
+  - **Turning the filter on before `getPeople` is deployed silently shows zero issues instead of
+    erroring** — an unrecognized action falls through to a different, equipment-tracker-shaped
+    response with no `data` array, which `getPeople()` treats as an empty People list, matching
+    nobody. Deploy the script addition first, then set the filter.
 
 ## Joint Pack Photos (via Google Sheet + Drive, its own Apps Script)
 
@@ -166,10 +190,17 @@ different spreadsheet from CxAlloy's. `useGetJointPackData`/`useLogJointPackPhot
   Top/Side/Bottom cell. Logging a photo for a Building/Asset/Joint Pack # combination that isn't in
   the sheet yet appends a new row for it — the app doesn't require pre-registering a Joint Pack #
   before photographing it.
-- The Apps Script's URL is stored in `arcapp_settings` under the key `joint_pack_script_url` — set
-  directly in Supabase (not exposed as an editable Settings field, same as CxAlloy's script URL
-  isn't editable from this app either). Redeploying the script as a new version of the same
-  deployment keeps the same URL; only a brand-new deployment would need this key updated.
+- **Per-project on/off toggle + Settings-editable URL** (added 2026-09-25 while onboarding
+  SAN-NT1B — this used to be shown unconditionally for every project, with the URL DB-only).
+  Settings → Joint Pack Photos → "Joint Pack Photos enabled for this project"
+  (`joint_pack_enabled` in `arcapp_settings`/`jointPackEnabled` in `AppSettings`) gates the page and
+  its Sidebar nav item (`CapabilityNotice` when off, same pattern as NETA Tracker/siteLogging/
+  cxAlloyActions), same reasoning as NETA Tracker's toggle: a newly-onboarded project shouldn't
+  show a page that just errors before its own Sheet/script exists. The Apps Script's URL itself
+  (`joint_pack_script_url`) is now an editable Field right below that toggle instead of DB-only —
+  an admin can wire up a new project's deployment themselves. STY4 was seeded with the toggle on to
+  preserve its existing behavior; SAN-NT1B starts off. Redeploying the script as a new version of
+  the same deployment keeps the same URL; only a brand-new deployment needs this field updated.
 - The script itself (`doGet`/`doPost`, not committed to this repo — see `JointPackPhotoScript.gs`
   shared separately, same as CxAlloy's script isn't committed here either) needs to be pasted into
   **Extensions → Apps Script** on the "Joint Pack Photo - STY4A" spreadsheet and deployed as a web
@@ -284,7 +315,9 @@ Pack Photo's) — `useGetNetaTrackerData`/`useUpdateNetaField` in `src/lib/api.t
   needed. Off shows the standard "not available for this project" notice, same as before; the
   toggle itself always renders (even while off) so an admin can find and flip it. STY4 was seeded
   with this on (`neta_tracker_enabled = 'true'`) to preserve its existing behavior across the
-  change; SAN-NT1B starts off, same as before.
+  change; SAN-NT1B starts off, same as before. Its Apps Script URL (`neta_tracker_script_url`) is
+  also now an editable Field right below the toggle (used to be DB-only) — same reasoning as
+  Joint Pack Photos' URL field just above.
 - No sign-in required to toggle checkboxes or edit comments, same as Tamper Seal/RTFT logging.
 - **Verified against the real deployed script and real sheet data** (778 Submissions / 119 Returned
   Files rows): `getNetaData`'s shape and row counts match a direct workbook inspection exactly; a

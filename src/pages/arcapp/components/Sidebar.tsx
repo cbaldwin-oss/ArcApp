@@ -25,7 +25,6 @@ const NAV: Array<{ to: string; label: string; icon: typeof LayoutDashboard; requ
   { to: '/checklists', label: 'Checklists', icon: ListChecks, requires: 'cxAlloyActions' },
   { to: '/issues', label: 'Issues', icon: AlertTriangle, requires: 'cxAlloyActions' },
   { to: '/submittals', label: 'Submittals', icon: FileCheck2 },
-  { to: '/jointpacks', label: 'Joint Packs', icon: Camera },
   { to: '/tamperseals', label: 'Tamper Seals', icon: ShieldAlert, requires: 'siteLogging' },
   { to: '/rtft', label: 'RTFT', icon: ClipboardCheck, requires: 'siteLogging' },
   { to: '/attributes', label: 'Asset Attributes', icon: Tag, requires: 'cxAlloyActions' },
@@ -33,16 +32,27 @@ const NAV: Array<{ to: string; label: string; icon: typeof LayoutDashboard; requ
   { to: '/settings', label: 'Settings', icon: SettingsIcon },
 ]
 
-/** NETA Tracker isn't in the static NAV list above — unlike the other gated items, its
- * availability is a per-project Settings toggle (`netaTrackerEnabled`), not a project.ts
- * capability, so it's spliced in conditionally instead of filtered via `requires`. */
+/** Joint Packs and NETA Tracker aren't in the static NAV list above — unlike the other gated
+ * items, their availability is a per-project Settings toggle (`jointPackEnabled`/
+ * `netaTrackerEnabled`), not a project.ts capability, so they're spliced in conditionally instead
+ * of filtered via `requires`. */
+const JOINT_PACKS_NAV_ITEM = { to: '/jointpacks', label: 'Joint Packs', icon: Camera }
 const NETA_NAV_ITEM = { to: '/netatracker', label: 'NETA Tracker', icon: FileSpreadsheet }
 
-export default function Sidebar({ netaTrackerEnabled }: { netaTrackerEnabled: boolean }) {
+/** Where to insert a spliced-in item: right before `before`, or at the end if `before` got
+ * filtered out by its own `requires` gate (e.g. "Tamper Seals" on a `siteLogging`-less project) —
+ * `findIndex` returning -1 would otherwise splice before the LAST item instead of at the end. */
+function insertionIndex(items: Array<{ to: string }>, before: string): number {
+  const idx = items.findIndex((i) => i.to === before)
+  return idx === -1 ? items.length : idx
+}
+
+export default function Sidebar({ jointPackEnabled, netaTrackerEnabled }: { jointPackEnabled: boolean; netaTrackerEnabled: boolean }) {
   const items = NAV.filter((item) => !item.requires || hasCapability(item.requires))
+  // Slotted after "Submittals" / before "Tamper Seals", matching where Joint Packs used to sit.
+  if (jointPackEnabled) items.splice(insertionIndex(items, '/tamperseals'), 0, JOINT_PACKS_NAV_ITEM)
   // Slotted after "Attributes" / before "Equipment Tracker", matching where it used to sit in NAV.
-  const equipmentTrackerIdx = items.findIndex((i) => i.to === '/equipmenttracker')
-  if (netaTrackerEnabled) items.splice(equipmentTrackerIdx, 0, NETA_NAV_ITEM)
+  if (netaTrackerEnabled) items.splice(insertionIndex(items, '/equipmenttracker'), 0, NETA_NAV_ITEM)
   return (
     <nav className="arcapp-sidebar" aria-label="Main">
       <div className="arcapp-sidebar-nav">
