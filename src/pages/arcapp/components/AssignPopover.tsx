@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import type { Team } from '../types'
+import PersonSelect, { useAuthorizedUsersOptions } from './PersonSelect'
 
 export type AssignResult = { teamId: string | null; email: string | null; name: string | null }
 type AssignMode = 'none' | 'team' | 'person'
@@ -32,10 +33,10 @@ function modeOf(initial: AssignResult | undefined): AssignMode {
 export default function AssignPopover({ top, left, teams, itemCount, initial, onApply, onClose }: Props) {
   const [mode, setMode] = useState<AssignMode>(() => modeOf(initial))
   const [teamId, setTeamId] = useState(initial?.teamId ?? '')
-  const [personName, setPersonName] = useState(initial?.name ?? '')
   const [personEmail, setPersonEmail] = useState(initial?.email ?? '')
   const [error, setError] = useState('')
   const ref = useRef<HTMLDivElement>(null)
+  const { users, loading: loadingUsers } = useAuthorizedUsersOptions()
 
   useEffect(() => {
     function onDocClick(e: MouseEvent) {
@@ -50,14 +51,15 @@ export default function AssignPopover({ top, left, teams, itemCount, initial, on
       setError('Pick a team, or switch to Unassigned/Person.')
       return
     }
-    if (mode === 'person' && !personName.trim()) {
-      setError('Enter a name for the person this is assigned to.')
+    if (mode === 'person' && !personEmail) {
+      setError('Pick a person, or switch to Unassigned/Team.')
       return
     }
+    const person = users.find((u) => u.email.toLowerCase() === personEmail.toLowerCase())
     onApply({
       teamId: mode === 'team' ? teamId : null,
-      name: mode === 'person' ? personName.trim() : null,
-      email: mode === 'person' ? personEmail.trim() : null,
+      name: mode === 'person' ? person?.name || initial?.name || '' : null,
+      email: mode === 'person' ? personEmail : null,
     })
   }
 
@@ -90,10 +92,7 @@ export default function AssignPopover({ top, left, teams, itemCount, initial, on
         </select>
       )}
       {mode === 'person' && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-          <input type="text" placeholder="Name" value={personName} onChange={(e) => setPersonName(e.target.value)} />
-          <input type="email" placeholder="Email (optional)" value={personEmail} onChange={(e) => setPersonEmail(e.target.value)} />
-        </div>
+        <PersonSelect users={users} loadingUsers={loadingUsers} value={personEmail} onChange={setPersonEmail} staleName={initial?.name} />
       )}
 
       {error && <div className="q-hint err">{error}</div>}

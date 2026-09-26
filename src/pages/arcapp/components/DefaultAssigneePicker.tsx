@@ -3,6 +3,7 @@ import { Save } from 'lucide-react'
 import { useGetAuthorizedUsers } from '../../../lib/api'
 import type { AuthorizedUser, DefaultAssignee } from '../../../lib/api'
 import type { Team } from '../types'
+import PersonSelect from './PersonSelect'
 
 type Mode = 'none' | 'team' | 'person'
 
@@ -54,11 +55,6 @@ export default function DefaultAssigneePicker({ label, hint, value, teams, canEd
   }, [value])
 
   const users = (usersFn.data as AuthorizedUser[] | undefined) ?? []
-  const selectedUser = users.find((u) => u.email.toLowerCase() === personEmail.toLowerCase())
-  // The saved email might belong to someone since removed from the authorized list (or seeded
-  // before this dropdown existed) — still shown, selected, and savable as-is, just flagged, rather
-  // than silently losing track of who it was pointing at.
-  const stale = mode === 'person' && personEmail && !selectedUser
 
   const dirty =
     mode !== modeOf(value) ||
@@ -125,7 +121,6 @@ export default function DefaultAssigneePicker({ label, hint, value, teams, canEd
       )}
       {mode === 'person' && (
         <div style={{ marginBottom: 8 }}>
-          {usersFn.loading && <div className="q-hint">Loading authorized users…</div>}
           {usersFn.error && (
             <div className="q-hint err">
               Couldn&apos;t load authorized users ({usersFn.error}).{' '}
@@ -134,17 +129,7 @@ export default function DefaultAssigneePicker({ label, hint, value, teams, canEd
               </button>
             </div>
           )}
-          {usersFn.data && (
-            <select value={personEmail} disabled={disabled} onChange={(e) => pickPerson(e.target.value)}>
-              <option value="">— Select a person —</option>
-              {users.map((u) => (
-                <option key={u.id} value={u.email}>
-                  {u.name ? `${u.name} (${u.email})` : u.email}
-                </option>
-              ))}
-              {stale && <option value={personEmail}>{(value.name ? `${value.name} (${personEmail})` : personEmail) + ' — not in Authorized Users'}</option>}
-            </select>
-          )}
+          <PersonSelect users={users} loadingUsers={usersFn.loading || !usersFn.data} value={personEmail} onChange={pickPerson} disabled={disabled} staleName={value.name} />
         </div>
       )}
       <button

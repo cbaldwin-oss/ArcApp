@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Plus, Pencil, Trash2, X } from 'lucide-react'
 import type { Team, TeamMember, Todo } from '../types'
+import PersonSelect, { useAuthorizedUsersOptions } from './PersonSelect'
 
 type Props = {
   teams: Team[]
@@ -21,6 +22,7 @@ export default function TeamsManager({ teams, tasks, onSave, onDelete }: Props) 
   const [formError, setFormError] = useState('')
   const [saving, setSaving] = useState(false)
   const [deleteId, setDeleteId] = useState<string | null>(null)
+  const { users, loading: loadingUsers } = useAuthorizedUsersOptions()
 
   const usageCount = (teamId: string) => tasks.filter((t) => t.assignedTeamId === teamId).length
 
@@ -47,6 +49,10 @@ export default function TeamsManager({ teams, tasks, onSave, onDelete }: Props) 
   }
   function updateMember(idx: number, patch: Partial<TeamMember>) {
     setForm((f) => ({ ...f, members: f.members.map((m, i) => (i === idx ? { ...m, ...patch } : m)) }))
+  }
+  function pickMember(idx: number, email: string) {
+    const person = users.find((u) => u.email.toLowerCase() === email.toLowerCase())
+    updateMember(idx, { name: person?.name || '', email })
   }
   function removeMember(idx: number) {
     setForm((f) => ({ ...f, members: f.members.filter((_, i) => i !== idx) }))
@@ -124,20 +130,9 @@ export default function TeamsManager({ teams, tasks, onSave, onDelete }: Props) 
                 <div className="wf-order-list">
                   {form.members.map((m, idx) => (
                     <div className="wf-order-item" key={idx}>
-                      <input
-                        type="text"
-                        placeholder="Name"
-                        value={m.name}
-                        style={{ flex: 1 }}
-                        onChange={(e) => updateMember(idx, { name: e.target.value })}
-                      />
-                      <input
-                        type="email"
-                        placeholder="Email (for 'assigned to me')"
-                        value={m.email}
-                        style={{ flex: 1.4 }}
-                        onChange={(e) => updateMember(idx, { email: e.target.value })}
-                      />
+                      <div style={{ flex: 1 }}>
+                        <PersonSelect users={users} loadingUsers={loadingUsers} value={m.email} onChange={(email) => pickMember(idx, email)} staleName={m.name} />
+                      </div>
                       <button className="wf-remove" title="Remove" onClick={() => removeMember(idx)}>
                         <X style={{ width: 14, height: 14 }} />
                       </button>

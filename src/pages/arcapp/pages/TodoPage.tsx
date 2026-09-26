@@ -8,6 +8,7 @@ import { isTodoMine } from '../utils'
 import { TodoList } from '../components/TodoPanel'
 import TeamsManager from '../components/TeamsManager'
 import { MyItemRow, MySummaryCard, todoSummaryRoute } from '../components/OpenItemsTodoPanel'
+import PersonSelect, { useAuthorizedUsersOptions } from '../components/PersonSelect'
 
 type AssignMode = 'none' | 'team' | 'person'
 type FormState = {
@@ -49,6 +50,7 @@ export default function TodoPage() {
   const [form, setForm] = useState<FormState>(emptyForm())
   const [formError, setFormError] = useState('')
   const [saving, setSaving] = useState(false)
+  const { users, loading: loadingUsers } = useAuthorizedUsersOptions()
 
   const mineTodos = todos.filter((t) => isTodoMine(t, currentUserEmail, teams))
   const mineCount = mineTodos.length + openItems.myItems.length + openItems.mySummaries.length
@@ -85,10 +87,11 @@ export default function TodoPage() {
       setFormError('Pick a team, or switch assignment to Unassigned/Person.')
       return
     }
-    if (form.assignMode === 'person' && !form.personName.trim()) {
-      setFormError('Enter a name for the person this is assigned to.')
+    if (form.assignMode === 'person' && !form.personEmail) {
+      setFormError('Pick a person, or switch assignment to Unassigned/Team.')
       return
     }
+    const person = users.find((u) => u.email.toLowerCase() === form.personEmail.toLowerCase())
 
     const input: TaskInput = {
       id: editingId ?? undefined,
@@ -97,8 +100,8 @@ export default function TodoPage() {
       sys: form.sys,
       dueDate: form.dueDate || null,
       assignedTeamId: form.assignMode === 'team' ? form.teamId : null,
-      assignedName: form.assignMode === 'person' ? form.personName.trim() : null,
-      assignedEmail: form.assignMode === 'person' ? form.personEmail.trim() : null,
+      assignedName: form.assignMode === 'person' ? person?.name || form.personName.trim() || null : null,
+      assignedEmail: form.assignMode === 'person' ? form.personEmail : null,
     }
 
     setSaving(true)
@@ -212,20 +215,13 @@ export default function TodoPage() {
                 </select>
               )}
               {form.assignMode === 'person' && (
-                <div className="seal-row3" style={{ gridTemplateColumns: '1fr 1fr' }}>
-                  <input
-                    type="text"
-                    placeholder="Name"
-                    value={form.personName}
-                    onChange={(e) => setForm((f) => ({ ...f, personName: e.target.value }))}
-                  />
-                  <input
-                    type="email"
-                    placeholder="Email (so it shows up under 'My Tasks' for them)"
-                    value={form.personEmail}
-                    onChange={(e) => setForm((f) => ({ ...f, personEmail: e.target.value }))}
-                  />
-                </div>
+                <PersonSelect
+                  users={users}
+                  loadingUsers={loadingUsers}
+                  value={form.personEmail}
+                  onChange={(email) => setForm((f) => ({ ...f, personEmail: email }))}
+                  staleName={form.personName}
+                />
               )}
             </div>
 

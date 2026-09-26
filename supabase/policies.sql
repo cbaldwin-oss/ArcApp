@@ -149,23 +149,27 @@ CREATE POLICY "tasks_write_public" ON arcapp_tasks
 -- tables above — this IS the access control list, and as of 2026-09-24 it's ArcApp's ENTIRE
 -- permission model (see schema.sql for the role column and CHECK constraint).
 --
--- Read is scoped to your OWN row only (lower(email) = your JWT's email) — the app only ever
--- needs to check "is *I* on this list, and what's my role", never enumerate who else is, so no
--- anon read at all and no way for a signed-in user to see the whole roster. Admins additionally
--- get full read+write (for the management UI in Settings) via the second, ALL-scoped policy —
--- Postgres RLS ORs multiple permissive policies for the same command together, so both apply at
--- once. This checks THIS table to decide who can write to THIS table rather than deferring to
--- STY4authorized_editors — by explicit request, so ArcApp's access control has no dependency on
--- LaunchPad's shared table at all, in either direction. The write policy goes through
--- is_arcapp_admin() (see top of file) rather than an inline subquery, specifically because a
--- same-table subquery here recurses infinitely — this table is the one that surfaced the bug.
+-- Read is any signed-in ArcApp user, full roster — widened 2026-09-25 (was: your OWN row only)
+-- so every "assign to a specific person" UI (Teams, task/item assignment, Settings' default
+-- assignee) can offer a dropdown of real authorized users instead of free-text name/email entry,
+-- for anyone doing the assigning, not just admins. This is safe to widen because the entire site
+-- now requires signing in (see the Sign-in section below) — everyone who can read this table is
+-- already a vetted member of the project, and the exposed columns are just email/name/role, not
+-- anything more sensitive. Admins additionally get full write (for the management UI in Settings)
+-- via the second, ALL-scoped policy — Postgres RLS ORs multiple permissive policies for the same
+-- command together, so both apply at once. The write policy goes through is_arcapp_admin() (see
+-- top of file) rather than an inline subquery, specifically because a same-table subquery here
+-- recurses infinitely — this table is the one that surfaced that bug (see the note at the top of
+-- this file). This checks THIS table to decide who can write to THIS table rather than deferring
+-- to STY4authorized_editors — by explicit request, so ArcApp's access control has no dependency on
+-- LaunchPad's shared table at all, in either direction.
 -- =============================================================================
 
 ALTER TABLE arcapp_authorized_users ENABLE ROW LEVEL SECURITY;
 
-CREATE POLICY "authorized_users_select_own" ON arcapp_authorized_users
+CREATE POLICY "authorized_users_select_all_signed_in" ON arcapp_authorized_users
   FOR SELECT TO authenticated
-  USING (lower(email) = lower(auth.jwt() ->> 'email'));
+  USING (true);
 
 CREATE POLICY "authorized_users_write_admins" ON arcapp_authorized_users
   FOR ALL TO authenticated

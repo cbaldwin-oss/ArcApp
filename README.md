@@ -614,6 +614,20 @@ only. `saveAuthorizedUser`/`getAuthorizedUsers` in `src/lib/api.ts` carry the `r
 `useCurrentUser.ts` reads it into `CurrentUser.role` at sign-in, and `AppShell.tsx` derives
 `isAdmin`/`canEdit` from that alone.
 
+**Reading the full roster isn't admin-only** (widened 2026-09-25 — used to be "your own row only"
+for a non-admin): every "assign to a specific person" control in the app — Teams' member picker,
+a task's/Checklist-Issue-NETA-item's assign-to popover, Settings' default-assignee picker — is a
+dropdown of `arcapp_authorized_users` (`PersonSelect.tsx`/`useAuthorizedUsersOptions`), never
+free-text name/email entry, so someone can only ever be assigned something if they can actually
+sign in and see it. That needs any signed-in user (not just admins) to be able to read the full
+list, which is safe now that the whole site requires signing in — everyone who can query this
+table is already a vetted project member, and the exposed columns are just email/name/role (see
+`authorized_users_select_all_signed_in` in `policies.sql`). *Writing* to the roster (add/remove/
+change role) is still admin-only, unchanged.
+- A previously-saved assignment whose email is no longer on the roster still shows, selected and
+  savable as-is, flagged "— not in Authorized Users" rather than silently disappearing (same
+  stale-value pattern `CxAlloyStatusPicker` already used for status lists).
+
 **Deliberately, completely independent of LaunchPad's `STY4authorized_editors` table** — that table
 has its own separate `is_admin`/`role` columns, but they mean something different (LaunchPad's own
 edit rights) and this was built to have zero dependency on it, in either direction. This used to be
