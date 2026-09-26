@@ -11,6 +11,7 @@ export default function SettingsPage() {
       jointPackScriptUrl={ctx.jointPackScriptUrl}
       netaTrackerEnabled={ctx.netaTrackerEnabled}
       netaTrackerScriptUrl={ctx.netaTrackerScriptUrl}
+      assetAttributesEnabled={ctx.assetAttributesEnabled}
       checklistReadyStatuses={ctx.checklistReadyStatuses}
       issueReviewStatuses={ctx.issueReviewStatuses}
       issueCreatorCompanyFilter={ctx.issueCreatorCompanyFilter}

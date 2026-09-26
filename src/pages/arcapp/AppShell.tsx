@@ -134,6 +134,7 @@ export default function AppShell() {
         jointPackScriptUrl?: string
         netaTrackerEnabled?: boolean
         netaTrackerScriptUrl?: string
+        assetAttributesEnabled?: boolean
         checklistReadyStatuses?: string[]
         issueReviewStatuses?: string[]
         issueCreatorCompanyFilter?: string
@@ -154,6 +155,7 @@ export default function AppShell() {
   const jointPackScriptUrl = settingsData?.jointPackScriptUrl ?? ''
   const netaTrackerEnabled = settingsData?.netaTrackerEnabled ?? false
   const netaTrackerScriptUrl = settingsData?.netaTrackerScriptUrl ?? ''
+  const assetAttributesEnabled = settingsData?.assetAttributesEnabled ?? false
   const checklistReadyStatuses = settingsData?.checklistReadyStatuses ?? []
   const issueReviewStatuses = settingsData?.issueReviewStatuses ?? []
   const issueCreatorCompanyFilter = settingsData?.issueCreatorCompanyFilter ?? ''
@@ -361,6 +363,7 @@ export default function AppShell() {
     jointPackScriptUrl,
     netaTrackerEnabled,
     netaTrackerScriptUrl,
+    assetAttributesEnabled,
 
     canEdit,
     isAdmin,
@@ -411,7 +414,7 @@ export default function AppShell() {
       <ContextStrip />
 
       <div className="arcapp-layout">
-        <Sidebar jointPackEnabled={jointPackEnabled} netaTrackerEnabled={netaTrackerEnabled} />
+        <Sidebar jointPackEnabled={jointPackEnabled} assetAttributesEnabled={assetAttributesEnabled} netaTrackerEnabled={netaTrackerEnabled} />
 
         <main className={isFullBleed ? 'main-full' : undefined}>
           <Outlet context={outletContext} />

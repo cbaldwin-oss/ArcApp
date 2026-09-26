@@ -47,6 +47,9 @@ export type ShellContext = {
   /** Per-project on/off switch for the whole Joint Pack Photos module — see AppSettings in
    * api.ts. Drives the Sidebar nav item and the page itself, same pattern as netaTrackerEnabled. */
   jointPackEnabled: boolean
+  /** Per-project on/off switch for Asset Attributes — see AppSettings in api.ts. Drives the
+   * Sidebar nav item and the page itself; deliberately independent of `cxAlloyActions`. */
+  assetAttributesEnabled: boolean
 
   /** Any signed-in, authorized ArcApp user (admin or editor) — governs Submittals, Asset
    * Attributes, Workflow item catalog, etc. Settings specifically requires `isAdmin` instead. */

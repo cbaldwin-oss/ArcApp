@@ -2,7 +2,6 @@ import { useEffect, useMemo, useState } from 'react'
 import { Camera, RefreshCw, Save } from 'lucide-react'
 import { useGetEquipmentAttributes, useSaveAssetAttributes } from '../../../lib/api'
 import type { AssetAttributeRow } from '../../../lib/api'
-import { hasCapability } from '../../../lib/project'
 import MultiBoxOcrModal from './MultiBoxOcrModal'
 import CapabilityNotice from './CapabilityNotice'
 
@@ -37,8 +36,7 @@ function groupAttributes(row: AssetAttributeRow): Group[] {
     .sort((a, b) => (a.name === 'General' ? -1 : b.name === 'General' ? 1 : a.name.localeCompare(b.name)))
 }
 
-export default function AssetAttributesManager({ canEdit }: { canEdit: boolean }) {
-  const available = hasCapability('cxAlloyActions')
+export default function AssetAttributesManager({ canEdit, available }: { canEdit: boolean; available: boolean }) {
   const fn = useGetEquipmentAttributes()
   const saveFn = useSaveAssetAttributes()
 
@@ -120,7 +118,7 @@ export default function AssetAttributesManager({ canEdit }: { canEdit: boolean }
       <CapabilityNotice
         feature="Asset Attributes"
         id="attributes"
-        reason="This project's Apps Script doesn't have the ArcApp getEquipmentAttributes/saveAttributes actions added yet."
+        reason="Not enabled for this project yet — turn it on in Settings once this project's Apps Script has the getEquipmentAttributes/saveAttributes/saveImageOnly/ocrImage actions."
       />
     )
   }

@@ -27,16 +27,16 @@ const NAV: Array<{ to: string; label: string; icon: typeof LayoutDashboard; requ
   { to: '/submittals', label: 'Submittals', icon: FileCheck2 },
   { to: '/tamperseals', label: 'Tamper Seals', icon: ShieldAlert, requires: 'siteLogging' },
   { to: '/rtft', label: 'RTFT', icon: ClipboardCheck, requires: 'siteLogging' },
-  { to: '/attributes', label: 'Asset Attributes', icon: Tag, requires: 'cxAlloyActions' },
   { to: '/equipmenttracker', label: 'Equipment Tracker', icon: Grid3x3 },
   { to: '/settings', label: 'Settings', icon: SettingsIcon },
 ]
 
-/** Joint Packs and NETA Tracker aren't in the static NAV list above — unlike the other gated
- * items, their availability is a per-project Settings toggle (`jointPackEnabled`/
- * `netaTrackerEnabled`), not a project.ts capability, so they're spliced in conditionally instead
- * of filtered via `requires`. */
+/** Joint Packs, Asset Attributes, and NETA Tracker aren't in the static NAV list above — unlike
+ * the other gated items, their availability is a per-project Settings toggle
+ * (`jointPackEnabled`/`assetAttributesEnabled`/`netaTrackerEnabled`), not a project.ts capability,
+ * so they're spliced in conditionally instead of filtered via `requires`. */
 const JOINT_PACKS_NAV_ITEM = { to: '/jointpacks', label: 'Joint Packs', icon: Camera }
+const ASSET_ATTRIBUTES_NAV_ITEM = { to: '/attributes', label: 'Asset Attributes', icon: Tag }
 const NETA_NAV_ITEM = { to: '/netatracker', label: 'NETA Tracker', icon: FileSpreadsheet }
 
 /** Where to insert a spliced-in item: right before `before`, or at the end if `before` got
@@ -47,10 +47,14 @@ function insertionIndex(items: Array<{ to: string }>, before: string): number {
   return idx === -1 ? items.length : idx
 }
 
-export default function Sidebar({ jointPackEnabled, netaTrackerEnabled }: { jointPackEnabled: boolean; netaTrackerEnabled: boolean }) {
+type Props = { jointPackEnabled: boolean; assetAttributesEnabled: boolean; netaTrackerEnabled: boolean }
+
+export default function Sidebar({ jointPackEnabled, assetAttributesEnabled, netaTrackerEnabled }: Props) {
   const items = NAV.filter((item) => !item.requires || hasCapability(item.requires))
   // Slotted after "Submittals" / before "Tamper Seals", matching where Joint Packs used to sit.
   if (jointPackEnabled) items.splice(insertionIndex(items, '/tamperseals'), 0, JOINT_PACKS_NAV_ITEM)
+  // Slotted after "RTFT" / before "Equipment Tracker", matching where Attributes used to sit.
+  if (assetAttributesEnabled) items.splice(insertionIndex(items, '/equipmenttracker'), 0, ASSET_ATTRIBUTES_NAV_ITEM)
   // Slotted after "Attributes" / before "Equipment Tracker", matching where it used to sit in NAV.
   if (netaTrackerEnabled) items.splice(insertionIndex(items, '/equipmenttracker'), 0, NETA_NAV_ITEM)
   return (

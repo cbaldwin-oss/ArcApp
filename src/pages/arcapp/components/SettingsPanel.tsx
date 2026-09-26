@@ -14,6 +14,7 @@ type Props = {
   jointPackScriptUrl: string
   netaTrackerEnabled: boolean
   netaTrackerScriptUrl: string
+  assetAttributesEnabled: boolean
   checklistReadyStatuses: string[]
   issueReviewStatuses: string[]
   issueCreatorCompanyFilter: string
@@ -165,6 +166,7 @@ export default function SettingsPanel({
   jointPackScriptUrl,
   netaTrackerEnabled,
   netaTrackerScriptUrl,
+  assetAttributesEnabled,
   checklistReadyStatuses,
   issueReviewStatuses,
   issueCreatorCompanyFilter,
@@ -247,6 +249,19 @@ export default function SettingsPanel({
               />
             </>
           )}
+        </div>
+        <div style={{ marginBottom: 22, maxWidth: 560 }}>
+          <label style={{ display: 'block', marginBottom: 4, fontFamily: 'var(--font-display)', fontSize: 13, fontWeight: 700, letterSpacing: '0.4px', textTransform: 'uppercase', color: 'var(--text)' }}>
+            Asset Attributes
+          </label>
+          <ToggleField
+            label="Asset Attributes enabled for this project"
+            hint="Turns on the Asset Attributes page and its Sidebar nav item. Separate from Checklists/Issues below — these are pre-existing LaunchPad actions (getEquipmentAttributes/saveAttributes/saveImageOnly/ocrImage) on this project's shared Apps Script, so this can work even where Checklists/Issues can't yet, or vice versa."
+            initial={assetAttributesEnabled}
+            canEdit={isAdmin}
+            loading={loading}
+            onSave={(v) => onSaveSetting('asset_attributes_enabled', v ? 'true' : '')}
+          />
         </div>
         <CxAlloyStatusPicker
           label="Checklist Ready — status(es) that count as ready for CxA review"

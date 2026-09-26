@@ -66,20 +66,21 @@ picked project.
   - **`siteLogging`** — Tamper Seals and RTFT write to `<prefix>Assets`/`<prefix>RTFT`, and
     SAN-NT1B has neither table yet (confirmed live — 404 from Supabase). Per your call, these
     stay unavailable for SAN-NT1B rather than provisioning matching tables sight-unseen.
-  - **`cxAlloyActions`** — Checklists, Issues, Asset Attributes (+ its photo-crop OCR), the
-    Checklist/Issue To-Do sections, and the CxAlloy status pickers in Settings all call custom
-    Apps Script actions (`getChecklists`/`getIssues`/`getCxAlloySettings`/
-    `getEquipmentAttributes`/`saveAttributes`/`saveImageOnly`/`ocrImage`). SAN-NT1B's
-    separately-deployed script didn't have them yet — confirmed live: `action=getChecklists`
-    against it fell through to a different, equipment-tracker-shaped default response instead of
-    an error, which would otherwise have rendered as a page of blank/malformed rows rather than
-    failing cleanly. **Resolved 2026-09-25**: `AppendToCxAlloyScript.gs` was added to SAN-NT1B's
-    own deployment and `cxAlloyActions` flipped on for it in `CAPABILITIES`.
+  - **`cxAlloyActions`** — Checklists, Issues, the Checklist/Issue To-Do sections, and the CxAlloy
+    status pickers in Settings all call custom Apps Script actions (`getChecklists`/`getIssues`/
+    `getCxAlloySettings`). SAN-NT1B's separately-deployed script didn't have them yet — confirmed
+    live: `action=getChecklists` against it fell through to a different, equipment-tracker-shaped
+    default response instead of an error, which would otherwise have rendered as a page of
+    blank/malformed rows rather than failing cleanly. **Resolved 2026-09-25**:
+    `AppendToCxAlloyScript.gs` was added to SAN-NT1B's own deployment and `cxAlloyActions` flipped
+    on for it in `CAPABILITIES`. (Asset Attributes used to share this same capability but was split
+    into its own independent Settings toggle the same day — see its own section above; it never
+    actually needed the ArcApp-specific actions this capability gates.)
 - **What already works for SAN-NT1B**: Activities (`SANNT1BBackEndData`, confirmed live), dropdown
   options, Equipment Status Tracker (reads Supabase directly, not Apps Script — confirmed live with
   837 real assets), Submittals, To-Do (manual tasks/teams), Settings, and — as of 2026-09-25 —
-  Checklists/Issues/Asset Attributes (`cxAlloyActions`, see above). Joint Pack Photos and NETA
-  Tracker are both admin-toggleable per project now (see their own sections above) but still need
+  Checklists/Issues (`cxAlloyActions`, see above). Joint Pack Photos, Asset Attributes, and NETA
+  Tracker are all admin-toggleable per project now (see their own sections above) but still need
   their own Sheet/Apps Script deployed for SAN-NT1B before flipping on.
 - Verified live end-to-end: switching STY4 → SAN-NT1B updates the site pill and localStorage,
   hides the five gated Sidebar items, shows real SAN-NT1B data on Activities/Equipment Tracker,
@@ -456,6 +457,18 @@ just "the STY4 project's shared script," stored in `launchpad_projects` and reus
 a dozen other things too). That meant no new script or table was needed — `AssetAttributesManager.tsx`
 just gives ArcApp its own window into data LaunchPad's version already reads and writes.
 
+- **Gated by its own per-project Settings toggle** (added 2026-09-25) — Settings → "Asset
+  Attributes enabled for this project" (`asset_attributes_enabled` in `arcapp_settings`,
+  `assetAttributesEnabled` in `AppSettings`/`ShellContext`), gating the page/nav item the same way
+  `netaTrackerEnabled`/`jointPackEnabled` do. Deliberately not tied to the `cxAlloyActions`
+  capability Checklists/Issues use, even though it used to share that gate: `getEquipmentAttributes`/
+  `saveAttributes`/`saveImageOnly`/`ocrImage` are pre-existing LaunchPad actions on the shared
+  script, not an ArcApp addition to it, so a project can have Asset Attributes working while
+  Checklists/Issues aren't wired up yet, or vice versa. `getCxAlloyScriptUrl()` in `src/lib/api.ts`
+  is now a pure URL resolver with no capability check baked in; `fetchCxAlloySheet` (Checklists/
+  Issues/CxAlloy Settings/People) and the new `getAssetAttributesScriptUrl()` (Asset Attributes)
+  each gate it independently before calling. STY4 was seeded with this on to preserve its existing
+  behavior; SAN-NT1B (and any new project) starts off.
 - **Grouping**: each column header in the sheet is either a bare attribute name (falls under
   "General") or `"Group: Attribute Name"` (e.g. `"Nameplate: Manufacturer"`) — `groupAttributes()`
   splits on the first `:` and renders one section per group, matching LaunchPad's own convention

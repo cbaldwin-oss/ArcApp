@@ -187,14 +187,11 @@ export function useGetCxAlloyLinkBase() {
   return useApiFn(getCxAlloyLinkBase)
 }
 
+/** Pure resolver for the project's shared LaunchPad Apps Script URL — no capability/feature check
+ * baked in, since it's used by two independently-gated feature families (fetchCxAlloySheet's own
+ * `cxAlloyActions` check below, and getAssetAttributesScriptUrl's `assetAttributesEnabled` check)
+ * that shouldn't be coupled to each other's on/off state. */
 async function getCxAlloyScriptUrl(): Promise<string> {
-  // Guards every caller (fetchCxAlloySheet, plus Asset Attributes/OCR which call this directly)
-  // against a project whose Apps Script hasn't had the ArcApp-specific actions added yet — see
-  // the `cxAlloyActions` capability comment in src/lib/project.ts for why that's a real gap today
-  // rather than something to detect from the response shape.
-  if (!hasCapability('cxAlloyActions')) {
-    throw new Error(`This project's Apps Script doesn't have the ArcApp actions (getChecklists/getIssues/etc.) added yet.`)
-  }
   const res = await supabase
     .from('launchpad_projects')
     .select('google_script_url')
@@ -207,6 +204,13 @@ async function getCxAlloyScriptUrl(): Promise<string> {
 }
 
 async function fetchCxAlloySheet(action: string, params: Record<string, string> = {}): Promise<Array<Record<string, string>>> {
+  // Guards Checklists/Issues/CxAlloy Settings/People against a project whose Apps Script hasn't
+  // had the ArcApp-specific actions added yet — Asset Attributes is gated separately
+  // (getAssetAttributesScriptUrl below), since its actions are pre-existing LaunchPad ones, not an
+  // ArcApp addition to this same script.
+  if (!hasCapability('cxAlloyActions')) {
+    throw new Error(`This project's Apps Script doesn't have the ArcApp actions (getChecklists/getIssues/etc.) added yet.`)
+  }
   const scriptUrl = await getCxAlloyScriptUrl()
   const url = new URL(scriptUrl)
   url.searchParams.set('action', action)
@@ -484,12 +488,23 @@ export function useSaveItemAssignments() {
 // getEquipmentAttributes/saveAttributes already exist there because LaunchPad's Asset Attributes
 // page already calls them — this just gives ArcApp its own window into the same data. QR/photo-OCR
 // scanning (LaunchPad has both) is intentionally not ported here — deferred to a follow-up.
+//
+// Gated by its own per-project Settings toggle, `assetAttributesEnabled` (added 2026-09-25) —
+// deliberately NOT tied to the `cxAlloyActions` capability Checklists/Issues use, since these
+// actions are pre-existing LaunchPad ones (not an ArcApp addition to the script) and can genuinely
+// work on a project even where Checklists/Issues can't yet, or vice versa.
 // ---------------------------------------------------------------------------
+
+async function getAssetAttributesScriptUrl(): Promise<string> {
+  const { assetAttributesEnabled } = await getSettings()
+  if (!assetAttributesEnabled) throw new Error('Asset Attributes isn’t enabled for this project.')
+  return getCxAlloyScriptUrl()
+}
 
 export type AssetAttributeRow = Record<string, string>
 
 async function getEquipmentAttributes(): Promise<AssetAttributeRow[]> {
-  const scriptUrl = await getCxAlloyScriptUrl()
+  const scriptUrl = await getAssetAttributesScriptUrl()
   const url = new URL(scriptUrl)
   url.searchParams.set('action', 'getEquipmentAttributes')
   const res = await fetch(url.toString())
@@ -509,7 +524,7 @@ export function useGetEquipmentAttributes() {
 export type AttributeChange = { attribute: string; newValue: string }
 async function saveAssetAttributes(params: { assetName: string; changes: AttributeChange[] }): Promise<{ success: boolean }> {
   if (!params.changes.length) return { success: true }
-  const scriptUrl = await getCxAlloyScriptUrl()
+  const scriptUrl = await getAssetAttributesScriptUrl()
   const res = await fetch(scriptUrl, {
     method: 'POST',
     // text/plain avoids a CORS preflight, same reasoning as Joint Pack Photos' upload — Apps
@@ -535,7 +550,7 @@ export function useSaveAssetAttributes() {
 // fires several of these concurrently via Promise.all and needs its own combined status/progress
 // state, not one hook's single loading/error pair.
 export async function uploadAssetPhoto(params: { assetName: string; scanType: string; imageBase64: string }): Promise<{ fileName: string }> {
-  const scriptUrl = await getCxAlloyScriptUrl()
+  const scriptUrl = await getAssetAttributesScriptUrl()
   const res = await fetch(scriptUrl, {
     method: 'POST',
     headers: { 'Content-Type': 'text/plain;charset=utf-8' },
@@ -553,7 +568,7 @@ export async function ocrAssetImage(params: {
   photoName: string
   imageBase64: string
 }): Promise<{ text: string }> {
-  const scriptUrl = await getCxAlloyScriptUrl()
+  const scriptUrl = await getAssetAttributesScriptUrl()
   const res = await fetch(scriptUrl, {
     method: 'POST',
     headers: { 'Content-Type': 'text/plain;charset=utf-8' },
@@ -1153,6 +1168,12 @@ export type AppSettings = {
   /** Apps Script Web App /exec URL for NETA Tracker — editable from Settings as of 2026-09-25
    * (used to be DB-only, set directly in Supabase for every new project). */
   netaTrackerScriptUrl: string
+  /** Per-project on/off switch for Asset Attributes (page, nav item) — added 2026-09-25. Separate
+   * from `cxAlloyActions` on purpose: getEquipmentAttributes/saveAttributes/saveImageOnly/ocrImage
+   * are pre-existing LaunchPad actions (not an ArcApp addition to the script), so this can be
+   * enabled independently of whether Checklists/Issues are. Off by default for any project until
+   * set — including STY4, seeded on so its existing behavior doesn't change. */
+  assetAttributesEnabled: boolean
   checklistReadyStatuses: string[]
   issueReviewStatuses: string[]
   /** Company name to keep issues from, matched against Created By (either directly, for a shared
@@ -1217,6 +1238,7 @@ async function getSettings(): Promise<AppSettings> {
     jointPackScriptUrl: map.get('joint_pack_script_url') ?? '',
     netaTrackerEnabled: map.get('neta_tracker_enabled') === 'true',
     netaTrackerScriptUrl: map.get('neta_tracker_script_url') ?? '',
+    assetAttributesEnabled: map.get('asset_attributes_enabled') === 'true',
     checklistReadyStatuses: splitCsv(map.get('checklist_ready_statuses'), SETTINGS_DEFAULTS.checklistReadyStatuses),
     issueReviewStatuses: splitCsv(map.get('issue_review_statuses'), SETTINGS_DEFAULTS.issueReviewStatuses),
     issueCreatorCompanyFilter: map.get('issue_creator_company_filter') ?? '',
@@ -1242,6 +1264,7 @@ const ALLOWED_SETTING_KEYS = new Set([
   'joint_pack_script_url',
   'neta_tracker_enabled',
   'neta_tracker_script_url',
+  'asset_attributes_enabled',
   'checklist_ready_statuses',
   'issue_review_statuses',
   'issue_creator_company_filter',
