@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { useOutletContext } from 'react-router-dom'
 import { RefreshCw } from 'lucide-react'
 import { useGetChecklists, cxAlloyChecklistUrl } from '../../../lib/api'
-import { hasCapability } from '../../../lib/project'
+import { hasCapability, CURRENT_PROJECT, projectLabel } from '../../../lib/project'
 import type { ShellContext } from '../ShellContext'
 import CapabilityNotice from './CapabilityNotice'
 
@@ -77,7 +77,7 @@ export default function ChecklistReadyPanel() {
         </div>
       </div>
       <div className="sync-note">
-        Ready for CxA review · source: <b style={{ color: 'var(--text-muted)' }}>STY4A API Database · Checklists</b>
+        Ready for CxA review · source: <b style={{ color: 'var(--text-muted)' }}>{projectLabel(CURRENT_PROJECT)} API Database · Checklists</b>
       </div>
       {state === 'ready' && (
         <div style={{ padding: '0 20px 12px', display: 'flex', gap: 10, flexWrap: 'wrap' }}>

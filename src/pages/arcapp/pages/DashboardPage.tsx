@@ -2,7 +2,7 @@ import { useNavigate, useOutletContext } from 'react-router-dom'
 import type { ShellContext } from '../ShellContext'
 import { MILESTONES } from '../sampleData'
 import { isTodoMine } from '../utils'
-import { CURRENT_PROJECT } from '../../../lib/project'
+import { CURRENT_PROJECT, projectLabel } from '../../../lib/project'
 import KpiRow from '../components/KpiRow'
 import TodoPanel from '../components/TodoPanel'
 import { MyItemRow, MySummaryCard, todoSummaryRoute } from '../components/OpenItemsTodoPanel'
@@ -44,7 +44,7 @@ export default function DashboardPage() {
     <>
       <div className="page-heading">
         <h1>Mission Dashboard</h1>
-        <p>Your checklist, milestones, and live activity feed for Phoenix Data Center 3.</p>
+        <p>Your checklist, milestones, and live activity feed for {projectLabel(CURRENT_PROJECT)}.</p>
       </div>
 
       <KpiRow />

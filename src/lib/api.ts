@@ -1014,12 +1014,12 @@ export type RtftRow = {
   signoff: string
 }
 async function getRtft(): Promise<RtftRow[]> {
-  // STY4RTFT only exists for STY4 today — see the `siteLogging` capability comment in
+  // <prefix>RTFT only exists for STY4 today — see the `siteLogging` capability comment in
   // src/lib/project.ts. The RTFT page/section itself already hides behind this same check; this
   // is defense in depth for any other caller (e.g. ActivityDrawer's embedded RTFT section).
   if (!hasCapability('siteLogging')) return []
   const res = await supabase
-    .from('STY4RTFT')
+    .from(`${CXALLOY_TABLE_PREFIX}RTFT`)
     .select(
       'id, created_at, inspection_date, equipment, equipment_type, ofe, inspector, ops_team_present, cxa_present, gc_present, issues_found, corrected_immediately, issue_description, entered_bim, bim_issue_number, l2_pass, signoff',
     )
@@ -1051,7 +1051,7 @@ async function submitRtft(p: RtftInput): Promise<{ id: number }> {
   if (!hasCapability('siteLogging')) throw new Error('RTFT logging isn’t available for this project yet.')
   const signoff = await getCurrentUserEmail()
   const res = await supabase
-    .from('STY4RTFT')
+    .from(`${CXALLOY_TABLE_PREFIX}RTFT`)
     .insert({
       inspection_date: p.date,
       equipment: p.equipment,
@@ -1480,12 +1480,12 @@ export type TamperSealRow = {
   created_at: string
 }
 async function getTamperSeals(): Promise<TamperSealRow[]> {
-  // STY4Assets only exists for STY4 today — see the `siteLogging` capability comment in
+  // <prefix>Assets only exists for STY4 today — see the `siteLogging` capability comment in
   // src/lib/project.ts. The Tamper Seals page/section already hides behind this same check; this
   // is defense in depth for any other caller (e.g. ActivityDrawer's embedded seal section).
   if (!hasCapability('siteLogging')) return []
   const res = await supabase
-    .from('STY4Assets')
+    .from(`${CXALLOY_TABLE_PREFIX}Assets`)
     .select(
       'id, asset_name, location, sub_area, seal_number, inspection_date, inspection_notes, signoff, status, responsible_party, break_date, break_reason, created_at',
     )
@@ -1536,7 +1536,7 @@ async function logTamperSeals(params: { rows: SealInput[] }): Promise<{ inserted
     signoff,
     status: r.status || 'Intact',
   }))
-  const res = await supabase.from('STY4Assets').insert(records)
+  const res = await supabase.from(`${CXALLOY_TABLE_PREFIX}Assets`).insert(records)
   if (res.error) throw new Error(res.error.message)
   return { inserted: rows.length }
 }

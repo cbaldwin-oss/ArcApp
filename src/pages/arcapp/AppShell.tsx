@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { Outlet, useLocation } from 'react-router-dom'
 import { useCurrentUser } from '../../lib/useCurrentUser'
-import { CURRENT_PROJECT } from '../../lib/project'
+import { CURRENT_PROJECT, projectLabel } from '../../lib/project'
 import {
   useGetSchedule, useGetResultOptions, useSaveResult, useLogTamperSeals, useSubmitRtft,
   useGetSettings, useSaveSetting, useSaveDefaultAssignee, useGetWorkflows, useGetWorkflowItems, useGetCxAlloyLinkBase, parseCxAlloyLinkBase,
@@ -421,7 +421,7 @@ export default function AppShell() {
 
           {!isFullBleed && (
             <footer>
-              ArcApp Commissioning · Phoenix Data Center 3 · Milestones are sample data — To-Dos
+              ArcApp Commissioning · {projectLabel(CURRENT_PROJECT)} · Milestones are sample data — To-Dos
               read live from arcapp_tasks and Scheduled Activities from {SOURCE_LABEL}
             </footer>
           )}

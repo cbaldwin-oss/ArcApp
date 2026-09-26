@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { useOutletContext } from 'react-router-dom'
 import { RefreshCw } from 'lucide-react'
 import { useGetIssues, cxAlloyIssueUrl } from '../../../lib/api'
-import { hasCapability } from '../../../lib/project'
+import { hasCapability, CURRENT_PROJECT, projectLabel } from '../../../lib/project'
 import type { ShellContext } from '../ShellContext'
 import CapabilityNotice from './CapabilityNotice'
 
@@ -82,7 +82,7 @@ export default function IssuesReviewPanel() {
         </div>
       </div>
       <div className="sync-note">
-        Ready for review · grouped by originator (created by) · source: <b style={{ color: 'var(--text-muted)' }}>STY4A API Database · Issues</b>
+        Ready for review · grouped by originator (created by) · source: <b style={{ color: 'var(--text-muted)' }}>{projectLabel(CURRENT_PROJECT)} API Database · Issues</b>
       </div>
       {state === 'ready' && (
         <div style={{ padding: '0 20px 12px', display: 'flex', gap: 10, flexWrap: 'wrap' }}>

@@ -13,7 +13,7 @@
 export type ProjectKey = 'STY4' | 'SANNT1B'
 
 export const PROJECTS: Array<{ key: ProjectKey; label: string }> = [
-  { key: 'STY4', label: 'STY4 — Phoenix DC3' },
+  { key: 'STY4', label: 'STY4' },
   { key: 'SANNT1B', label: 'SAN-NT1B' },
 ]
 

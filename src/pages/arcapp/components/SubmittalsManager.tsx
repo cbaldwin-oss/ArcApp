@@ -12,6 +12,7 @@ import {
   SUBMITTAL_STATUSES,
 } from '../../../lib/api'
 import type { Submittal } from '../../../lib/api'
+import { CURRENT_PROJECT } from '../../../lib/project'
 import { localIsoDate } from '../utils'
 import MultiSelectPicker from './MultiSelectPicker'
 
@@ -324,7 +325,7 @@ export default function SubmittalsManager({ canEdit }: { canEdit: boolean }) {
       </div>
       <div className="sync-note">
         Upload a submittal, pick every asset it applies to, then set one review status/notes for
-        all of them at once — assets from <b style={{ color: 'var(--text-muted)' }}>STY4dropdownoptions.Assets</b>
+        all of them at once — assets from <b style={{ color: 'var(--text-muted)' }}>{CURRENT_PROJECT}dropdownoptions.Assets</b>
         {!canEdit ? ' · sign in as an authorized editor to add or edit' : ''}
       </div>
 

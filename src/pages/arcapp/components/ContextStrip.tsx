@@ -1,8 +1,10 @@
+import { CURRENT_PROJECT, projectLabel } from '../../../lib/project'
+
 export default function ContextStrip() {
   return (
     <div className="context-strip">
       <span>
-        PROJECT <b>Phoenix Data Center 3</b>
+        PROJECT <b>{projectLabel(CURRENT_PROJECT)}</b>
       </span>
       <span className="divider">/</span>
       <span>

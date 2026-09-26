@@ -6,6 +6,7 @@ import AuthorizedUsersManager from './AuthorizedUsersManager'
 import SubmittalExemptAssetsManager from './SubmittalExemptAssetsManager'
 import DefaultAssigneePicker from './DefaultAssigneePicker'
 import type { DefaultAssignee } from '../../../lib/api'
+import { CURRENT_PROJECT, projectLabel } from '../../../lib/project'
 import type { Team } from '../types'
 
 type Props = {
@@ -265,7 +266,7 @@ export default function SettingsPanel({
         </div>
         <CxAlloyStatusPicker
           label="Checklist Ready — status(es) that count as ready for CxA review"
-          hint="Pulled live from the CxAlloy Settings tab (STY4A API Database). Checked statuses show up on the Checklists page. Also defines Checklist To-Do below: any status NOT checked here counts as still open."
+          hint={`Pulled live from the CxAlloy Settings tab (${projectLabel(CURRENT_PROJECT)} API Database). Checked statuses show up on the Checklists page. Also defines Checklist To-Do below: any status NOT checked here counts as still open.`}
           column="checklistStatuses"
           value={checklistReadyStatuses}
           canEdit={isAdmin}
@@ -274,7 +275,7 @@ export default function SettingsPanel({
         />
         <CxAlloyStatusPicker
           label="Issues for Review — status(es) that count as ready for review"
-          hint="Pulled live from the CxAlloy Settings tab (STY4A API Database). Checked statuses show up on the Issues page. Also defines Issues To-Do below: any status NOT checked here counts as still open."
+          hint={`Pulled live from the CxAlloy Settings tab (${projectLabel(CURRENT_PROJECT)} API Database). Checked statuses show up on the Issues page. Also defines Issues To-Do below: any status NOT checked here counts as still open.`}
           column="issueStatuses"
           value={issueReviewStatuses}
           canEdit={isAdmin}

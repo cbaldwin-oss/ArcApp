@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { Camera, FolderOpen, Plus, RefreshCw } from 'lucide-react'
 import { useGetJointPackData, useLogJointPackPhotos } from '../../../lib/api'
 import type { JointPackRow, JointPackSide } from '../../../lib/api'
+import { CURRENT_PROJECT, projectLabel } from '../../../lib/project'
 import { compressImageFile } from '../utils'
 import FullscreenOverlay from './FullscreenOverlay'
 
@@ -15,9 +16,11 @@ type Props = {
 }
 
 const SIDES: JointPackSide[] = ['Top', 'Side', 'Bottom']
-// Every row in the sheet today is this building — kept as a fallback only, never hardcoded into
-// a request; a new Joint Pack # takes whatever building an asset's existing rows already use.
-const DEFAULT_BUILDING = 'STY4A'
+// Every row in the sheet takes whichever building its own existing rows already use — this is
+// only the fallback for a brand-new asset with zero rows yet, never hardcoded into a request.
+// Keyed off the current project rather than a fixed site's building code, since that's wrong for
+// every other project.
+const DEFAULT_BUILDING = CURRENT_PROJECT
 
 function sideUrls(row: Pick<JointPackRow, 'topUrl' | 'sideUrl' | 'bottomUrl'>): Record<JointPackSide, string> {
   return { Top: row.topUrl, Side: row.sideUrl, Bottom: row.bottomUrl }
@@ -96,7 +99,7 @@ export default function JointPackPhotosPanel({ folder, onGoToSettings }: Props) 
         </div>
       </div>
       <div className="sync-note">
-        Diagnosed from <b style={{ color: 'var(--text-muted)' }}>Joint Pack Photo - STY4A · Joint Packs</b>
+        Diagnosed from <b style={{ color: 'var(--text-muted)' }}>{projectLabel(CURRENT_PROJECT)} Joint Pack Photos</b>
         {state === 'ready'
           ? ` — ${totals.packs} joint pack${totals.packs === 1 ? '' : 's'} tracked across ${totals.assetsWithRows} asset${totals.assetsWithRows === 1 ? '' : 's'}${
               totals.assetsNotStarted > 0 ? `, ${totals.assetsNotStarted} more not started` : ''

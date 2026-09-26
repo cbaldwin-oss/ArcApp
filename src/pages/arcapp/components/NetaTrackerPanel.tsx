@@ -3,6 +3,7 @@ import { useOutletContext } from 'react-router-dom'
 import { ChevronDown, ChevronRight, RefreshCw } from 'lucide-react'
 import { useGetNetaTrackerData, useUpdateNetaField } from '../../../lib/api'
 import type { NetaReturnedRow, NetaSubmissionRow, NetaTab } from '../../../lib/api'
+import { CURRENT_PROJECT, projectLabel } from '../../../lib/project'
 import type { ShellContext } from '../ShellContext'
 import CapabilityNotice from './CapabilityNotice'
 
@@ -357,7 +358,7 @@ export default function NetaTrackerPanel() {
         </div>
       </div>
       <div className="sync-note">
-        Synced live from <b style={{ color: 'var(--text-muted)' }}>STY4 NETA Tracker · {tab === 'submissions' ? 'Submissions' : 'Returned Files'}</b>
+        Synced live from <b style={{ color: 'var(--text-muted)' }}>{projectLabel(CURRENT_PROJECT)} NETA Tracker · {tab === 'submissions' ? 'Submissions' : 'Returned Files'}</b>
         {data?.syncedAt ? ` — as of ${new Date(data.syncedAt).toLocaleString()}.` : '.'} Edits here are written straight back to that sheet.
       </div>
 
