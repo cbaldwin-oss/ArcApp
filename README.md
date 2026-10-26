@@ -413,6 +413,30 @@ editable grid → "Confirm & Save" flow as always, writing to the same `STY4Asse
   admin-configured status catalog the way LaunchPad's `getActiveStatuses()` works — ArcApp has no
   such catalog for Tamper Seals. LaunchPad's more elaborate match-navigation (highlight + prev/next
   + counter) and PDF/CSV export weren't ported — out of scope for what was asked.
+- **Break request approval** (added 2026-10-26) — LaunchPad's field form (`seal-form-view.js`,
+  `submitBreakRequest`) lets a worker request to break a seal: it flips that seal's `STY4Assets`
+  row to status `Break Requested (Pending Approval)` and best-effort logs the requestor's name/
+  company/email/reason into `STY4BreakRequests` (plus a per-seal row into `STY4RequestedSeals`).
+  Nothing in LaunchPad itself ever reads the `ccm_decision` field back, though — there was no
+  approval UI anywhere, for either app. ArcApp is now that missing half:
+  - `TamperSealLogPanel.tsx` shows a **Pending Break Requests** card above the filter bar whenever
+    any `STY4Assets` row is sitting at `Break Requested (Pending Approval)`, matched back to its
+    `STY4BreakRequests` row (by asset name + seal number, since one request can cover several
+    seals) to show who asked and why. Any signed-in authorized user (`canEdit`, editor or admin)
+    gets **Approve**/**Deny** buttons with an optional note; approving sets the seal to
+    `Break Approved by CCM` (continuing LaunchPad's existing workflow), denying sets it to a new
+    `Break Request Denied` status (kept distinct from reverting to `Intact`, to preserve an audit
+    trail) — see `getBreakRequests`/`useDecideBreakRequest` in `src/lib/api.ts`.
+  - `STY4BreakRequests` and `STY4RequestedSeals` **did not actually exist** in the live database
+    before this — LaunchPad's insert into them was silently failing (RLS/`PGRST205`). They've been
+    created now (open RLS, matching `STY4Assets`'s `anon, authenticated` policy, since Tamper Seal
+    logging is "no sign-in required" throughout), plus `decided_by`/`decided_at`/`decision_notes`
+    columns on `STY4BreakRequests` for the approval step itself. Because those tables didn't exist
+    yet, the handful of break requests already pending in production before this change have no
+    requestor name/company/reason on file — those rows show "No request details on file" instead.
+  - The live `launchpad_tamperseal_config` workflow (`project_key='STY4'`) was updated to add the
+    `break_request_denied` status and a `break_requested → break_request_denied` transition
+    (`t2b`), since the deny path didn't exist in the workflow graph at all before this.
 
 ## Submittals — one record per document, applied to many assets
 

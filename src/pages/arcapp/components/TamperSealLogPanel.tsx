@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useOutletContext } from 'react-router-dom'
-import { Plus, RefreshCw } from 'lucide-react'
-import { useGetAssetPlaceOptions, useGetTamperSeals, useLogTamperSeals } from '../../../lib/api'
-import type { SealInput } from '../../../lib/api'
+import { Check, Plus, RefreshCw, X } from 'lucide-react'
+import { useGetAssetPlaceOptions, useGetBreakRequests, useGetTamperSeals, useLogTamperSeals, useDecideBreakRequest } from '../../../lib/api'
+import type { BreakRequestRow, SealInput } from '../../../lib/api'
 import { fmtDate, localIsoDate } from '../utils'
 import { hasCapability } from '../../../lib/project'
 import TamperSealSection from './TamperSealSection'
@@ -62,8 +62,136 @@ function FilterButtonGroup({ label, options, selected, onToggle }: { label: stri
   )
 }
 
+/** The CCM approval step LaunchPad's field form starts but never finishes: it flips a seal to
+ * "Break Requested (Pending Approval)" and logs a request, but there's no approve/deny UI
+ * anywhere in LaunchPad itself. This lists those pending seals and lets a CCM decide them. */
+function BreakRequestsSection({ canDecide, onDecided }: { canDecide: boolean; onDecided: () => void }) {
+  const breakFn = useGetBreakRequests()
+  const decideFn = useDecideBreakRequest()
+  const [pending, setPending] = useState<{ row: BreakRequestRow; approve: boolean } | null>(null)
+  const [notes, setNotes] = useState('')
+
+  useEffect(() => {
+    void breakFn.trigger()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  const rows = (breakFn.data as BreakRequestRow[] | undefined) ?? []
+
+  async function confirmDecision() {
+    if (!pending) return
+    await decideFn.trigger({ assetId: pending.row.assetId, requestId: pending.row.requestId, approve: pending.approve, notes }).result
+    setPending(null)
+    setNotes('')
+    void breakFn.trigger()
+    onDecided()
+  }
+
+  if (breakFn.loading && !breakFn.data) return null
+  if (rows.length === 0) return null
+
+  return (
+    <div className="panel-body" style={{ borderBottom: '1px solid var(--border)' }}>
+      <div className="q-hint" style={{ marginBottom: 10, fontWeight: 600, color: 'var(--text)' }}>
+        Pending Break Requests ({rows.length})
+      </div>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+        {rows.map((r) => {
+          const isPendingThis = pending?.row.assetId === r.assetId
+          return (
+            <div
+              key={r.assetId}
+              style={{
+                border: '1px solid var(--border-strong)',
+                borderRadius: 'var(--radius-sm)',
+                padding: '10px 12px',
+                background: 'var(--bg-elev-2)',
+              }}
+            >
+              <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap' }}>
+                <div>
+                  <strong style={{ color: 'var(--text)' }}>{r.asset_name}</strong>{' '}
+                  <span style={{ color: 'var(--text-muted)' }}>— Seal #{r.seal_number}</span>
+                  <div style={{ color: 'var(--text-muted)', fontSize: 12.5, marginTop: 2 }}>
+                    {r.location || '—'}
+                    {r.sub_area ? ` / ${r.sub_area}` : ''}
+                  </div>
+                </div>
+                {canDecide && !isPendingThis && (
+                  <div style={{ display: 'flex', gap: 8 }}>
+                    <button
+                      type="button"
+                      className="wf-btn"
+                      style={{ display: 'flex', alignItems: 'center', gap: 5 }}
+                      onClick={() => {
+                        setPending({ row: r, approve: true })
+                        setNotes('')
+                      }}
+                    >
+                      <Check style={{ width: 13, height: 13 }} /> Approve
+                    </button>
+                    <button
+                      type="button"
+                      className="wf-btn danger"
+                      style={{ display: 'flex', alignItems: 'center', gap: 5 }}
+                      onClick={() => {
+                        setPending({ row: r, approve: false })
+                        setNotes('')
+                      }}
+                    >
+                      <X style={{ width: 13, height: 13 }} /> Deny
+                    </button>
+                  </div>
+                )}
+              </div>
+
+              <div style={{ marginTop: 8, fontSize: 13, color: 'var(--text-muted)' }}>
+                {r.requestor_name || r.requestor_email || r.requestor_company || r.reason || r.requested_at ? (
+                  <>
+                    {(r.requestor_name || r.requestor_email) && (
+                      <div>
+                        Requested by {r.requestor_name || '—'}
+                        {r.requestor_company ? ` (${r.requestor_company})` : ''}
+                        {r.requestor_email ? ` — ${r.requestor_email}` : ''}
+                        {r.requested_at ? ` on ${fmtDate(r.requested_at.slice(0, 10))}` : ''}
+                      </div>
+                    )}
+                    {r.reason && <div style={{ marginTop: 2 }}>Reason: {r.reason}</div>}
+                  </>
+                ) : (
+                  <div style={{ color: 'var(--text-faint)' }}>No request details on file for this seal.</div>
+                )}
+              </div>
+
+              {isPendingThis && (
+                <div className="wf-confirm" style={{ marginTop: 10, flexWrap: 'wrap' }}>
+                  {pending.approve ? 'Approve this break request?' : 'Deny this break request?'}
+                  <input
+                    type="text"
+                    placeholder="Notes (optional)"
+                    value={notes}
+                    onChange={(e) => setNotes(e.target.value)}
+                    style={{ flex: '1 1 160px', minWidth: 140 }}
+                  />
+                  <button className={pending.approve ? 'wf-btn' : 'wf-btn danger'} disabled={decideFn.loading} onClick={confirmDecision}>
+                    {decideFn.loading ? '…' : pending.approve ? 'Yes, approve' : 'Yes, deny'}
+                  </button>
+                  <button className="wf-btn" disabled={decideFn.loading} onClick={() => setPending(null)}>
+                    Cancel
+                  </button>
+                </div>
+              )}
+            </div>
+          )
+        })}
+      </div>
+      {decideFn.error && <div className="q-hint err" style={{ marginTop: 8 }}>{decideFn.error}</div>}
+    </div>
+  )
+}
+
 export default function TamperSealLogPanel() {
-  const { currentUserEmail } = useOutletContext<ShellContext>()
+  const { currentUserEmail, canEdit } = useOutletContext<ShellContext>()
   const available = hasCapability('siteLogging')
   const fn = useGetTamperSeals()
   const assetPlaceFn = useGetAssetPlaceOptions()
@@ -203,6 +331,8 @@ export default function TamperSealLogPanel() {
           )}
         </div>
       )}
+
+      <BreakRequestsSection canDecide={canEdit} onDecided={() => void fn.trigger()} />
 
       {state === 'ready' && (
         <div className="ts-filters">

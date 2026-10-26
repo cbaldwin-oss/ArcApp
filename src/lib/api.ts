@@ -1545,6 +1545,117 @@ export function useLogTamperSeals() {
 }
 
 // ---------------------------------------------------------------------------
+// tamper seal break requests — LaunchPad's field form (seal-form-view.js,
+// submitBreakRequest) flips a seal to "Break Requested (Pending Approval)"
+// and best-effort logs a <prefix>BreakRequests row, but nothing in LaunchPad
+// itself ever reads the ccm_decision field back — there's no CCM approval UI
+// there at all. This is that missing half, on the ArcApp side: list pending
+// seals and let a CCM approve/deny them, which also resolves the matching
+// BreakRequests row (when one exists) so LaunchPad's own data stays correct.
+// ---------------------------------------------------------------------------
+
+export type BreakRequestRow = {
+  assetId: number
+  asset_name: string
+  location: string
+  sub_area: string
+  seal_number: string
+  status: string
+  requestId: number | null
+  reason: string
+  requestor_name: string
+  requestor_company: string
+  requestor_email: string
+  requested_at: string
+}
+
+const BREAK_REQUESTED_STATUS = 'Break Requested (Pending Approval)'
+const BREAK_APPROVED_STATUS = 'Break Approved by CCM'
+const BREAK_DENIED_STATUS = 'Break Request Denied'
+
+async function getBreakRequests(): Promise<BreakRequestRow[]> {
+  if (!hasCapability('siteLogging')) return []
+  const [assetsRes, requestsRes] = await Promise.all([
+    supabase
+      .from(`${CXALLOY_TABLE_PREFIX}Assets`)
+      .select('id, asset_name, location, sub_area, seal_number, status')
+      .eq('status', BREAK_REQUESTED_STATUS)
+      .order('id', { ascending: false }),
+    supabase
+      .from(`${CXALLOY_TABLE_PREFIX}BreakRequests`)
+      .select('id, asset_name, requested_seal_numbers, reason, requestor_name, requestor_company, requestor_email, created_at, ccm_decision')
+      .eq('ccm_decision', 'Pending'),
+  ])
+  const assets = unwrap(assetsRes) as Array<{ id: number; asset_name: string; location: string; sub_area: string; seal_number: string; status: string }>
+  const requests = unwrap(requestsRes) as Array<{
+    id: number
+    asset_name: string
+    requested_seal_numbers: string
+    reason: string
+    requestor_name: string
+    requestor_company: string
+    requestor_email: string
+    created_at: string
+  }>
+
+  // LaunchPad logs one BreakRequests row per submission (which can cover several seals, joined
+  // as a comma-separated requested_seal_numbers string) rather than one row per seal, so matching
+  // a pending Assets row back to its request means checking asset name + seal membership, not a
+  // simple foreign key. A handful of real rows predate BreakRequests existing at all (it was never
+  // created in the live DB until this feature) — those just come back with empty requestor fields.
+  return assets.map((a) => {
+    const match = requests.find(
+      (r) =>
+        (r.asset_name || '').trim() === (a.asset_name || '').trim() &&
+        (r.requested_seal_numbers || '')
+          .split(',')
+          .map((s) => s.trim())
+          .includes((a.seal_number || '').trim()),
+    )
+    return {
+      assetId: a.id,
+      asset_name: a.asset_name || '',
+      location: a.location || '',
+      sub_area: a.sub_area || '',
+      seal_number: a.seal_number || '',
+      status: a.status || '',
+      requestId: match?.id ?? null,
+      reason: match?.reason || '',
+      requestor_name: match?.requestor_name || '',
+      requestor_company: match?.requestor_company || '',
+      requestor_email: match?.requestor_email || '',
+      requested_at: match?.created_at || '',
+    }
+  })
+}
+export function useGetBreakRequests() {
+  return useApiFn(getBreakRequests)
+}
+
+async function decideBreakRequest(params: { assetId: number; requestId: number | null; approve: boolean; notes?: string }): Promise<void> {
+  if (!hasCapability('siteLogging')) throw new Error('Tamper Seal logging isn’t available for this project yet.')
+  const decidedBy = await getCurrentUserEmail()
+  const newStatus = params.approve ? BREAK_APPROVED_STATUS : BREAK_DENIED_STATUS
+  const assetRes = await supabase.from(`${CXALLOY_TABLE_PREFIX}Assets`).update({ status: newStatus }).eq('id', params.assetId)
+  if (assetRes.error) throw new Error(assetRes.error.message)
+  if (params.requestId != null) {
+    const reqRes = await supabase
+      .from(`${CXALLOY_TABLE_PREFIX}BreakRequests`)
+      .update({
+        ccm_decision: params.approve ? 'Approved' : 'Denied',
+        decided_by: decidedBy,
+        decided_at: new Date().toISOString(),
+        decision_notes: params.notes || '',
+      })
+      .eq('id', params.requestId)
+    if (reqRes.error) throw new Error(reqRes.error.message)
+  }
+}
+export function useDecideBreakRequest() {
+  return useApiFn(decideBreakRequest)
+}
+
+// ---------------------------------------------------------------------------
 // workflow items — the catalog of on-site modules a workflow can include.
 // Backed by arcapp_workflow_items; each row will later also carry the definition of what the
 // item does (its `config` jsonb). New in this app — no Retool equivalent.
