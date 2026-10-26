@@ -424,9 +424,10 @@ editable grid → "Confirm & Save" flow as always, writing to the same `STY4Asse
     `STY4BreakRequests` row (by asset name + seal number, since one request can cover several
     seals) to show who asked and why. Any signed-in authorized user (`canEdit`, editor or admin)
     gets **Approve**/**Deny** buttons with an optional note; approving sets the seal to
-    `Break Approved by CCM` (continuing LaunchPad's existing workflow), denying sets it to a new
-    `Break Request Denied` status (kept distinct from reverting to `Intact`, to preserve an audit
-    trail) — see `getBreakRequests`/`useDecideBreakRequest` in `src/lib/api.ts`.
+    `Break Approved by CCM` (continuing LaunchPad's existing workflow), denying reverts it to
+    `Intact` — matching the progression already shown in LaunchPad's own Tamper Seal log settings
+    (accept moves forward a stage, deny sends it back to Intact rather than a dead-end status) —
+    see `getBreakRequests`/`useDecideBreakRequest` in `src/lib/api.ts`.
   - `STY4BreakRequests` and `STY4RequestedSeals` **did not actually exist** in the live database
     before this — LaunchPad's insert into them was silently failing (RLS/`PGRST205`). They've been
     created now (open RLS, matching `STY4Assets`'s `anon, authenticated` policy, since Tamper Seal
@@ -434,9 +435,9 @@ editable grid → "Confirm & Save" flow as always, writing to the same `STY4Asse
     columns on `STY4BreakRequests` for the approval step itself. Because those tables didn't exist
     yet, the handful of break requests already pending in production before this change have no
     requestor name/company/reason on file — those rows show "No request details on file" instead.
-  - The live `launchpad_tamperseal_config` workflow (`project_key='STY4'`) was updated to add the
-    `break_request_denied` status and a `break_requested → break_request_denied` transition
-    (`t2b`), since the deny path didn't exist in the workflow graph at all before this.
+  - The live `launchpad_tamperseal_config` workflow (`project_key='STY4'`) was updated to add a
+    `break_requested → intact` transition (`t2b`), since the deny path didn't exist in the
+    workflow graph at all before this.
 
 ## Submittals — one record per document, applied to many assets
 

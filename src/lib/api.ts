@@ -1571,7 +1571,7 @@ export type BreakRequestRow = {
 
 const BREAK_REQUESTED_STATUS = 'Break Requested (Pending Approval)'
 const BREAK_APPROVED_STATUS = 'Break Approved by CCM'
-const BREAK_DENIED_STATUS = 'Break Request Denied'
+const INTACT_STATUS = 'Intact'
 
 async function getBreakRequests(): Promise<BreakRequestRow[]> {
   if (!hasCapability('siteLogging')) return []
@@ -1635,7 +1635,7 @@ export function useGetBreakRequests() {
 async function decideBreakRequest(params: { assetId: number; requestId: number | null; approve: boolean; notes?: string }): Promise<void> {
   if (!hasCapability('siteLogging')) throw new Error('Tamper Seal logging isn’t available for this project yet.')
   const decidedBy = await getCurrentUserEmail()
-  const newStatus = params.approve ? BREAK_APPROVED_STATUS : BREAK_DENIED_STATUS
+  const newStatus = params.approve ? BREAK_APPROVED_STATUS : INTACT_STATUS
   const assetRes = await supabase.from(`${CXALLOY_TABLE_PREFIX}Assets`).update({ status: newStatus }).eq('id', params.assetId)
   if (assetRes.error) throw new Error(assetRes.error.message)
   if (params.requestId != null) {
