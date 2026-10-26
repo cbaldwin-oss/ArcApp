@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useOutletContext } from 'react-router-dom'
 import { Check, Plus, RefreshCw, X } from 'lucide-react'
-import { useGetAssetPlaceOptions, useGetBreakRequests, useGetTamperSeals, useLogTamperSeals, useDecideBreakRequest } from '../../../lib/api'
-import type { BreakRequestRow, SealInput } from '../../../lib/api'
+import { useGetAssetPlaceOptions, useGetBreakRequests, useGetTamperSeals, useLogTamperSeals, useDecideBreakRequests } from '../../../lib/api'
+import type { BreakRequestGroup, SealInput } from '../../../lib/api'
 import { fmtDate, localIsoDate } from '../utils'
 import { hasCapability } from '../../../lib/project'
 import TamperSealSection from './TamperSealSection'
@@ -62,122 +62,98 @@ function FilterButtonGroup({ label, options, selected, onToggle }: { label: stri
   )
 }
 
-/** The CCM approval step LaunchPad's field form starts but never finishes: it flips a seal to
- * "Break Requested (Pending Approval)" and logs a request, but there's no approve/deny UI
- * anywhere in LaunchPad itself. This lists those pending seals and lets a CCM decide them. */
-function BreakRequestsSection({ canDecide, onDecided }: { canDecide: boolean; onDecided: () => void }) {
-  const breakFn = useGetBreakRequests()
-  const decideFn = useDecideBreakRequest()
-  const [pending, setPending] = useState<{ row: BreakRequestRow; approve: boolean } | null>(null)
+/** One batch submission's card — shows the request-level info once (requestor/reason/date, or
+ * "no request details" for the legacy orphan rows that predate the BreakRequests table existing),
+ * then every seal in that submission with its own Approve/Deny toggle, so a CCM can approve some
+ * and deny the rest of the same batch before submitting the decisions for whichever got touched. */
+function BreakRequestGroupCard({
+  group,
+  canDecide,
+  onDecided,
+}: {
+  group: BreakRequestGroup
+  canDecide: boolean
+  onDecided: () => void
+}) {
+  const decideFn = useDecideBreakRequests()
+  const [choices, setChoices] = useState<Record<number, 'approve' | 'deny'>>({})
   const [notes, setNotes] = useState('')
+  const [confirming, setConfirming] = useState(false)
 
-  useEffect(() => {
-    void breakFn.trigger()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+  const chosenCount = Object.keys(choices).length
 
-  const rows = (breakFn.data as BreakRequestRow[] | undefined) ?? []
+  function setChoice(assetId: number, choice: 'approve' | 'deny') {
+    setChoices((prev) => {
+      const next = { ...prev }
+      if (next[assetId] === choice) delete next[assetId]
+      else next[assetId] = choice
+      return next
+    })
+  }
 
-  async function confirmDecision() {
-    if (!pending) return
-    await decideFn.trigger({ assetId: pending.row.assetId, requestId: pending.row.requestId, approve: pending.approve, notes }).result
-    setPending(null)
+  async function submitDecisions() {
+    const decisions = Object.entries(choices).map(([assetId, choice]) => ({ assetId: Number(assetId), approve: choice === 'approve' }))
+    if (decisions.length === 0) return
+    await decideFn.trigger({ requestId: group.requestId, decisions, notes }).result
+    setChoices({})
     setNotes('')
-    void breakFn.trigger()
+    setConfirming(false)
     onDecided()
   }
 
-  if (breakFn.loading && !breakFn.data) return null
-  if (rows.length === 0) return null
+  const hasRequestDetails = group.requestor_name || group.requestor_email || group.requestor_company || group.reason || group.requested_at
 
   return (
-    <div className="panel-body" style={{ borderBottom: '1px solid var(--border)' }}>
-      <div className="q-hint" style={{ marginBottom: 10, fontWeight: 600, color: 'var(--text)' }}>
-        Pending Break Requests ({rows.length})
+    <div style={{ border: '1px solid var(--border-strong)', borderRadius: 'var(--radius-sm)', padding: '10px 12px', background: 'var(--bg-elev-2)' }}>
+      <div>
+        <strong style={{ color: 'var(--text)' }}>{group.asset_name}</strong>
+        <div style={{ color: 'var(--text-muted)', fontSize: 12.5, marginTop: 2 }}>{group.location || '—'}</div>
       </div>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-        {rows.map((r) => {
-          const isPendingThis = pending?.row.assetId === r.assetId
+
+      <div style={{ marginTop: 8, fontSize: 13, color: 'var(--text-muted)' }}>
+        {hasRequestDetails ? (
+          <>
+            {(group.requestor_name || group.requestor_email) && (
+              <div>
+                Requested by {group.requestor_name || '—'}
+                {group.requestor_company ? ` (${group.requestor_company})` : ''}
+                {group.requestor_email ? ` — ${group.requestor_email}` : ''}
+                {group.requested_at ? ` on ${fmtDate(group.requested_at.slice(0, 10))}` : ''}
+              </div>
+            )}
+            {group.reason && <div style={{ marginTop: 2 }}>Reason: {group.reason}</div>}
+          </>
+        ) : (
+          <div style={{ color: 'var(--text-faint)' }}>No request details on file for this batch.</div>
+        )}
+      </div>
+
+      <div style={{ marginTop: 10, display: 'flex', flexDirection: 'column', gap: 6 }}>
+        {group.seals.map((s) => {
+          const choice = choices[s.assetId]
           return (
-            <div
-              key={r.assetId}
-              style={{
-                border: '1px solid var(--border-strong)',
-                borderRadius: 'var(--radius-sm)',
-                padding: '10px 12px',
-                background: 'var(--bg-elev-2)',
-              }}
-            >
-              <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap' }}>
-                <div>
-                  <strong style={{ color: 'var(--text)' }}>{r.asset_name}</strong>{' '}
-                  <span style={{ color: 'var(--text-muted)' }}>— Seal #{r.seal_number}</span>
-                  <div style={{ color: 'var(--text-muted)', fontSize: 12.5, marginTop: 2 }}>
-                    {r.location || '—'}
-                    {r.sub_area ? ` / ${r.sub_area}` : ''}
-                  </div>
-                </div>
-                {canDecide && !isPendingThis && (
-                  <div style={{ display: 'flex', gap: 8 }}>
-                    <button
-                      type="button"
-                      className="wf-btn"
-                      style={{ display: 'flex', alignItems: 'center', gap: 5 }}
-                      onClick={() => {
-                        setPending({ row: r, approve: true })
-                        setNotes('')
-                      }}
-                    >
-                      <Check style={{ width: 13, height: 13 }} /> Approve
-                    </button>
-                    <button
-                      type="button"
-                      className="wf-btn danger"
-                      style={{ display: 'flex', alignItems: 'center', gap: 5 }}
-                      onClick={() => {
-                        setPending({ row: r, approve: false })
-                        setNotes('')
-                      }}
-                    >
-                      <X style={{ width: 13, height: 13 }} /> Deny
-                    </button>
-                  </div>
-                )}
-              </div>
-
-              <div style={{ marginTop: 8, fontSize: 13, color: 'var(--text-muted)' }}>
-                {r.requestor_name || r.requestor_email || r.requestor_company || r.reason || r.requested_at ? (
-                  <>
-                    {(r.requestor_name || r.requestor_email) && (
-                      <div>
-                        Requested by {r.requestor_name || '—'}
-                        {r.requestor_company ? ` (${r.requestor_company})` : ''}
-                        {r.requestor_email ? ` — ${r.requestor_email}` : ''}
-                        {r.requested_at ? ` on ${fmtDate(r.requested_at.slice(0, 10))}` : ''}
-                      </div>
-                    )}
-                    {r.reason && <div style={{ marginTop: 2 }}>Reason: {r.reason}</div>}
-                  </>
-                ) : (
-                  <div style={{ color: 'var(--text-faint)' }}>No request details on file for this seal.</div>
-                )}
-              </div>
-
-              {isPendingThis && (
-                <div className="wf-confirm" style={{ marginTop: 10, flexWrap: 'wrap' }}>
-                  {pending.approve ? 'Approve this break request?' : 'Deny this break request?'}
-                  <input
-                    type="text"
-                    placeholder="Notes (optional)"
-                    value={notes}
-                    onChange={(e) => setNotes(e.target.value)}
-                    style={{ flex: '1 1 160px', minWidth: 140 }}
-                  />
-                  <button className={pending.approve ? 'wf-btn' : 'wf-btn danger'} disabled={decideFn.loading} onClick={confirmDecision}>
-                    {decideFn.loading ? '…' : pending.approve ? 'Yes, approve' : 'Yes, deny'}
+            <div key={s.assetId} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap' }}>
+              <span style={{ fontFamily: 'var(--font-mono)', fontSize: 13, color: 'var(--text)' }}>
+                Seal #{s.seal_number}
+                {s.sub_area ? <span style={{ color: 'var(--text-muted)' }}> / {s.sub_area}</span> : null}
+              </span>
+              {canDecide && (
+                <div style={{ display: 'flex', gap: 6 }}>
+                  <button
+                    type="button"
+                    className={`ts-seal-btn${choice === 'approve' ? ' active-approve' : ''}`}
+                    style={{ display: 'flex', alignItems: 'center', gap: 4 }}
+                    onClick={() => setChoice(s.assetId, 'approve')}
+                  >
+                    <Check style={{ width: 12, height: 12 }} /> Approve
                   </button>
-                  <button className="wf-btn" disabled={decideFn.loading} onClick={() => setPending(null)}>
-                    Cancel
+                  <button
+                    type="button"
+                    className={`ts-seal-btn${choice === 'deny' ? ' active-deny' : ''}`}
+                    style={{ display: 'flex', alignItems: 'center', gap: 4 }}
+                    onClick={() => setChoice(s.assetId, 'deny')}
+                  >
+                    <X style={{ width: 12, height: 12 }} /> Deny
                   </button>
                 </div>
               )}
@@ -185,7 +161,71 @@ function BreakRequestsSection({ canDecide, onDecided }: { canDecide: boolean; on
           )
         })}
       </div>
+
+      {canDecide && chosenCount > 0 && (
+        <div style={{ marginTop: 10 }}>
+          {confirming ? (
+            <div className="wf-confirm" style={{ flexWrap: 'wrap' }}>
+              Apply {chosenCount} decision{chosenCount === 1 ? '' : 's'} to this batch?
+              <input
+                type="text"
+                placeholder="Notes (optional)"
+                value={notes}
+                onChange={(e) => setNotes(e.target.value)}
+                style={{ flex: '1 1 160px', minWidth: 140 }}
+              />
+              <button className="wf-btn" disabled={decideFn.loading} onClick={submitDecisions}>
+                {decideFn.loading ? '…' : 'Confirm'}
+              </button>
+              <button className="wf-btn" disabled={decideFn.loading} onClick={() => setConfirming(false)}>
+                Cancel
+              </button>
+            </div>
+          ) : (
+            <button type="button" className="wf-btn" onClick={() => setConfirming(true)}>
+              Submit {chosenCount} decision{chosenCount === 1 ? '' : 's'}
+            </button>
+          )}
+        </div>
+      )}
       {decideFn.error && <div className="q-hint err" style={{ marginTop: 8 }}>{decideFn.error}</div>}
+    </div>
+  )
+}
+
+/** The CCM approval step LaunchPad's field form starts but never finishes: it flips the selected
+ * seals (a worker can request several in one submission) to "Break Requested (Pending Approval)"
+ * and logs the request, but there's no approve/deny UI anywhere in LaunchPad itself. This groups
+ * those pending seals back into their original batch submissions and lets a CCM decide them. */
+function BreakRequestsSection({ canDecide, onDecided }: { canDecide: boolean; onDecided: () => void }) {
+  const breakFn = useGetBreakRequests()
+
+  useEffect(() => {
+    void breakFn.trigger()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  const groups = (breakFn.data as BreakRequestGroup[] | undefined) ?? []
+  const sealCount = groups.reduce((n, g) => n + g.seals.length, 0)
+
+  if (breakFn.loading && !breakFn.data) return null
+  if (groups.length === 0) return null
+
+  function refresh() {
+    void breakFn.trigger()
+    onDecided()
+  }
+
+  return (
+    <div className="panel-body" style={{ borderBottom: '1px solid var(--border)' }}>
+      <div className="q-hint" style={{ marginBottom: 10, fontWeight: 600, color: 'var(--text)' }}>
+        Pending Break Requests ({groups.length} {groups.length === 1 ? 'batch' : 'batches'}, {sealCount} seal{sealCount === 1 ? '' : 's'})
+      </div>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+        {groups.map((g) => (
+          <BreakRequestGroupCard key={g.requestId ?? `orphan:${g.asset_name}`} group={g} canDecide={canDecide} onDecided={refresh} />
+        ))}
+      </div>
     </div>
   )
 }

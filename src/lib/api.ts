@@ -1554,26 +1554,36 @@ export function useLogTamperSeals() {
 // BreakRequests row (when one exists) so LaunchPad's own data stays correct.
 // ---------------------------------------------------------------------------
 
-export type BreakRequestRow = {
+/** One seal within a batch break request, carrying only what varies per seal — the request-level
+ * fields (requestor, reason, etc.) live once on the group, not repeated per seal. */
+export type BreakRequestSeal = {
   assetId: number
+  seal_number: string
+  sub_area: string
+  status: string
+}
+
+/** One submission from LaunchPad's break-request form — a worker can select several seals
+ * (e.g. "6 seals") in one go, which LaunchPad logs as a single <prefix>BreakRequests row covering
+ * all of them (requested_seal_numbers is comma-joined), not one row per seal. Grouped here the
+ * same way so a CCM reviews/decides the whole submission at once, seal by seal. */
+export type BreakRequestGroup = {
+  requestId: number | null
   asset_name: string
   location: string
-  sub_area: string
-  seal_number: string
-  status: string
-  requestId: number | null
   reason: string
   requestor_name: string
   requestor_company: string
   requestor_email: string
   requested_at: string
+  seals: BreakRequestSeal[]
 }
 
 const BREAK_REQUESTED_STATUS = 'Break Requested (Pending Approval)'
 const BREAK_APPROVED_STATUS = 'Break Approved by CCM'
 const INTACT_STATUS = 'Intact'
 
-async function getBreakRequests(): Promise<BreakRequestRow[]> {
+async function getBreakRequests(): Promise<BreakRequestGroup[]> {
   if (!hasCapability('siteLogging')) return []
   const [assetsRes, requestsRes] = await Promise.all([
     supabase
@@ -1583,13 +1593,14 @@ async function getBreakRequests(): Promise<BreakRequestRow[]> {
       .order('id', { ascending: false }),
     supabase
       .from(`${CXALLOY_TABLE_PREFIX}BreakRequests`)
-      .select('id, asset_name, requested_seal_numbers, reason, requestor_name, requestor_company, requestor_email, created_at, ccm_decision')
+      .select('id, asset_name, location, requested_seal_numbers, reason, requestor_name, requestor_company, requestor_email, created_at, ccm_decision')
       .eq('ccm_decision', 'Pending'),
   ])
   const assets = unwrap(assetsRes) as Array<{ id: number; asset_name: string; location: string; sub_area: string; seal_number: string; status: string }>
   const requests = unwrap(requestsRes) as Array<{
     id: number
     asset_name: string
+    location: string
     requested_seal_numbers: string
     reason: string
     requestor_name: string
@@ -1599,60 +1610,120 @@ async function getBreakRequests(): Promise<BreakRequestRow[]> {
   }>
 
   // LaunchPad logs one BreakRequests row per submission (which can cover several seals, joined
-  // as a comma-separated requested_seal_numbers string) rather than one row per seal, so matching
-  // a pending Assets row back to its request means checking asset name + seal membership, not a
-  // simple foreign key. A handful of real rows predate BreakRequests existing at all (it was never
-  // created in the live DB until this feature) — those just come back with empty requestor fields.
-  return assets.map((a) => {
-    const match = requests.find(
-      (r) =>
-        (r.asset_name || '').trim() === (a.asset_name || '').trim() &&
-        (r.requested_seal_numbers || '')
-          .split(',')
-          .map((s) => s.trim())
-          .includes((a.seal_number || '').trim()),
+  // as a comma-separated requested_seal_numbers string) rather than one row per seal, so grouping
+  // pending Assets rows back to their request means checking asset name + seal membership, not a
+  // simple foreign key. Each seal is claimed by at most one request (first match wins) so the same
+  // seal never shows up twice if two submissions happened to name it.
+  const groups = new Map<string, BreakRequestGroup>()
+  const claimed = new Set<number>()
+
+  for (const req of requests) {
+    const sealNumbers = (req.requested_seal_numbers || '')
+      .split(',')
+      .map((s) => s.trim())
+      .filter(Boolean)
+    const matched = assets.filter(
+      (a) => !claimed.has(a.id) && (a.asset_name || '').trim() === (req.asset_name || '').trim() && sealNumbers.includes((a.seal_number || '').trim()),
     )
-    return {
-      assetId: a.id,
-      asset_name: a.asset_name || '',
-      location: a.location || '',
-      sub_area: a.sub_area || '',
-      seal_number: a.seal_number || '',
-      status: a.status || '',
-      requestId: match?.id ?? null,
-      reason: match?.reason || '',
-      requestor_name: match?.requestor_name || '',
-      requestor_company: match?.requestor_company || '',
-      requestor_email: match?.requestor_email || '',
-      requested_at: match?.created_at || '',
-    }
-  })
+    if (matched.length === 0) continue // every seal from this submission has already been decided
+    matched.forEach((a) => claimed.add(a.id))
+    groups.set(`req:${req.id}`, {
+      requestId: req.id,
+      asset_name: req.asset_name || '',
+      location: req.location || '',
+      reason: req.reason || '',
+      requestor_name: req.requestor_name || '',
+      requestor_company: req.requestor_company || '',
+      requestor_email: req.requestor_email || '',
+      requested_at: req.created_at || '',
+      seals: matched.map((a) => ({ assetId: a.id, seal_number: a.seal_number || '', sub_area: a.sub_area || '', status: a.status || '' })),
+    })
+  }
+
+  // A handful of real rows predate BreakRequests existing at all (it was never created in the
+  // live DB until this feature) — those have no submission to match, so group them by asset name
+  // alone (the only thing they share) with no requestor details on file.
+  for (const a of assets) {
+    if (claimed.has(a.id)) continue
+    const key = `orphan:${(a.asset_name || '').trim()}`
+    const existing = groups.get(key)
+    const seal = { assetId: a.id, seal_number: a.seal_number || '', sub_area: a.sub_area || '', status: a.status || '' }
+    if (existing) existing.seals.push(seal)
+    else
+      groups.set(key, {
+        requestId: null,
+        asset_name: a.asset_name || '',
+        location: a.location || '',
+        reason: '',
+        requestor_name: '',
+        requestor_company: '',
+        requestor_email: '',
+        requested_at: '',
+        seals: [seal],
+      })
+  }
+
+  return Array.from(groups.values()).sort((a, b) => Math.max(...b.seals.map((s) => s.assetId)) - Math.max(...a.seals.map((s) => s.assetId)))
 }
 export function useGetBreakRequests() {
   return useApiFn(getBreakRequests)
 }
 
-async function decideBreakRequest(params: { assetId: number; requestId: number | null; approve: boolean; notes?: string }): Promise<void> {
+/** Decides some or all of a batch request's seals in one go — a CCM can approve a subset and deny
+ * the rest of the same submission, so `decisions` only needs to cover the seals being acted on
+ * this round, not the whole group. */
+async function decideBreakRequests(params: { requestId: number | null; decisions: Array<{ assetId: number; approve: boolean }>; notes?: string }): Promise<void> {
   if (!hasCapability('siteLogging')) throw new Error('Tamper Seal logging isn’t available for this project yet.')
+  const decisions = params.decisions || []
+  if (decisions.length === 0) return
   const decidedBy = await getCurrentUserEmail()
-  const newStatus = params.approve ? BREAK_APPROVED_STATUS : INTACT_STATUS
-  const assetRes = await supabase.from(`${CXALLOY_TABLE_PREFIX}Assets`).update({ status: newStatus }).eq('id', params.assetId)
-  if (assetRes.error) throw new Error(assetRes.error.message)
-  if (params.requestId != null) {
-    const reqRes = await supabase
-      .from(`${CXALLOY_TABLE_PREFIX}BreakRequests`)
-      .update({
-        ccm_decision: params.approve ? 'Approved' : 'Denied',
-        decided_by: decidedBy,
-        decided_at: new Date().toISOString(),
-        decision_notes: params.notes || '',
-      })
-      .eq('id', params.requestId)
-    if (reqRes.error) throw new Error(reqRes.error.message)
+
+  const approvedIds = decisions.filter((d) => d.approve).map((d) => d.assetId)
+  const deniedIds = decisions.filter((d) => !d.approve).map((d) => d.assetId)
+
+  if (approvedIds.length > 0) {
+    const res = await supabase.from(`${CXALLOY_TABLE_PREFIX}Assets`).update({ status: BREAK_APPROVED_STATUS }).in('id', approvedIds)
+    if (res.error) throw new Error(res.error.message)
   }
+  if (deniedIds.length > 0) {
+    const res = await supabase.from(`${CXALLOY_TABLE_PREFIX}Assets`).update({ status: INTACT_STATUS }).in('id', deniedIds)
+    if (res.error) throw new Error(res.error.message)
+  }
+
+  if (params.requestId == null) return
+
+  // The request row's ccm_decision is one field covering potentially several seals, so once any
+  // seal in the submission has been decided, re-derive it from every seal's current status rather
+  // than just this round's — covers acting on a batch across more than one visit, and a mix of
+  // approve/deny landing on "Partially Approved" instead of a single pass/fail.
+  const reqRes = await supabase.from(`${CXALLOY_TABLE_PREFIX}BreakRequests`).select('asset_name, requested_seal_numbers').eq('id', params.requestId).single()
+  if (reqRes.error || !reqRes.data) return
+  const sealNumbers = (reqRes.data.requested_seal_numbers || '')
+    .split(',')
+    .map((s: string) => s.trim())
+    .filter(Boolean)
+  if (sealNumbers.length === 0) return
+  const statusesRes = await supabase
+    .from(`${CXALLOY_TABLE_PREFIX}Assets`)
+    .select('status')
+    .eq('asset_name', reqRes.data.asset_name)
+    .in('seal_number', sealNumbers)
+  const statuses = (unwrap(statusesRes) as Array<{ status: string }>).map((r) => r.status)
+  const aggregate = statuses.some((s) => s === BREAK_REQUESTED_STATUS)
+    ? 'Pending'
+    : statuses.every((s) => s === BREAK_APPROVED_STATUS)
+      ? 'Approved'
+      : statuses.every((s) => s === INTACT_STATUS)
+        ? 'Denied'
+        : 'Partially Approved'
+  const updateRes = await supabase
+    .from(`${CXALLOY_TABLE_PREFIX}BreakRequests`)
+    .update({ ccm_decision: aggregate, decided_by: decidedBy, decided_at: new Date().toISOString(), decision_notes: params.notes || '' })
+    .eq('id', params.requestId)
+  if (updateRes.error) throw new Error(updateRes.error.message)
 }
-export function useDecideBreakRequest() {
-  return useApiFn(decideBreakRequest)
+export function useDecideBreakRequests() {
+  return useApiFn(decideBreakRequests)
 }
 
 // ---------------------------------------------------------------------------

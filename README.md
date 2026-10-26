@@ -419,15 +419,22 @@ editable grid → "Confirm & Save" flow as always, writing to the same `STY4Asse
   company/email/reason into `STY4BreakRequests` (plus a per-seal row into `STY4RequestedSeals`).
   Nothing in LaunchPad itself ever reads the `ccm_decision` field back, though — there was no
   approval UI anywhere, for either app. ArcApp is now that missing half:
-  - `TamperSealLogPanel.tsx` shows a **Pending Break Requests** card above the filter bar whenever
-    any `STY4Assets` row is sitting at `Break Requested (Pending Approval)`, matched back to its
-    `STY4BreakRequests` row (by asset name + seal number, since one request can cover several
-    seals) to show who asked and why. Any signed-in authorized user (`canEdit`, editor or admin)
-    gets **Approve**/**Deny** buttons with an optional note; approving sets the seal to
-    `Break Approved by CCM` (continuing LaunchPad's existing workflow), denying reverts it to
+  - A worker can select several seals in one submission (LaunchPad's form logs this as a single
+    `STY4BreakRequests` row with a comma-joined `requested_seal_numbers`, not one row per seal), so
+    `TamperSealLogPanel.tsx` groups pending seals back into their original batch before showing
+    them — a **Pending Break Requests** card per batch, above the filter bar, listing the
+    requestor's name/company/email/reason once and every seal in that submission underneath
+    (`getBreakRequests` in `src/lib/api.ts` does the asset-name + seal-number matching). Any
+    signed-in authorized user (`canEdit`, editor or admin) gets an **Approve**/**Deny** toggle per
+    seal — a batch of 6 can be any mix, e.g. 4 approved and 2 denied — then **Submit N decisions**
+    applies just the seals that were touched (`useDecideBreakRequests`); approving a seal sets it
+    to `Break Approved by CCM` (continuing LaunchPad's existing workflow), denying reverts it to
     `Intact` — matching the progression already shown in LaunchPad's own Tamper Seal log settings
-    (accept moves forward a stage, deny sends it back to Intact rather than a dead-end status) —
-    see `getBreakRequests`/`useDecideBreakRequest` in `src/lib/api.ts`.
+    (accept moves forward a stage, deny sends it back to Intact rather than a dead-end status). The
+    batch's `STY4BreakRequests.ccm_decision` is re-derived from every seal's current status after
+    each decision (not just the ones just acted on) — `Pending` while any seal in the batch is
+    still awaiting a decision, `Approved`/`Denied` once they're unanimous, `Partially Approved`
+    for a mixed outcome.
   - `STY4BreakRequests` and `STY4RequestedSeals` **did not actually exist** in the live database
     before this — LaunchPad's insert into them was silently failing (RLS/`PGRST205`). They've been
     created now (open RLS, matching `STY4Assets`'s `anon, authenticated` policy, since Tamper Seal
