@@ -871,6 +871,22 @@ html, body, #root{ margin:0; padding:0; min-height:100%; background:#05070d; }
 .arcapp .oi-assign-chip:hover{ border-color:var(--green); color:var(--green); }
 .arcapp .oi-assign-chip:disabled{ opacity:0.5; cursor:not-allowed; }
 
+/* ---------- Tamper Seal Log filter bar (Location/Status toggle buttons + search, ported from LaunchPad) ---------- */
+.arcapp .ts-filters{ display:flex; align-items:center; gap:16px; flex-wrap:wrap; padding:0 20px 14px; }
+.arcapp .ts-filter-group{ display:flex; align-items:center; gap:6px; flex-wrap:wrap; }
+.arcapp .ts-filter-label{ font-family:var(--font-mono); font-size:11px; color:var(--text-faint); text-transform:uppercase; letter-spacing:0.4px; }
+.arcapp .ts-filter-btn{
+  font-family:var(--font-mono); font-size:11.5px; color:var(--text-muted); background:var(--bg-elev-2);
+  border:1px solid var(--border-strong); border-radius:999px; padding:5px 12px; cursor:pointer; white-space:nowrap;
+}
+.arcapp .ts-filter-btn:hover{ color:var(--text); border-color:var(--border-strong); filter:brightness(1.15); }
+.arcapp .ts-filter-btn.active{ color:var(--green-soft); background:var(--green-tint); border-color:var(--green-dim); }
+.arcapp .ts-search{
+  flex:1; min-width:220px; max-width:360px; background:var(--bg-elev-2); border:1px solid var(--border-strong);
+  border-radius:var(--radius-sm); color:var(--text); font-family:var(--font-mono); font-size:12.5px; padding:9px 13px;
+}
+.arcapp .ts-search::placeholder{ color:var(--text-faint); }
+
 .arcapp .oi-popover{
   position:fixed; background:var(--bg-elev); border:1px solid var(--border-strong); box-shadow:var(--shadow-md);
   padding:14px; z-index:400; border-radius:var(--radius-sm); color:var(--text); font-size:13px; width:260px;

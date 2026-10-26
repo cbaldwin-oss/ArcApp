@@ -400,6 +400,19 @@ editable grid → "Confirm & Save" flow as always, writing to the same `STY4Asse
 - `TamperSealSection` itself was generalized to take a plain `assetName`/`location` pair instead
   of requiring a whole `ScheduleRow` — the Activity Drawer usage just passes
   `activeRow.asset`/`activeRow.place` now.
+- **Filtering** (added 2026-10-26, ported from LaunchPad's own Tamper Seal log) — a filter bar
+  above the table: multi-select **Location** and **Status** toggle-button groups (both default to
+  "All"; clicking a specific value drops "All" and toggles that value, clicking "All" clears back
+  to just "All", emptying the set falls back to "All" rather than matching nothing —
+  `toggleFilterValue` in `TamperSealLogPanel.tsx`) plus a free-text **search** across asset/
+  location/seal #/sub area/notes/signoff. Deliberately multi-select toggle buttons rather than the
+  single-select dropdowns Checklists/Issues/Submittals use elsewhere in this app — that's
+  LaunchPad's own UX for this specific page, matched as asked rather than homogenized to ArcApp's
+  usual pattern. Location/Status option lists are derived from whatever's actually in the loaded
+  rows (same technique the Checklist Type/Issue Priority filters already use), not a separate
+  admin-configured status catalog the way LaunchPad's `getActiveStatuses()` works — ArcApp has no
+  such catalog for Tamper Seals. LaunchPad's more elaborate match-navigation (highlight + prev/next
+  + counter) and PDF/CSV export weren't ported — out of scope for what was asked.
 
 ## Submittals — one record per document, applied to many assets
 

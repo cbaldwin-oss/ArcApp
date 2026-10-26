@@ -29,6 +29,39 @@ function sealStatusClass(status: string): string {
   return 'muted'
 }
 
+const ALL = 'All'
+
+/** Toggles a value in/out of a multi-select filter set, same semantics as LaunchPad's Tamper Seal
+ * log filter bar: clicking "All" clears back to just {All}; clicking a specific value drops "All"
+ * and toggles that value; emptying the set falls back to {All} rather than matching nothing. */
+function toggleFilterValue(current: Set<string>, value: string): Set<string> {
+  const next = new Set(current)
+  if (value === ALL) return new Set([ALL])
+  next.delete(ALL)
+  if (next.has(value)) next.delete(value)
+  else next.add(value)
+  if (next.size === 0) next.add(ALL)
+  return next
+}
+
+function FilterButtonGroup({ label, options, selected, onToggle }: { label: string; options: string[]; selected: Set<string>; onToggle: (value: string) => void }) {
+  return (
+    <div className="ts-filter-group">
+      <span className="ts-filter-label">{label}:</span>
+      {options.map((opt) => (
+        <button
+          key={opt}
+          type="button"
+          className={`ts-filter-btn${selected.has(opt) ? ' active' : ''}`}
+          onClick={() => onToggle(opt)}
+        >
+          {opt}
+        </button>
+      ))}
+    </div>
+  )
+}
+
 export default function TamperSealLogPanel() {
   const { currentUserEmail } = useOutletContext<ShellContext>()
   const available = hasCapability('siteLogging')
@@ -57,6 +90,36 @@ export default function TamperSealLogPanel() {
   const assetPlaceOptions = assetPlaceFn.data ?? []
   const state = fn.error ? 'error' : fn.loading || !fn.data ? 'loading' : 'ready'
 
+  // Filtering ported from LaunchPad's Tamper Seal log: multi-select Location/Status toggle
+  // buttons (both default to "All") plus a free-text search, rather than the single-select
+  // dropdowns Checklists/Issues/Submittals use elsewhere in this app — LaunchPad's own UX for
+  // this specific page, kept as-is since that's what was asked for.
+  const [locationFilter, setLocationFilter] = useState<Set<string>>(new Set([ALL]))
+  const [statusFilter, setStatusFilter] = useState<Set<string>>(new Set([ALL]))
+  const [search, setSearch] = useState('')
+
+  const locations = useMemo(() => [ALL, ...Array.from(new Set(rows.map((r) => r.location.trim() || 'Unassigned'))).sort()], [rows])
+  const statuses = useMemo(() => [ALL, ...Array.from(new Set(rows.map((r) => r.status).filter(Boolean))).sort()], [rows])
+
+  const q = search.trim().toLowerCase()
+  const filteredRows = useMemo(
+    () =>
+      rows.filter((r) => {
+        const loc = r.location.trim() || 'Unassigned'
+        if (!locationFilter.has(ALL) && !locationFilter.has(loc)) return false
+        if (!statusFilter.has(ALL)) {
+          const s = (r.status || '').toLowerCase()
+          if (!Array.from(statusFilter).some((f) => s.includes(f.toLowerCase()))) return false
+        }
+        if (q) {
+          const searchStr = `${r.asset_name} ${r.location} ${r.seal_number} ${r.sub_area} ${r.inspection_notes} ${r.signoff}`.toLowerCase()
+          if (!searchStr.includes(q)) return false
+        }
+        return true
+      }),
+    [rows, locationFilter, statusFilter, q],
+  )
+
   const [addOpen, setAddOpen] = useState(false)
   const [asset, setAsset] = useState('')
   const [date, setDate] = useState(localIsoDate())
@@ -75,7 +138,9 @@ export default function TamperSealLogPanel() {
       <div className="panel-header">
         <div className="panel-header-left">
           <h2 className="panel-title">Tamper Seal Log</h2>
-          <span className="panel-count">{state === 'ready' ? `${rows.length} seals` : '— seals'}</span>
+          <span className="panel-count">
+            {state === 'ready' ? (filteredRows.length === rows.length ? `${rows.length} seals` : `${filteredRows.length} of ${rows.length} seals`) : '— seals'}
+          </span>
           <span className={state === 'ready' ? 'conn-pill ready' : state === 'error' ? 'conn-pill error' : 'conn-pill loading'}>
             <span className={state === 'error' ? 'led red' : 'led'} /> {state === 'ready' ? 'Live' : state === 'error' ? 'Offline' : 'Syncing'}
           </span>
@@ -139,6 +204,20 @@ export default function TamperSealLogPanel() {
         </div>
       )}
 
+      {state === 'ready' && (
+        <div className="ts-filters">
+          <FilterButtonGroup label="Locations" options={locations} selected={locationFilter} onToggle={(v) => setLocationFilter((cur) => toggleFilterValue(cur, v))} />
+          <FilterButtonGroup label="Statuses" options={statuses} selected={statusFilter} onToggle={(v) => setStatusFilter((cur) => toggleFilterValue(cur, v))} />
+          <input
+            type="text"
+            className="ts-search"
+            placeholder="Search seal #, asset, location, notes, signoff…"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+          />
+        </div>
+      )}
+
       <div className="panel-body no-pad">
         <div style={{ overflowX: 'auto' }}>
           <table className="sched">
@@ -183,8 +262,15 @@ export default function TamperSealLogPanel() {
                   </td>
                 </tr>
               )}
+              {state === 'ready' && rows.length > 0 && filteredRows.length === 0 && (
+                <tr>
+                  <td colSpan={8} className="table-empty">
+                    No seals match the current filters.
+                  </td>
+                </tr>
+              )}
               {state === 'ready' &&
-                rows.map((r) => (
+                filteredRows.map((r) => (
                   <tr key={r.id}>
                     <td className="tag-cell">{r.seal_number}</td>
                     <td>{r.asset_name}</td>
