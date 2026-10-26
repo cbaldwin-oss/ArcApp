@@ -5,6 +5,10 @@ import { useGetIssues, cxAlloyIssueUrl } from '../../../lib/api'
 import { hasCapability, CURRENT_PROJECT, projectLabel } from '../../../lib/project'
 import type { ShellContext } from '../ShellContext'
 import CapabilityNotice from './CapabilityNotice'
+import ModuleSettingsSection from './ModuleSettingsSection'
+import CxAlloyStatusPicker from './CxAlloyStatusPicker'
+import DefaultAssigneePicker from './DefaultAssigneePicker'
+import { Field, ToggleField } from './SettingsControls'
 
 type Row = {
   issue_id: string
@@ -30,7 +34,8 @@ function priorityClass(p: string): string {
 }
 
 export default function IssuesReviewPanel() {
-  const { cxAlloyLinkBase } = useOutletContext<ShellContext>()
+  const ctx = useOutletContext<ShellContext>()
+  const { cxAlloyLinkBase } = ctx
   const available = hasCapability('cxAlloyActions')
   const fn = useGetIssues()
   const [filter, setFilter] = useState('')
@@ -83,6 +88,52 @@ export default function IssuesReviewPanel() {
       </div>
       <div className="sync-note">
         Ready for review · grouped by originator (created by) · source: <b style={{ color: 'var(--text-muted)' }}>{projectLabel(CURRENT_PROJECT)} API Database · Issues</b>
+      </div>
+      <div style={{ padding: '0 20px 12px' }}>
+        <ModuleSettingsSection>
+          <CxAlloyStatusPicker
+            label="Issues for Review — status(es) that count as ready for review"
+            hint={`Pulled live from the CxAlloy Settings tab (${projectLabel(CURRENT_PROJECT)} API Database). Checked statuses show up in the list below. Also defines Issues To-Do below: any status NOT checked here counts as still open.`}
+            column="issueStatuses"
+            value={ctx.issueReviewStatuses}
+            canEdit={ctx.isAdmin}
+            loading={ctx.settingsLoading}
+            onSave={(values) => ctx.onSaveSetting('issue_review_statuses', values.join(', '))}
+          />
+          <Field
+            label="Issues — creator company filter"
+            hint={
+              'Only shows issues created by this exact company name, or by a person listed under it in the "People" tab (columns: Name, Company) of this project\'s API Database sheet. ' +
+              'Blank shows every issue regardless of creator (default). Requires the getPeople Apps Script action (AppendPeopleAction.gs) to already be deployed — turning this on before that\'s ' +
+              'in place will show zero issues instead of erroring, since an empty People list matches nobody.'
+            }
+            initial={ctx.issueCreatorCompanyFilter}
+            canEdit={ctx.isAdmin}
+            loading={ctx.settingsLoading}
+            onSave={(v) => ctx.onSaveSetting('issue_creator_company_filter', v)}
+          />
+          <div className="q-hint" style={{ marginBottom: 12 }}>
+            Powers the "Your To-Dos" widget's Issue markers — a default-assignee summary card, plus
+            any individually-assigned item still shows in "My Tasks".
+          </div>
+          <ToggleField
+            label="Issues To-Do"
+            hint="Turns on the Issues default-assignee summary card and My Tasks entries."
+            initial={ctx.issueTodoEnabled}
+            canEdit={ctx.isAdmin}
+            loading={ctx.settingsLoading}
+            onSave={(v) => ctx.onSaveSetting('issue_todo_enabled', v ? 'true' : '')}
+          />
+          <DefaultAssigneePicker
+            label="Issues — default assignee"
+            hint="When set and at least one issue is ready for review (per above), this team/person gets a single 'Issues need to be reviewed' card in Your To-Dos."
+            value={ctx.issueDefaultAssignee}
+            teams={ctx.teams}
+            canEdit={ctx.isAdmin}
+            loading={ctx.settingsLoading}
+            onSave={(v) => ctx.onSaveDefaultAssignee('issue_default_assignee', v)}
+          />
+        </ModuleSettingsSection>
       </div>
       {state === 'ready' && (
         <div style={{ padding: '0 20px 12px', display: 'flex', gap: 10, flexWrap: 'wrap' }}>

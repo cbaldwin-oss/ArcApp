@@ -1,9 +1,9 @@
 import { useEffect, useMemo, useState } from 'react'
+import { useOutletContext } from 'react-router-dom'
 import JSZip from 'jszip'
 import { Plus, Pencil, Trash2, RefreshCw, Paperclip, ExternalLink, Download, AlertTriangle, ChevronDown, ChevronUp } from 'lucide-react'
 import {
   useGetAssetOptions,
-  useGetSettings,
   useGetSubmittalsList,
   useSaveSubmittalRecord,
   useDeleteSubmittalRecord,
@@ -13,8 +13,11 @@ import {
 } from '../../../lib/api'
 import type { Submittal } from '../../../lib/api'
 import { CURRENT_PROJECT } from '../../../lib/project'
+import type { ShellContext } from '../ShellContext'
 import { localIsoDate } from '../utils'
 import MultiSelectPicker from './MultiSelectPicker'
+import ModuleSettingsSection from './ModuleSettingsSection'
+import SubmittalExemptAssetsManager from './SubmittalExemptAssetsManager'
 
 const ALL_STATUSES = 'All statuses'
 
@@ -110,9 +113,9 @@ function SubmittalNotesLog({ submittal, canEdit, onChanged }: { submittal: Submi
 }
 
 export default function SubmittalsManager({ canEdit }: { canEdit: boolean }) {
+  const ctx = useOutletContext<ShellContext>()
   const assetsFn = useGetAssetOptions()
   const listFn = useGetSubmittalsList()
-  const settingsFn = useGetSettings()
   const saveFn = useSaveSubmittalRecord()
   const deleteFn = useDeleteSubmittalRecord()
   const uploadFn = useUploadSubmittalFile()
@@ -120,7 +123,6 @@ export default function SubmittalsManager({ canEdit }: { canEdit: boolean }) {
   function load() {
     void assetsFn.trigger()
     void listFn.trigger()
-    void settingsFn.trigger()
   }
   useEffect(() => {
     load()
@@ -129,9 +131,9 @@ export default function SubmittalsManager({ canEdit }: { canEdit: boolean }) {
 
   const assets = (assetsFn.data as string[] | undefined) ?? []
   const submittals = listFn.data ?? []
-  const exemptAssets = settingsFn.data?.submittalExemptAssets ?? []
-  const state = assetsFn.error || listFn.error || settingsFn.error ? 'error' : !assetsFn.data || !listFn.data || !settingsFn.data ? 'loading' : 'ready'
-  const loading = assetsFn.loading || listFn.loading || settingsFn.loading
+  const exemptAssets = ctx.submittalExemptAssets
+  const state = assetsFn.error || listFn.error ? 'error' : !assetsFn.data || !listFn.data ? 'loading' : 'ready'
+  const loading = assetsFn.loading || listFn.loading
 
   // Assets that don't need a submittal at all (marked exempt in Settings) never count against
   // the total, so "missing" only ever flags assets that genuinely still need one.
@@ -327,6 +329,16 @@ export default function SubmittalsManager({ canEdit }: { canEdit: boolean }) {
         Upload a submittal, pick every asset it applies to, then set one review status/notes for
         all of them at once — assets from <b style={{ color: 'var(--text-muted)' }}>{CURRENT_PROJECT}dropdownoptions.Assets</b>
         {!canEdit ? ' · sign in as an authorized editor to add or edit' : ''}
+      </div>
+      <div style={{ padding: '0 20px 12px' }}>
+        <ModuleSettingsSection>
+          <SubmittalExemptAssetsManager
+            value={exemptAssets}
+            canEdit={ctx.isAdmin}
+            loading={ctx.settingsLoading}
+            onSave={(values) => ctx.onSaveSetting('submittal_exempt_assets', values.join(', '))}
+          />
+        </ModuleSettingsSection>
       </div>
 
       <div className="panel-body">

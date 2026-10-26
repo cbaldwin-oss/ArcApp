@@ -6,6 +6,9 @@ import type { NetaReturnedRow, NetaSubmissionRow, NetaTab } from '../../../lib/a
 import { CURRENT_PROJECT, projectLabel } from '../../../lib/project'
 import type { ShellContext } from '../ShellContext'
 import CapabilityNotice from './CapabilityNotice'
+import ModuleSettingsSection from './ModuleSettingsSection'
+import DefaultAssigneePicker from './DefaultAssigneePicker'
+import { Field, ToggleField } from './SettingsControls'
 
 type TabKey = 'submissions' | 'returned'
 
@@ -360,6 +363,57 @@ export default function NetaTrackerPanel() {
       <div className="sync-note">
         Synced live from <b style={{ color: 'var(--text-muted)' }}>{projectLabel(CURRENT_PROJECT)} NETA Tracker · {tab === 'submissions' ? 'Submissions' : 'Returned Files'}</b>
         {data?.syncedAt ? ` — as of ${new Date(data.syncedAt).toLocaleString()}.` : '.'} Edits here are written straight back to that sheet.
+      </div>
+      <div style={{ padding: '0 20px 12px' }}>
+        <ModuleSettingsSection>
+          <Field
+            label="NETA Tracker — Apps Script Web App URL"
+            hint="The /exec URL from that project's NETA Tracker Apps Script deployment (Deploy > Manage deployments)."
+            initial={ctx.netaTrackerScriptUrl}
+            canEdit={ctx.isAdmin}
+            loading={ctx.settingsLoading}
+            onSave={(v) => ctx.onSaveSetting('neta_tracker_script_url', v)}
+          />
+          <div className="q-hint" style={{ marginBottom: 12 }}>
+            Powers the "Your To-Dos" widget's NETA markers. "Still open" isn't configurable here —
+            it's the same not-yet-completed definition this page itself uses (Submissions: not yet
+            Submitted to Google; Returned Files: not yet Uploaded to ACC).
+          </div>
+          <ToggleField
+            label="NETA Submissions To-Do"
+            hint="Turns on the NETA Submissions default-assignee summary card and My Tasks entries."
+            initial={ctx.netaSubmissionsTodoEnabled}
+            canEdit={ctx.isAdmin}
+            loading={ctx.settingsLoading}
+            onSave={(v) => ctx.onSaveSetting('neta_submissions_todo_enabled', v ? 'true' : '')}
+          />
+          <DefaultAssigneePicker
+            label="NETA Submissions — default assignee"
+            hint="When set and at least one submission is still open, this team/person gets a single 'NETA Submissions need to be reviewed' card in Your To-Dos."
+            value={ctx.netaSubmissionsDefaultAssignee}
+            teams={ctx.teams}
+            canEdit={ctx.isAdmin}
+            loading={ctx.settingsLoading}
+            onSave={(v) => ctx.onSaveDefaultAssignee('neta_submissions_default_assignee', v)}
+          />
+          <ToggleField
+            label="NETA Returned Files To-Do"
+            hint="Turns on the NETA Returned Files default-assignee summary card and My Tasks entries."
+            initial={ctx.netaReturnedTodoEnabled}
+            canEdit={ctx.isAdmin}
+            loading={ctx.settingsLoading}
+            onSave={(v) => ctx.onSaveSetting('neta_returned_todo_enabled', v ? 'true' : '')}
+          />
+          <DefaultAssigneePicker
+            label="NETA Returned Files — default assignee"
+            hint="When set and at least one returned file is still open, this team/person gets a single 'NETA Returned Files need to be reviewed' card in Your To-Dos."
+            value={ctx.netaReturnedDefaultAssignee}
+            teams={ctx.teams}
+            canEdit={ctx.isAdmin}
+            loading={ctx.settingsLoading}
+            onSave={(v) => ctx.onSaveDefaultAssignee('neta_returned_default_assignee', v)}
+          />
+        </ModuleSettingsSection>
       </div>
 
       <div className="panel-body">

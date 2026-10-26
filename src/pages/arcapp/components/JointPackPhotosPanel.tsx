@@ -1,19 +1,17 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { useOutletContext } from 'react-router-dom'
 import { Camera, FolderOpen, Plus, RefreshCw } from 'lucide-react'
 import { useGetJointPackData, useLogJointPackPhotos } from '../../../lib/api'
 import type { JointPackRow, JointPackSide } from '../../../lib/api'
 import { CURRENT_PROJECT, projectLabel } from '../../../lib/project'
+import type { ShellContext } from '../ShellContext'
 import { compressImageFile } from '../utils'
 import FullscreenOverlay from './FullscreenOverlay'
+import ModuleSettingsSection from './ModuleSettingsSection'
+import { Field } from './SettingsControls'
 
 const MAX_CAPTURE_DIM = 1600
 const CAPTURE_QUALITY = 0.82
-
-type Props = {
-  /** Google Drive folder ID from Settings — see the label there for how to find one. */
-  folder: string
-  onGoToSettings: () => void
-}
 
 const SIDES: JointPackSide[] = ['Top', 'Side', 'Bottom']
 // Every row in the sheet takes whichever building its own existing rows already use — this is
@@ -29,7 +27,10 @@ function outstandingCount(row: Pick<JointPackRow, 'topUrl' | 'sideUrl' | 'bottom
   return [row.topUrl, row.sideUrl, row.bottomUrl].filter((v) => !v).length
 }
 
-export default function JointPackPhotosPanel({ folder, onGoToSettings }: Props) {
+export default function JointPackPhotosPanel() {
+  const ctx = useOutletContext<ShellContext>()
+  const folder = ctx.jointPackFolder
+  const [settingsOpen, setSettingsOpen] = useState(false)
   const fn = useGetJointPackData()
   useEffect(() => {
     void fn.trigger()
@@ -107,6 +108,27 @@ export default function JointPackPhotosPanel({ folder, onGoToSettings }: Props) 
           : '.'}
       </div>
 
+      <div style={{ padding: '0 20px 12px' }}>
+        <ModuleSettingsSection open={settingsOpen} onOpenChange={setSettingsOpen}>
+          <Field
+            label="Joint Pack Photos — Apps Script Web App URL"
+            hint="The /exec URL from that project's Joint Pack Apps Script deployment (Deploy > Manage deployments)."
+            initial={ctx.jointPackScriptUrl}
+            canEdit={ctx.isAdmin}
+            loading={ctx.settingsLoading}
+            onSave={(v) => ctx.onSaveSetting('joint_pack_script_url', v)}
+          />
+          <Field
+            label="Joint Pack Photos — Google Drive destination folder ID"
+            hint="Open the destination folder in Drive and copy the ID from its URL (.../folders/<THIS PART>). Must be a folder the Joint Pack Apps Script's account can write to."
+            initial={folder}
+            canEdit={ctx.isAdmin}
+            loading={ctx.settingsLoading}
+            onSave={(v) => ctx.onSaveSetting('joint_pack_photos_folder', v)}
+          />
+        </ModuleSettingsSection>
+      </div>
+
       <div className="panel-body">
         <div className="form-field" style={{ maxWidth: 560 }}>
           <label>Logging destination (Google Drive folder)</label>
@@ -133,10 +155,10 @@ export default function JointPackPhotosPanel({ folder, onGoToSettings }: Props) 
           <div className="q-hint">
             Set a Google Drive folder ID in{' '}
             {/* eslint-disable-next-line jsx-a11y/anchor-is-valid */}
-            <a style={{ color: 'var(--green-soft)', cursor: 'pointer' }} onClick={onGoToSettings}>
+            <a style={{ color: 'var(--green-soft)', cursor: 'pointer' }} onClick={() => setSettingsOpen(true)}>
               Settings
             </a>{' '}
-            before logging Joint Pack photos.
+            above before logging Joint Pack photos.
           </div>
         )}
 

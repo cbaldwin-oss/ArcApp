@@ -5,6 +5,10 @@ import { useGetChecklists, cxAlloyChecklistUrl } from '../../../lib/api'
 import { hasCapability, CURRENT_PROJECT, projectLabel } from '../../../lib/project'
 import type { ShellContext } from '../ShellContext'
 import CapabilityNotice from './CapabilityNotice'
+import ModuleSettingsSection from './ModuleSettingsSection'
+import CxAlloyStatusPicker from './CxAlloyStatusPicker'
+import DefaultAssigneePicker from './DefaultAssigneePicker'
+import { ToggleField } from './SettingsControls'
 
 type Row = {
   checklist_id: string
@@ -21,7 +25,8 @@ type Row = {
 const ALL_TYPES = 'All types'
 
 export default function ChecklistReadyPanel() {
-  const { cxAlloyLinkBase } = useOutletContext<ShellContext>()
+  const ctx = useOutletContext<ShellContext>()
+  const { cxAlloyLinkBase } = ctx
   const available = hasCapability('cxAlloyActions')
   const fn = useGetChecklists()
   const [filter, setFilter] = useState('')
@@ -78,6 +83,40 @@ export default function ChecklistReadyPanel() {
       </div>
       <div className="sync-note">
         Ready for CxA review · source: <b style={{ color: 'var(--text-muted)' }}>{projectLabel(CURRENT_PROJECT)} API Database · Checklists</b>
+      </div>
+      <div style={{ padding: '0 20px 12px' }}>
+        <ModuleSettingsSection>
+          <CxAlloyStatusPicker
+            label="Checklist Ready — status(es) that count as ready for CxA review"
+            hint={`Pulled live from the CxAlloy Settings tab (${projectLabel(CURRENT_PROJECT)} API Database). Checked statuses show up in the list below. Also defines Checklist To-Do below: any status NOT checked here counts as still open.`}
+            column="checklistStatuses"
+            value={ctx.checklistReadyStatuses}
+            canEdit={ctx.isAdmin}
+            loading={ctx.settingsLoading}
+            onSave={(values) => ctx.onSaveSetting('checklist_ready_statuses', values.join(', '))}
+          />
+          <div className="q-hint" style={{ marginBottom: 12 }}>
+            Powers the "Your To-Dos" widget's Checklist markers — a default-assignee summary card,
+            plus any individually-assigned item still shows in "My Tasks".
+          </div>
+          <ToggleField
+            label="Checklist To-Do"
+            hint="Turns on the Checklists default-assignee summary card and My Tasks entries."
+            initial={ctx.checklistTodoEnabled}
+            canEdit={ctx.isAdmin}
+            loading={ctx.settingsLoading}
+            onSave={(v) => ctx.onSaveSetting('checklist_todo_enabled', v ? 'true' : '')}
+          />
+          <DefaultAssigneePicker
+            label="Checklists — default assignee"
+            hint="When set and at least one checklist is ready for review (per above), this team/person gets a single 'Checklists need to be reviewed' card in Your To-Dos."
+            value={ctx.checklistDefaultAssignee}
+            teams={ctx.teams}
+            canEdit={ctx.isAdmin}
+            loading={ctx.settingsLoading}
+            onSave={(v) => ctx.onSaveDefaultAssignee('checklist_default_assignee', v)}
+          />
+        </ModuleSettingsSection>
       </div>
       {state === 'ready' && (
         <div style={{ padding: '0 20px 12px', display: 'flex', gap: 10, flexWrap: 'wrap' }}>

@@ -1,11 +1,10 @@
-import { useNavigate, useOutletContext } from 'react-router-dom'
+import { useOutletContext } from 'react-router-dom'
 import type { ShellContext } from '../ShellContext'
 import JointPackPhotosPanel from '../components/JointPackPhotosPanel'
 import CapabilityNotice from '../components/CapabilityNotice'
 
 export default function JointPacksPage() {
   const ctx = useOutletContext<ShellContext>()
-  const navigate = useNavigate()
   if (!ctx.jointPackEnabled) {
     return (
       <CapabilityNotice
@@ -15,5 +14,5 @@ export default function JointPacksPage() {
       />
     )
   }
-  return <JointPackPhotosPanel folder={ctx.jointPackFolder} onGoToSettings={() => navigate('/settings')} />
+  return <JointPackPhotosPanel />
 }

@@ -100,6 +100,41 @@ different/earlier ArcApp deployment for STY4 and SLC1. Enabling RLS on any of th
 a matching policy first would silently break whatever currently reads them, so review with
 whoever owns them before running anything.
 
+## Settings — per-module now, not one long page
+
+As of 2026-10-26, most settings moved out of the single Settings tab (`SettingsPanel.tsx`) and
+onto the page they actually configure — a collapsed-by-default **Settings** drawer
+(`ModuleSettingsSection.tsx`) near the top of Checklists, Issues, Joint Packs, NETA Tracker, and
+Submittals. Visible to everyone (an editor can expand it and see what's configured, same as
+before), but every control inside is still admin-only to actually change — same
+`Field`/`ToggleField` controls as before (now shared from `SettingsControls.tsx` instead of being
+local to `SettingsPanel.tsx`), same "Only admins can change settings." messaging.
+
+**What's still in the Settings tab, and why**: only things that don't belong to one module —
+- **CxAlloy project override** — used by both Checklist and Issue deep links, not either one alone.
+- **Each module's own enable/disable toggle** (Joint Pack Photos / Asset Attributes / NETA
+  Tracker) — has to stay here rather than move to the module's own page, since that page (and its
+  Sidebar nav item) doesn't exist to show the toggle on while the module's off. Once a module is
+  on, everything *else* about it (script URL, folder ID, To-Do settings) lives on its own page —
+  only reachable once the enable toggle up here already let you get there.
+- **Workflows** — has no page of its own.
+- **Authorized Users** — app-wide access control, not a per-module thing.
+
+Per-page breakdown of what moved where:
+- **Checklists page**: Checklist Ready status picker, Checklist To-Do toggle + default assignee.
+- **Issues page**: Issues for Review status picker, creator-company filter, Issues To-Do toggle +
+  default assignee.
+- **Joint Packs page**: Apps Script URL, Drive destination folder ID. The old "no destination set"
+  notice used to link to the Settings tab (`onGoToSettings`); now it just expands this same page's
+  own Settings drawer in place (`ModuleSettingsSection`'s new controlled `open`/`onOpenChange`
+  props, used only here).
+- **NETA Tracker page**: Apps Script URL, both To-Do toggles + default assignees (Submissions and
+  Returned Files).
+- **Submittals page**: exempt-assets manager (`SubmittalExemptAssetsManager`) — this also let
+  `SubmittalsManager.tsx` drop its own separate `useGetSettings()` fetch entirely in favor of
+  reading `submittalExemptAssets` straight from `ShellContext`, since that was the only field it
+  ever used from the full settings object.
+
 ## Checklists & Issues (CxAlloy, via Google Sheet)
 
 Unlike the rest of this app, Checklists and Issues don't come from Supabase — they come from the
@@ -117,7 +152,8 @@ directly:
   (`getChecklists`, `getIssues`, `getCxAlloySettings`) that didn't exist before this — nothing
   existing in that script was modified. If these ever go missing (script reverted, etc.), both
   panels degrade to the same "couldn't load" error state the rest of the app already uses.
-- **Settings → Checklist Ready / Issues for Review** are multi-selects populated live from the
+- **Checklist Ready / Issues for Review** (each page's own Settings drawer now, see above) are
+  multi-selects populated live from the
   `CxAlloy Settings` tab, not free text. The **Checklist Type** and **Issue Priority** filters on
   the Checklists/Issues pages are *not* sourced from that tab, though — its Type/Priority lists
   don't currently match the names actually used on real rows (e.g. Issue Priority there is
@@ -147,8 +183,9 @@ directly:
   - Checklist/Issue rows render as plain text instead of a broken link while `cxAlloyLinkBase` is
     null (still loading, or nothing detected and no override set) — same "degrade gracefully, no
     dead link" approach as everything else CxAlloy-related.
-- **Issues — creator company filter** (added 2026-09-25): Settings → "Issues — creator company
-  filter" (`issue_creator_company_filter` in `arcapp_settings`) restricts Issues to ones created by
+- **Issues — creator company filter** (added 2026-09-25, moved to the Issues page's own Settings
+  drawer 2026-10-26): "Issues — creator company filter"
+  (`issue_creator_company_filter` in `arcapp_settings`) restricts Issues to ones created by
   a specific company — either the exact string itself (an issue created by a shared/org account,
   where Created By literally *is* the company name) or a person listed under that company in a
   "People" tab (columns `Name`/`Company`, header casing doesn't matter) on the same API Database
@@ -186,22 +223,26 @@ different spreadsheet from CxAlloy's. `useGetJointPackData`/`useLogJointPackPhot
 - **Logging a photo** compresses it client-side (`compressImageFile` in `utils.ts` — downscaled to
   1600px, JPEG ~0.82 quality, to keep uploads fast on-site) then POSTs it to the Apps Script, which
   uploads it to Drive (via `DriveApp`, running as the script's own account — no per-user Google
-  Drive permission needed) into the folder ID set in **Settings → Joint Pack Photos**, named
+  Drive permission needed) into the folder ID set in the **Joint Packs page's own Settings
+  drawer**, named
   `Building - Asset - Joint Pack # - Side.jpg`, and writes that file's URL back into the matching
   Top/Side/Bottom cell. Logging a photo for a Building/Asset/Joint Pack # combination that isn't in
   the sheet yet appends a new row for it — the app doesn't require pre-registering a Joint Pack #
   before photographing it.
-- **Per-project on/off toggle + Settings-editable URL** (added 2026-09-25 while onboarding
-  SAN-NT1B — this used to be shown unconditionally for every project, with the URL DB-only).
-  Settings → Joint Pack Photos → "Joint Pack Photos enabled for this project"
+- **Per-project on/off toggle + editable URL** (added 2026-09-25 while onboarding
+  SAN-NT1B — this used to be shown unconditionally for every project, with the URL DB-only). The
+  main **Settings tab**'s "Joint Pack Photos enabled for this project"
   (`joint_pack_enabled` in `arcapp_settings`/`jointPackEnabled` in `AppSettings`) gates the page and
   its Sidebar nav item (`CapabilityNotice` when off, same pattern as NETA Tracker/siteLogging/
   cxAlloyActions), same reasoning as NETA Tracker's toggle: a newly-onboarded project shouldn't
-  show a page that just errors before its own Sheet/script exists. The Apps Script's URL itself
-  (`joint_pack_script_url`) is now an editable Field right below that toggle instead of DB-only —
-  an admin can wire up a new project's deployment themselves. STY4 was seeded with the toggle on to
-  preserve its existing behavior; SAN-NT1B starts off. Redeploying the script as a new version of
-  the same deployment keeps the same URL; only a brand-new deployment needs this field updated.
+  show a page that just errors before its own Sheet/script exists — that's why this one toggle
+  stays in the main Settings tab instead of moving to the Joint Packs page with everything else
+  (2026-10-26), since the page doesn't exist to show it on while it's off. The Apps Script's URL
+  itself (`joint_pack_script_url`) is an editable Field on the **Joint Packs page's own Settings
+  drawer** instead of DB-only — an admin can wire up a new project's deployment themselves. STY4
+  was seeded with the toggle on to preserve its existing behavior; SAN-NT1B starts off.
+  Redeploying the script as a new version of the same deployment keeps the same URL; only a
+  brand-new deployment needs this field updated.
 - The script itself (`doGet`/`doPost`, not committed to this repo — see `JointPackPhotoScript.gs`
   shared separately, same as CxAlloy's script isn't committed here either) needs to be pasted into
   **Extensions → Apps Script** on the "Joint Pack Photo - STY4A" spreadsheet and deployed as a web
@@ -309,16 +350,18 @@ Pack Photo's) — `useGetNetaTrackerData`/`useUpdateNetaField` in `src/lib/api.t
   mistake — changed to `r.uploadedToAcc === true`.)
 - **Gated by a per-project Settings toggle, not a project.ts capability** (changed 2026-09-25 —
   `netaTracker` used to be a third hardcoded capability alongside `siteLogging`/`cxAlloyActions`,
-  requiring a code change/redeploy to turn on for a new site). Settings → NETA Tracker → "NETA
+  requiring a code change/redeploy to turn on for a new site). The main **Settings tab**'s "NETA
   Tracker enabled for this project" (`neta_tracker_enabled` in `arcapp_settings`,
   `netaTrackerEnabled` in `AppSettings`/`ShellContext`) is admin-toggleable per project — flip it on
   once that project's own NETA Sheet + Apps Script are actually deployed, no ArcApp code change
   needed. Off shows the standard "not available for this project" notice, same as before; the
-  toggle itself always renders (even while off) so an admin can find and flip it. STY4 was seeded
-  with this on (`neta_tracker_enabled = 'true'`) to preserve its existing behavior across the
-  change; SAN-NT1B starts off, same as before. Its Apps Script URL (`neta_tracker_script_url`) is
-  also now an editable Field right below the toggle (used to be DB-only) — same reasoning as
-  Joint Pack Photos' URL field just above.
+  toggle itself always renders (even while off) so an admin can find and flip it — same reasoning
+  as Joint Pack Photos' toggle for why this one stays in the main Settings tab rather than moving
+  to the NETA Tracker page with everything else (2026-10-26). STY4 was seeded with this on
+  (`neta_tracker_enabled = 'true'`) to preserve its existing behavior across the change; SAN-NT1B
+  starts off, same as before. Its Apps Script URL (`neta_tracker_script_url`) is an editable Field
+  on the **NETA Tracker page's own Settings drawer** (used to be DB-only, then briefly lived in the
+  main Settings tab) — same reasoning as Joint Pack Photos' URL field.
 - No sign-in required to toggle checkboxes or edit comments, same as Tamper Seal/RTFT logging.
 - **Verified against the real deployed script and real sheet data** (778 Submissions / 119 Returned
   Files rows): `getNetaData`'s shape and row counts match a direct workbook inspection exactly; a
@@ -389,7 +432,8 @@ There's no propagation logic to get right; it's just what "one row, many assets"
   nothing in it worth migrating).
 - **Missing-submittal count**: the header badge is every tracked asset (`STY4dropdownoptions.
   Assets`) that isn't covered by any submittal's `assets` array — hover it to see which ones.
-  **Settings → Assets Exempt From Submittal Review** (`SubmittalExemptAssetsManager.tsx`, a new
+  The Submittals page's own Settings drawer → **Assets Exempt From Submittal Review**
+  (`SubmittalExemptAssetsManager.tsx`, moved here from the main Settings tab 2026-10-26; a
   `submittal_exempt_assets` setting) lets you mark assets that will never need one (e.g. nothing
   commissionable in that space) so they're excluded from the count entirely, rather than sitting
   there permanently flagged as "missing."
@@ -573,8 +617,9 @@ markers, computed once by `useOpenItemsData()` (`OpenItemsTodoPanel.tsx`), calle
   items; duplicating that as a fourth place to browse them wasn't needed). The To-Do module's job
   here is purely notification: tell the right person something needs their attention, and point
   them at the page where it actually lives.
-- **Default assignee per category** — a team-or-person picker in Settings next to each category's
-  toggle (`checklist_default_assignee_*`/`issue_default_assignee_*`/same for both NETA categories,
+- **Default assignee per category** — a team-or-person picker next to each category's toggle, on
+  that category's own page's Settings drawer as of 2026-10-26 (used to be the main Settings tab)
+  (`checklist_default_assignee_*`/`issue_default_assignee_*`/same for both NETA categories,
   3 keys each: `_team_id`/`_email`/`_name`, saved together via `saveDefaultAssignee` in
   `src/lib/api.ts`; the "specific person" option is a dropdown of `arcapp_authorized_users`, not
   free text — only someone who can actually sign in can usefully be a default assignee). When the
