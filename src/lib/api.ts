@@ -1940,6 +1940,40 @@ export function useSaveAuthorizedUser() {
   return useApiFn(saveAuthorizedUser)
 }
 
+/** Adds many people at once (Settings → Authorized Users → Bulk Add) — deliberately ADD-only, not
+ * upsert: an email already on the roster is left completely untouched (role, name, everything)
+ * rather than silently overwritten by whatever the bulk paste happened to specify, since a bulk
+ * list someone pastes in might not even be thinking about roles for people already added. Existing
+ * emails are reported back as skipped so the admin can see what happened, not just a row count. */
+async function bulkAddAuthorizedUsers(params: { entries: Array<{ email: string; name: string; role: UserRole }> }): Promise<{ added: string[]; skipped: string[] }> {
+  const who = (await getCurrentUserEmail()) || 'admin'
+
+  // De-dupe by email within the pasted batch itself (last occurrence wins), case/whitespace-
+  // insensitive, same normalization saveAuthorizedUser already applies one row at a time.
+  const byEmail = new Map<string, { email: string; name: string; role: UserRole }>()
+  for (const e of params.entries) {
+    const email = e.email.trim().toLowerCase()
+    if (!email) continue
+    byEmail.set(email, { email, name: e.name.trim(), role: e.role })
+  }
+  if (byEmail.size === 0) return { added: [], skipped: [] }
+
+  const existingRes = await supabase.from('arcapp_authorized_users').select('email')
+  const existing = new Set((unwrap(existingRes) as Array<{ email: string }>).map((r) => r.email.toLowerCase()))
+
+  const toInsert = Array.from(byEmail.values()).filter((e) => !existing.has(e.email))
+  const skipped = Array.from(byEmail.keys()).filter((email) => existing.has(email))
+  if (toInsert.length === 0) return { added: [], skipped }
+
+  const records = toInsert.map((e) => ({ email: e.email, name: e.name, role: e.role, added_by: who }))
+  const res = await supabase.from('arcapp_authorized_users').insert(records)
+  if (res.error) throw new Error(res.error.message)
+  return { added: toInsert.map((e) => e.email), skipped }
+}
+export function useBulkAddAuthorizedUsers() {
+  return useApiFn(bulkAddAuthorizedUsers)
+}
+
 async function deleteAuthorizedUser(params: { id: string }): Promise<{ id: string }> {
   const res = await supabase.from('arcapp_authorized_users').delete().eq('id', params.id)
   if (res.error) throw new Error(res.error.message)

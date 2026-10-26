@@ -627,6 +627,17 @@ only. `saveAuthorizedUser`/`getAuthorizedUsers` in `src/lib/api.ts` carry the `r
 `useCurrentUser.ts` reads it into `CurrentUser.role` at sign-in, and `AppShell.tsx` derives
 `isAdmin`/`canEdit` from that alone.
 
+**Bulk Add** (added 2026-10-25, `AuthorizedUsersManager.tsx`/`bulkAddAuthorizedUsers` in
+`src/lib/api.ts`) — a collapsible textarea next to the one-at-a-time form for pasting many people
+at once, one per line: `email`, `email, name`, or `email, name, role` (comma- or tab-separated, so
+a column pasted straight out of a spreadsheet works unchanged; a trailing role only counts if it
+actually reads "admin"/"editor", otherwise a default-role dropdown above the textarea applies).
+Deliberately **add-only, not upsert** — an email already on the roster is left completely
+untouched (role, name, everything) rather than silently overwritten by whatever the pasted list
+happened to say for them, since a bulk list someone pastes in may not even be thinking about roles
+for people already added; the result message reports how many were added vs. skipped (already on
+the list, listed by email) vs. ignored (no `@`) so nothing is silently dropped.
+
 **Reading the full roster isn't admin-only** (widened 2026-09-25 — used to be "your own row only"
 for a non-admin): every "assign to a specific person" control in the app — Teams' member picker,
 a task's/Checklist-Issue-NETA-item's assign-to popover, Settings' default-assignee picker — is a
