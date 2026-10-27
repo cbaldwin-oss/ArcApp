@@ -42,6 +42,7 @@ export default function MilestonesPage() {
       areas: distinctAreas(data.assetPlaces),
       checklistStatuses: cxSettingsFn.data?.checklistStatuses ?? [],
       issueStatuses: cxSettingsFn.data?.issueStatuses ?? [],
+      issuePriorities: cxSettingsFn.data?.issuePriorities ?? [],
       submittalStatuses: SUBMITTAL_STATUSES,
       netaZones: distinctZones(data.neta.submissions, data.neta.returnedFiles),
       netaEnabled: ctx.netaTrackerEnabled,

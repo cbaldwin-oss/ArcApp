@@ -535,6 +535,12 @@ instead of being set by hand.
     criterion. `CriterionScope` (`{ by: 'assets', assets }` or `{ by: 'areas', areas }`,
     `src/lib/api.ts`) replaced the old flat `assets: string[]` field; `parseMilestoneCriteria` still
     reads the old shape from any criterion saved before this change.
+  - **Issues criteria can also filter by priority** (added 2026-10-27) — an optional multi-select
+    (none selected = every priority counts) on top of the asset/area scope and target status, so a
+    criterion can track e.g. only Critical-priority issues for an area instead of every issue
+    regardless of severity. `IssueCriterion` is its own type now (`priorities: string[]`, distinct
+    from `ChecklistCriterion`, which has no priority concept) — `parseMilestoneCriteria` defaults
+    `priorities` to `[]` for any Issues criterion saved before this field existed.
 - **Combining criteria**: a milestone's overall pct is the plain average of each criterion's own
   pct (not weighted by how many items each one covers) — by request, so a milestone rests on
   several conditions clearing roughly together rather than needing every last one done before

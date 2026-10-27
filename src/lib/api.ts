@@ -1474,11 +1474,14 @@ export function useDeleteSubmittalRecord() {
 // track "everything in Electrical Room 3" without enumerating each asset in it by hand, and picks
 // up assets added to that area later automatically.
 export type CriterionScope = { by: 'assets'; assets: string[] } | { by: 'areas'; areas: string[] }
-export type ChecklistOrIssueCriterion = { module: 'checklists' | 'issues'; scope: CriterionScope; targetStatuses: string[] }
+export type ChecklistCriterion = { module: 'checklists'; scope: CriterionScope; targetStatuses: string[] }
+// `priorities` empty = every priority counts — kept separate from ChecklistCriterion since
+// Checklists has no priority concept to filter by.
+export type IssueCriterion = { module: 'issues'; scope: CriterionScope; targetStatuses: string[]; priorities: string[] }
 export type SubmittalCriterion = { module: 'submittals'; scope: CriterionScope; targetStatuses: string[] }
 export type NetaFlag = 'clericalReview' | 'submittedToGoogle' | 'technicalReview' | 'stampPresent' | 'netaCompleted' | 'uploadedToAcc'
 export type NetaCriterion = { module: 'neta'; tab: NetaTab; zones: string[]; flag: NetaFlag }
-export type MilestoneCriterion = ChecklistOrIssueCriterion | SubmittalCriterion | NetaCriterion
+export type MilestoneCriterion = ChecklistCriterion | IssueCriterion | SubmittalCriterion | NetaCriterion
 
 export type MilestoneRecord = {
   id: string
@@ -1498,7 +1501,12 @@ function parseMilestoneCriteria(raw: unknown): MilestoneCriterion[] {
       // Pre-area-scoping criteria stored `assets: string[]` directly instead of `scope` — wrap
       // those into the current shape so milestones saved before this change still evaluate.
       if (c.module !== 'neta' && !c.scope && Array.isArray(c.assets)) {
-        return { ...c, scope: { by: 'assets', assets: c.assets } }
+        c = { ...c, scope: { by: 'assets', assets: c.assets } }
+      }
+      // Pre-priority-filter Issues criteria have no `priorities` field at all — default to "every
+      // priority counts", matching their behavior before this field existed.
+      if (c.module === 'issues' && !Array.isArray(c.priorities)) {
+        c = { ...c, priorities: [] }
       }
       return c
     }) as MilestoneCriterion[]

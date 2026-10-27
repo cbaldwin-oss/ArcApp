@@ -55,11 +55,17 @@ function resolveScopeAssets(scope: CriterionScope, assetPlaces: Array<{ asset: s
  */
 export function evaluateCriterion(c: MilestoneCriterion, data: ModuleData): CriterionResult {
   switch (c.module) {
-    case 'checklists':
+    case 'checklists': {
+      const assetSet = resolveScopeAssets(c.scope, data.assetPlaces)
+      const scoped = assetSet.size === 0 ? [] : data.checklists.filter((r) => assetSet.has(norm(r.asset_name)))
+      const satisfied = scoped.filter((r) => c.targetStatuses.includes(r.status)).length
+      return { satisfied, total: scoped.length, pct: scoped.length === 0 ? null : (satisfied / scoped.length) * 100 }
+    }
     case 'issues': {
       const assetSet = resolveScopeAssets(c.scope, data.assetPlaces)
-      const rows = c.module === 'checklists' ? data.checklists : data.issues
-      const scoped = assetSet.size === 0 ? [] : rows.filter((r) => assetSet.has(norm(r.asset_name)))
+      const prioritySet = new Set(c.priorities.map(norm))
+      let scoped = assetSet.size === 0 ? [] : data.issues.filter((r) => assetSet.has(norm(r.asset_name)))
+      if (prioritySet.size > 0) scoped = scoped.filter((r) => prioritySet.has(norm(r.priority)))
       const satisfied = scoped.filter((r) => c.targetStatuses.includes(r.status)).length
       return { satisfied, total: scoped.length, pct: scoped.length === 0 ? null : (satisfied / scoped.length) * 100 }
     }
@@ -137,7 +143,8 @@ const MODULE_LABEL: Record<MilestoneCriterion['module'], string> = {
 export function describeCriterion(c: MilestoneCriterion): string {
   if (c.module === 'neta') return `${MODULE_LABEL.neta} (${c.tab}) for ${zonePart(c.zones)} — ${NETA_FLAG_LABELS[c.flag]}`
   const statusPart = c.targetStatuses.length === 0 ? 'no target status picked yet' : c.targetStatuses.join(' or ')
-  return `${MODULE_LABEL[c.module]} for ${scopePart(c.scope)} reach ${statusPart}`
+  const priorityPart = c.module === 'issues' && c.priorities.length > 0 ? ` (${c.priorities.join('/')} only)` : ''
+  return `${MODULE_LABEL[c.module]} for ${scopePart(c.scope)}${priorityPart} reach ${statusPart}`
 }
 
 export function distinctAreas(assetPlaces: Array<{ asset: string; place: string }>): string[] {

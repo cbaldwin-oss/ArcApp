@@ -12,6 +12,7 @@ const MODULE_LABEL: Record<MilestoneCriterion['module'], string> = {
 
 function defaultCriterion(module: MilestoneCriterion['module']): MilestoneCriterion {
   if (module === 'neta') return { module: 'neta', tab: 'Submissions', zones: [], flag: 'submittedToGoogle' }
+  if (module === 'issues') return { module, scope: { by: 'assets', assets: [] }, targetStatuses: [], priorities: [] }
   return { module, scope: { by: 'assets', assets: [] }, targetStatuses: [] }
 }
 
@@ -20,6 +21,7 @@ type Options = {
   areas: string[]
   checklistStatuses: string[]
   issueStatuses: string[]
+  issuePriorities: string[]
   submittalStatuses: readonly string[]
   netaZones: string[]
   netaEnabled: boolean
@@ -162,6 +164,16 @@ export default function MilestoneCriteriaBuilder({
                     selected={c.scope.areas}
                     onChange={(areas) => updateAt(i, { ...c, scope: { by: 'areas', areas } })}
                     placeholder="Search areas… (every asset placed there counts)"
+                    disabled={disabled}
+                  />
+                )}
+                {c.module === 'issues' && (
+                  <MultiSelectPicker
+                    label={`Priority (${c.priorities.length === 0 ? 'all priorities' : `${c.priorities.length} selected`})`}
+                    options={options.issuePriorities}
+                    selected={c.priorities}
+                    onChange={(priorities) => updateAt(i, { ...c, priorities })}
+                    placeholder="Search priorities… (none selected = all priorities)"
                     disabled={disabled}
                   />
                 )}
