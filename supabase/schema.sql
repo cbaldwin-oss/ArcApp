@@ -241,3 +241,26 @@ ALTER TABLE arcapp_workflows ADD COLUMN IF NOT EXISTS project_key text NOT NULL 
 ALTER TABLE arcapp_item_assignments ADD COLUMN IF NOT EXISTS project_key text NOT NULL DEFAULT 'STY4';
 ALTER TABLE arcapp_item_assignments DROP CONSTRAINT arcapp_item_assignments_item_type_item_id_key;
 ALTER TABLE arcapp_item_assignments ADD CONSTRAINT arcapp_item_assignments_project_item_key UNIQUE (project_key, item_type, item_id);
+
+-- ---------------------------------------------------------------------------
+-- APPLIED — arcapp_milestones (requested 2026-10-27).
+--
+-- Milestones used to be hardcoded sample data (sampleData.ts) with a hand-set pct/status. This
+-- table persists just a milestone's own fields — `criteria` is a jsonb array of
+-- MilestoneCriterion objects (see src/lib/api.ts) scoping into Checklists/Issues/Submittals/NETA
+-- Tracker by asset (or zone, for NETA) + target status/flag. The pct/status themselves are never
+-- stored — computeMilestoneProgress (src/pages/arcapp/milestones.ts) derives them live from
+-- `criteria` plus each module's current data every time the Milestones page loads, same
+-- project_key-scoped pattern as arcapp_submittals/arcapp_tasks/etc. above.
+-- ---------------------------------------------------------------------------
+
+CREATE TABLE IF NOT EXISTS arcapp_milestones (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  project_key text NOT NULL,
+  name text NOT NULL,
+  due_date date,
+  criteria jsonb NOT NULL DEFAULT '[]'::jsonb,
+  updated_by text,
+  updated_at timestamptz NOT NULL DEFAULT now(),
+  created_at timestamptz NOT NULL DEFAULT now()
+);

@@ -508,6 +508,44 @@ same `getSettings()`. The fix is a one-line policy swap (`settings_select_authen
 but changing a live RLS policy needs your explicit go-ahead rather than being applied
 automatically — ask for it to be applied when you're ready.
 
+## Milestones — criteria-driven progress, not hand-set
+
+Used to be entirely fake: `sampleData.ts` hardcoded six milestones with a hand-picked pct/status,
+rendered read-only on the Dashboard and the Milestones page (now deleted — nothing reads it
+anymore). The Milestones page (`MilestonesPage.tsx`) is now fully editable, backed by a new
+`arcapp_milestones` table (`project_key`-scoped, same pattern as Submittals/Tasks/Teams), and a
+milestone's pct/status are **computed live, every page load**, from a list of completion criteria
+instead of being set by hand.
+
+- **A criterion** scopes into one other module — Checklists, Issues, or Submittals by a set of
+  assets + which status(es) on that module count as "done" for them; or NETA Tracker by a tab
+  (Submissions/Returned Files) + zone(s) + which boolean field (Clerical Review, Technical Review,
+  NETA Completed, etc.) counts as done. `MilestoneCriteriaBuilder.tsx` is the editable list of these
+  inside the Add/Edit Milestone form; `evaluateCriterion`/`computeMilestoneProgress`
+  (`src/pages/arcapp/milestones.ts`) are the pure functions that turn `criteria` + each module's
+  current data into a result — **nothing is stored except `criteria` itself**, so there's no stale
+  pct sitting in the database disagreeing with reality.
+- **Combining criteria**: a milestone's overall pct is the plain average of each criterion's own
+  pct (not weighted by how many items each one covers) — by request, so a milestone rests on
+  several conditions clearing roughly together rather than needing every last one done before
+  showing any progress. Status is then derived from that pct: 100% → Complete, ≥70% → Go, ≥40% →
+  Caution, else Hold. A criterion with zero matching items (nothing picked yet, or the picked
+  assets/zone have no rows in that module) is left out of the average entirely rather than counted
+  as 0% or 100% — a misconfigured criterion shouldn't silently look either done or stuck.
+- **Checklists/Issues criteria see every status, not just "Ready"/"for review"**: `useGetChecklists`/
+  `useGetOpenChecklists` (and the Issues equivalents) are fetched and merged together to get the
+  complete current set of rows regardless of status, since a criterion might target any status, not
+  just whatever Settings currently calls "ready." This reuses the existing ready+open split instead
+  of adding a new unfiltered fetch (CxAlloy's Apps Script needs an explicit status filter either
+  way — see the comment on `getOpenChecklists` in `src/lib/api.ts`).
+- **Dashboard's Milestones widget** now reads this same live computed data (`useMilestonesWithProgress`
+  in `src/pages/arcapp/milestones.ts`) instead of the old hardcoded sample list, so it can never show
+  something different from the Milestones page itself. The tradeoff: visiting the Dashboard now also
+  fires the Checklists/Issues/Submittals (and, if enabled, NETA) fetches that used to only happen on
+  their own pages — say if that extra load time on the landing page becomes a problem.
+- Any signed-in authorized user (`canEdit`, editor or admin — not admin-only, same as Submittals)
+  can add, edit, or delete milestones and their criteria.
+
 ## RTFT — standalone logging + per-asset coverage
 
 Same two additions as Tamper Seals got, applied to RTFT (`RtftTrackerPanel.tsx`):

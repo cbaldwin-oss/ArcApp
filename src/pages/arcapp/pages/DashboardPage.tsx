@@ -1,7 +1,7 @@
 import { useNavigate, useOutletContext } from 'react-router-dom'
 import type { ShellContext } from '../ShellContext'
-import { MILESTONES } from '../sampleData'
-import { isTodoMine } from '../utils'
+import { useMilestonesWithProgress } from '../milestones'
+import { isTodoMine, fmtDate } from '../utils'
 import { CURRENT_PROJECT, projectLabel } from '../../../lib/project'
 import KpiRow from '../components/KpiRow'
 import TodoPanel from '../components/TodoPanel'
@@ -16,6 +16,18 @@ const SOURCE_LABEL = `${CURRENT_PROJECT}BackEndData`
 export default function DashboardPage() {
   const ctx = useOutletContext<ShellContext>()
   const navigate = useNavigate()
+
+  // Milestones used to be hardcoded sample data here — now the same live, criteria-driven
+  // progress the Milestones page itself computes (see useMilestonesWithProgress), so the two never
+  // disagree about what's actually complete.
+  const { computed: milestoneRows } = useMilestonesWithProgress(ctx.netaTrackerEnabled)
+  const dashboardMilestones = milestoneRows.map((m) => ({
+    name: m.name,
+    pct: m.progress.pct,
+    due: m.dueDate ? fmtDate(m.dueDate) : 'No due date',
+    status: m.progress.status,
+    label: m.progress.label,
+  }))
 
   // "Your To-Dos" personalizes once someone's signed in (mine + my teams'); falls back to every
   // open task when signed out, same as before this widget could know who "you" are.
@@ -57,7 +69,7 @@ export default function DashboardPage() {
           extraRows={dashboardExtraRows}
           extraOpenCount={myItems.length + mySummaries.length}
         />
-        <MilestonesPanel milestones={MILESTONES} onExpand={() => navigate('/milestones')} />
+        <MilestonesPanel milestones={dashboardMilestones} onExpand={() => navigate('/milestones')} />
       </div>
 
       <SchedulePanel

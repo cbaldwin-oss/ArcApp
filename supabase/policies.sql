@@ -233,3 +233,20 @@ CREATE POLICY "item_assignments_write_public" ON arcapp_item_assignments
 -- query in src/lib/api.ts filtering/stamping `.eq('project_key', CURRENT_PROJECT)` — same as how
 -- this app was already trusting itself (not RLS) to keep e.g. one submittal's assets list correct.
 -- =============================================================================
+
+
+-- =============================================================================
+-- APPLIED — arcapp_milestones (requested 2026-10-27). Same "viewable without signing in, writes
+-- need any authorized ArcApp user" pattern as arcapp_submittals above — Milestones isn't Settings,
+-- so no admin-only check.
+-- =============================================================================
+
+ALTER TABLE arcapp_milestones ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "milestones_select_public" ON arcapp_milestones
+  FOR SELECT TO anon, authenticated USING (true);
+
+CREATE POLICY "milestones_write_authorized" ON arcapp_milestones
+  FOR ALL TO authenticated
+  USING (is_arcapp_authorized())
+  WITH CHECK (is_arcapp_authorized());

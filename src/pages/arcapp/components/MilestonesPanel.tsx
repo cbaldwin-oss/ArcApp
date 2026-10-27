@@ -5,38 +5,34 @@ import { statusColor } from '../utils'
 const R = 24
 const C = 2 * Math.PI * R
 
+export function MilestoneArc({ pct, status }: { pct: number; status: Milestone['status'] }) {
+  const offset = C - (pct / 100) * C
+  return (
+    <div className="arc-wrap">
+      <svg viewBox="0 0 56 56">
+        <circle className="arc-bg" cx="28" cy="28" r={R} />
+        <circle className="arc-fg" cx="28" cy="28" r={R} stroke={statusColor(status)} strokeDasharray={C} strokeDashoffset={offset} />
+      </svg>
+      <div className="arc-pct">{pct}%</div>
+    </div>
+  )
+}
+
 export function MilestoneList({ milestones }: { milestones: Milestone[] }) {
   return (
     <div className="milestone-list">
-      {milestones.map((m) => {
-        const offset = C - (m.pct / 100) * C
-        return (
-          <div key={m.name} className="milestone-item">
-            <div className="arc-wrap">
-              <svg viewBox="0 0 56 56">
-                <circle className="arc-bg" cx="28" cy="28" r={R} />
-                <circle
-                  className="arc-fg"
-                  cx="28"
-                  cy="28"
-                  r={R}
-                  stroke={statusColor(m.status)}
-                  strokeDasharray={C}
-                  strokeDashoffset={offset}
-                />
-              </svg>
-              <div className="arc-pct">{m.pct}%</div>
-            </div>
-            <div className="milestone-main">
-              <p className="milestone-name">{m.name}</p>
-              <div className="milestone-meta">
-                <span className={`status-chip ${m.status}`}>{m.label}</span>
-                <span className="milestone-date">{m.due}</span>
-              </div>
+      {milestones.map((m) => (
+        <div key={m.name} className="milestone-item">
+          <MilestoneArc pct={m.pct} status={m.status} />
+          <div className="milestone-main">
+            <p className="milestone-name">{m.name}</p>
+            <div className="milestone-meta">
+              <span className={`status-chip ${m.status}`}>{m.label}</span>
+              <span className="milestone-date">{m.due}</span>
             </div>
           </div>
-        )
-      })}
+        </div>
+      ))}
     </div>
   )
 }

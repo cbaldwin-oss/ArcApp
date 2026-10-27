@@ -1461,6 +1461,95 @@ export function useDeleteSubmittalRecord() {
 }
 
 // ---------------------------------------------------------------------------
+// milestones — a milestone's completion is driven by criteria checked against this app's other
+// modules (Checklists/Issues/Submittals/NETA Tracker) instead of a hand-set percentage; see
+// computeMilestoneProgress in src/pages/arcapp/milestones.ts for how `criteria` turns into a pct.
+// This file only persists the milestone's own fields (name/due date/criteria) — same
+// upsert-by-id/delete shape as Submittals above.
+// ---------------------------------------------------------------------------
+
+export type ChecklistOrIssueCriterion = { module: 'checklists' | 'issues'; assets: string[]; targetStatuses: string[] }
+export type SubmittalCriterion = { module: 'submittals'; assets: string[]; targetStatuses: string[] }
+export type NetaFlag = 'clericalReview' | 'submittedToGoogle' | 'technicalReview' | 'stampPresent' | 'netaCompleted' | 'uploadedToAcc'
+export type NetaCriterion = { module: 'neta'; tab: NetaTab; zones: string[]; flag: NetaFlag }
+export type MilestoneCriterion = ChecklistOrIssueCriterion | SubmittalCriterion | NetaCriterion
+
+export type MilestoneRecord = {
+  id: string
+  name: string
+  dueDate: string // ISO yyyy-mm-dd, or '' if unset
+  criteria: MilestoneCriterion[]
+  updatedBy: string
+  updatedAt: string
+  createdAt: string
+}
+
+function parseMilestoneCriteria(raw: unknown): MilestoneCriterion[] {
+  if (!Array.isArray(raw)) return []
+  return raw.filter((c): c is MilestoneCriterion => !!c && typeof c === 'object' && typeof (c as { module?: unknown }).module === 'string')
+}
+
+async function getMilestoneRecords(): Promise<MilestoneRecord[]> {
+  const res = await supabase
+    .from('arcapp_milestones')
+    .select('id, name, due_date, criteria, updated_by, updated_at, created_at')
+    .eq('project_key', CURRENT_PROJECT)
+    .order('due_date', { ascending: true, nullsFirst: false })
+  const rows = unwrap(res) as Array<{
+    id: string
+    name: string | null
+    due_date: string | null
+    criteria: unknown
+    updated_by: string | null
+    updated_at: string | null
+    created_at: string | null
+  }>
+  return rows.map((r) => ({
+    id: r.id,
+    name: r.name || '',
+    dueDate: r.due_date || '',
+    criteria: parseMilestoneCriteria(r.criteria),
+    updatedBy: r.updated_by || '',
+    updatedAt: r.updated_at || '',
+    createdAt: r.created_at || '',
+  }))
+}
+export function useGetMilestoneRecords() {
+  return useApiFn(getMilestoneRecords)
+}
+
+export type MilestoneInput = { id?: string; name: string; dueDate: string; criteria: MilestoneCriterion[] }
+async function saveMilestone(params: MilestoneInput): Promise<{ id: string }> {
+  const name = params.name.trim()
+  if (!name) throw new Error('A name is required.')
+  const updatedBy = (await getCurrentUserEmail()) || 'admin'
+  const record: Record<string, unknown> = {
+    project_key: CURRENT_PROJECT,
+    name,
+    due_date: params.dueDate || null,
+    criteria: params.criteria,
+    updated_by: updatedBy,
+    updated_at: new Date().toISOString(),
+  }
+  if (params.id) record.id = params.id
+  const res = await supabase.from('arcapp_milestones').upsert(record, { onConflict: 'id' }).select('id').single()
+  const row = unwrap(res) as { id: string }
+  return { id: row.id }
+}
+export function useSaveMilestone() {
+  return useApiFn(saveMilestone)
+}
+
+async function deleteMilestone(params: { id: string }): Promise<{ id: string }> {
+  const res = await supabase.from('arcapp_milestones').delete().eq('id', params.id)
+  if (res.error) throw new Error(res.error.message)
+  return { id: params.id }
+}
+export function useDeleteMilestone() {
+  return useApiFn(deleteMilestone)
+}
+
+// ---------------------------------------------------------------------------
 // tamper seals — mirrors getTamperSeals.ts / logTamperSeals.ts
 // ---------------------------------------------------------------------------
 
