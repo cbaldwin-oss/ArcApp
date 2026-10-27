@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useOutletContext } from 'react-router-dom'
 import JSZip from 'jszip'
-import { Plus, Pencil, Trash2, RefreshCw, Paperclip, ExternalLink, Download, AlertTriangle, ChevronDown, ChevronUp } from 'lucide-react'
+import { Plus, Pencil, Trash2, RefreshCw, Paperclip, ExternalLink, Download, AlertTriangle, ChevronDown, ChevronUp, Ban } from 'lucide-react'
 import {
   useGetAssetOptions,
   useGetSubmittalsList,
@@ -149,6 +149,7 @@ export default function SubmittalsManager({ canEdit }: { canEdit: boolean }) {
     [submittals, statusFilter],
   )
 
+  const [settingsOpen, setSettingsOpen] = useState(false)
   const [formOpen, setFormOpen] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [form, setForm] = useState<FormState>(EMPTY_FORM)
@@ -320,6 +321,10 @@ export default function SubmittalsManager({ canEdit }: { canEdit: boolean }) {
               New Submittal
             </button>
           )}
+          <button type="button" className="wf-btn" style={{ display: 'flex', alignItems: 'center', gap: 6 }} onClick={() => setSettingsOpen((v) => !v)}>
+            <Ban style={{ width: 13, height: 13 }} />
+            Exempt Assets
+          </button>
           <button className={loading ? 'icon-btn spin' : 'icon-btn'} title="Refresh" onClick={load} aria-label="Refresh submittals">
             <RefreshCw />
           </button>
@@ -331,7 +336,7 @@ export default function SubmittalsManager({ canEdit }: { canEdit: boolean }) {
         {!canEdit ? ' · sign in as an authorized editor to add or edit' : ''}
       </div>
       <div style={{ padding: '0 20px 12px' }}>
-        <ModuleSettingsSection>
+        <ModuleSettingsSection open={settingsOpen} onOpenChange={setSettingsOpen}>
           <SubmittalExemptAssetsManager
             value={exemptAssets}
             canEdit={ctx.isAdmin}

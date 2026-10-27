@@ -481,7 +481,10 @@ There's no propagation logic to get right; it's just what "one row, many assets"
   (`SubmittalExemptAssetsManager.tsx`, moved here from the main Settings tab 2026-10-26; a
   `submittal_exempt_assets` setting) lets you mark assets that will never need one (e.g. nothing
   commissionable in that space) so they're excluded from the count entirely, rather than sitting
-  there permanently flagged as "missing."
+  there permanently flagged as "missing." An **Exempt Assets** button next to **New Submittal** in
+  the header (added 2026-10-27) jumps straight to that drawer instead of needing to find/expand the
+  page's own collapsed-by-default Settings toggle first — same controlled-open pattern Joint Packs'
+  "no destination folder set" notice already used to jump to its own Settings section.
 - **Export**: the button next to the status filter zips every *currently filtered* submittal's
   file (client-side, via `jszip` — fetches each file, bundles them, triggers one download named
   `submittals-<status>-<date>.zip`) so you can pull, say, every Approved submittal's paperwork in
