@@ -1,15 +1,8 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useOutletContext } from 'react-router-dom'
 import { Plus, Pencil, Trash2, RefreshCw } from 'lucide-react'
-import {
-  useGetAssetOptions,
-  useGetCxAlloySettingsSheet,
-  useSaveMilestone,
-  useDeleteMilestone,
-  SUBMITTAL_STATUSES,
-  type MilestoneCriterion,
-} from '../../../lib/api'
-import { useMilestonesWithProgress, describeCriterion, type ComputedMilestone } from '../milestones'
+import { useGetCxAlloySettingsSheet, useSaveMilestone, useDeleteMilestone, SUBMITTAL_STATUSES, type MilestoneCriterion } from '../../../lib/api'
+import { useMilestonesWithProgress, describeCriterion, distinctAreas, type ComputedMilestone } from '../milestones'
 import { MilestoneArc } from '../components/MilestonesPanel'
 import MilestoneCriteriaBuilder from '../components/MilestoneCriteriaBuilder'
 import { fmtDate } from '../utils'
@@ -27,13 +20,11 @@ function distinctZones(...lists: Array<Array<{ zone: string }>>): string[] {
 export default function MilestonesPage() {
   const ctx = useOutletContext<ShellContext>()
   const { computed, data, loading, error, reload } = useMilestonesWithProgress(ctx.netaTrackerEnabled)
-  const assetsFn = useGetAssetOptions()
   const cxSettingsFn = useGetCxAlloySettingsSheet()
   const saveFn = useSaveMilestone()
   const deleteFn = useDeleteMilestone()
 
   useEffect(() => {
-    void assetsFn.trigger()
     void cxSettingsFn.trigger()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
@@ -47,14 +38,15 @@ export default function MilestonesPage() {
 
   const criteriaOptions = useMemo(
     () => ({
-      assets: assetsFn.data ?? [],
+      assets: data.assetPlaces.map((p) => p.asset),
+      areas: distinctAreas(data.assetPlaces),
       checklistStatuses: cxSettingsFn.data?.checklistStatuses ?? [],
       issueStatuses: cxSettingsFn.data?.issueStatuses ?? [],
       submittalStatuses: SUBMITTAL_STATUSES,
       netaZones: distinctZones(data.neta.submissions, data.neta.returnedFiles),
       netaEnabled: ctx.netaTrackerEnabled,
     }),
-    [assetsFn.data, cxSettingsFn.data, data.neta, ctx.netaTrackerEnabled],
+    [data.assetPlaces, cxSettingsFn.data, data.neta, ctx.netaTrackerEnabled],
   )
 
   function openNew() {

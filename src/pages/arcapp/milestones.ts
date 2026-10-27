@@ -6,6 +6,7 @@ import {
   useGetOpenIssues,
   useGetSubmittalsList,
   useGetNetaTrackerData,
+  useGetAssetPlaceOptions,
   useGetMilestoneRecords,
   type ChecklistRow,
   type IssueRow,
@@ -13,6 +14,7 @@ import {
   type NetaTrackerData,
   type MilestoneCriterion,
   type MilestoneRecord,
+  type CriterionScope,
   type NetaFlag,
 } from '../../lib/api'
 import type { Milestone } from './types'
@@ -24,29 +26,45 @@ export type ModuleData = {
   issues: IssueRow[]
   submittals: Submittal[]
   neta: NetaTrackerData
+  /** Asset<->Place pairing (STY4dropdownoptions) — lets a criterion scope by area instead of
+   * listing assets one by one; see resolveScopeAssets. */
+  assetPlaces: Array<{ asset: string; place: string }>
 }
 
 const norm = (s: string) => s.trim().toLowerCase()
 
+/** Turns a criterion's scope into the concrete set of asset names it covers right now — either
+ * the explicit list, or every asset currently paired with one of the selected areas (places), so
+ * a criterion keeps tracking "everything in Electrical Room 3" as assets are added to that area
+ * rather than freezing on whatever was in it when the criterion was created. */
+function resolveScopeAssets(scope: CriterionScope, assetPlaces: Array<{ asset: string; place: string }>): Set<string> {
+  if (scope.by === 'assets') return new Set(scope.assets.map(norm))
+  const areaSet = new Set(scope.areas.map(norm))
+  if (areaSet.size === 0) return new Set()
+  const assets = new Set<string>()
+  for (const { asset, place } of assetPlaces) if (areaSet.has(norm(place))) assets.add(norm(asset))
+  return assets
+}
+
 /**
  * Checklists/Issues/Submittals criteria all reduce to the same shape: how many of the rows
- * scoped to this criterion's assets already sit in one of its target statuses. `total` is 0 (and
- * `pct` null, excluded from the milestone's average) whenever no asset is picked yet, or none of
- * the picked assets currently have any rows in that module — a misconfigured/empty criterion
+ * scoped to this criterion (by asset list or by area) already sit in one of its target statuses.
+ * `total` is 0 (and `pct` null, excluded from the milestone's average) whenever nothing's picked
+ * yet, or the scope currently matches no rows in that module — a misconfigured/empty criterion
  * shouldn't silently count as either 0% or 100% done.
  */
 export function evaluateCriterion(c: MilestoneCriterion, data: ModuleData): CriterionResult {
   switch (c.module) {
     case 'checklists':
     case 'issues': {
-      const assetSet = new Set(c.assets.map(norm))
+      const assetSet = resolveScopeAssets(c.scope, data.assetPlaces)
       const rows = c.module === 'checklists' ? data.checklists : data.issues
       const scoped = assetSet.size === 0 ? [] : rows.filter((r) => assetSet.has(norm(r.asset_name)))
       const satisfied = scoped.filter((r) => c.targetStatuses.includes(r.status)).length
       return { satisfied, total: scoped.length, pct: scoped.length === 0 ? null : (satisfied / scoped.length) * 100 }
     }
     case 'submittals': {
-      const assetSet = new Set(c.assets.map(norm))
+      const assetSet = resolveScopeAssets(c.scope, data.assetPlaces)
       const scoped = assetSet.size === 0 ? [] : data.submittals.filter((s) => s.assets.some((a) => assetSet.has(norm(a))))
       const satisfied = scoped.filter((s) => c.targetStatuses.includes(s.reviewStatus)).length
       return { satisfied, total: scoped.length, pct: scoped.length === 0 ? null : (satisfied / scoped.length) * 100 }
@@ -100,8 +118,11 @@ export const NETA_FLAGS_BY_TAB: Record<'Submissions' | 'Returned Files', NetaFla
   'Returned Files': ['technicalReview', 'stampPresent', 'netaCompleted', 'uploadedToAcc'],
 }
 
-function assetPart(assets: string[]): string {
-  return assets.length === 0 ? 'no assets picked yet' : assets.length === 1 ? assets[0] : `${assets.length} assets`
+function listPart(items: string[], noneLabel: string, nounPlural: string): string {
+  return items.length === 0 ? noneLabel : items.length === 1 ? items[0] : `${items.length} ${nounPlural}`
+}
+function scopePart(scope: CriterionScope): string {
+  return scope.by === 'areas' ? `area ${listPart(scope.areas, '(none picked yet)', 'areas')}` : listPart(scope.assets, 'no assets picked yet', 'assets')
 }
 function zonePart(zones: string[]): string {
   return zones.length === 0 ? 'all zones' : zones.length === 1 ? zones[0] : `${zones.length} zones`
@@ -116,7 +137,13 @@ const MODULE_LABEL: Record<MilestoneCriterion['module'], string> = {
 export function describeCriterion(c: MilestoneCriterion): string {
   if (c.module === 'neta') return `${MODULE_LABEL.neta} (${c.tab}) for ${zonePart(c.zones)} — ${NETA_FLAG_LABELS[c.flag]}`
   const statusPart = c.targetStatuses.length === 0 ? 'no target status picked yet' : c.targetStatuses.join(' or ')
-  return `${MODULE_LABEL[c.module]} for ${assetPart(c.assets)} reach ${statusPart}`
+  return `${MODULE_LABEL[c.module]} for ${scopePart(c.scope)} reach ${statusPart}`
+}
+
+export function distinctAreas(assetPlaces: Array<{ asset: string; place: string }>): string[] {
+  const set = new Set<string>()
+  for (const { place } of assetPlaces) if (place.trim()) set.add(place.trim())
+  return Array.from(set).sort((a, b) => a.localeCompare(b))
 }
 
 export type ComputedMilestone = MilestoneRecord & { progress: MilestoneProgress }
@@ -136,6 +163,7 @@ export function useMilestonesWithProgress(netaEnabled: boolean) {
   const openIssuesFn = useGetOpenIssues()
   const submittalsFn = useGetSubmittalsList()
   const netaFn = useGetNetaTrackerData()
+  const assetPlacesFn = useGetAssetPlaceOptions()
 
   function reload() {
     void milestonesFn.trigger()
@@ -144,6 +172,7 @@ export function useMilestonesWithProgress(netaEnabled: boolean) {
     void issuesFn.trigger()
     void openIssuesFn.trigger()
     void submittalsFn.trigger()
+    void assetPlacesFn.trigger()
     if (netaEnabled) void netaFn.trigger()
   }
 
@@ -157,6 +186,7 @@ export function useMilestonesWithProgress(netaEnabled: boolean) {
     issues: [...(issuesFn.data?.rows ?? []), ...(openIssuesFn.data?.rows ?? [])],
     submittals: submittalsFn.data ?? [],
     neta: netaFn.data ?? { submissions: [], returnedFiles: [], syncedAt: null },
+    assetPlaces: assetPlacesFn.data ?? [],
   }
 
   const computed: ComputedMilestone[] = (milestonesFn.data ?? []).map((m) => ({ ...m, progress: computeMilestoneProgress(m.criteria, data) }))

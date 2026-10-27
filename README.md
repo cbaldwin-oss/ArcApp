@@ -517,14 +517,24 @@ anymore). The Milestones page (`MilestonesPage.tsx`) is now fully editable, back
 milestone's pct/status are **computed live, every page load**, from a list of completion criteria
 instead of being set by hand.
 
-- **A criterion** scopes into one other module — Checklists, Issues, or Submittals by a set of
-  assets + which status(es) on that module count as "done" for them; or NETA Tracker by a tab
-  (Submissions/Returned Files) + zone(s) + which boolean field (Clerical Review, Technical Review,
-  NETA Completed, etc.) counts as done. `MilestoneCriteriaBuilder.tsx` is the editable list of these
-  inside the Add/Edit Milestone form; `evaluateCriterion`/`computeMilestoneProgress`
-  (`src/pages/arcapp/milestones.ts`) are the pure functions that turn `criteria` + each module's
-  current data into a result — **nothing is stored except `criteria` itself**, so there's no stale
-  pct sitting in the database disagreeing with reality.
+- **A criterion** scopes into one other module — Checklists, Issues, or Submittals by either an
+  explicit asset list **or by area** (added 2026-10-27), + which status(es) on that module count as
+  "done"; or NETA Tracker by a tab (Submissions/Returned Files) + zone(s) + which boolean field
+  (Clerical Review, Technical Review, NETA Completed, etc.) counts as done.
+  `MilestoneCriteriaBuilder.tsx` is the editable list of these inside the Add/Edit Milestone form;
+  `evaluateCriterion`/`computeMilestoneProgress` (`src/pages/arcapp/milestones.ts`) are the pure
+  functions that turn `criteria` + each module's current data into a result — **nothing is stored
+  except `criteria` itself**, so there's no stale pct sitting in the database disagreeing with
+  reality.
+  - **Scope by area**: a Checklists/Issues/Submittals criterion's "Scope by" toggle switches
+    between **Asset** (pick specific assets) and **Area** (pick one or more Places — same
+    Asset↔Place pairing from `STY4dropdownoptions` that Tamper Seal/RTFT already use to auto-fill
+    Place from Asset). An area-scoped criterion resolves to "every asset currently paired with one
+    of these Places" at evaluation time (`resolveScopeAssets` in `milestones.ts`), not a frozen
+    snapshot — an asset added to that area later is automatically picked up without editing the
+    criterion. `CriterionScope` (`{ by: 'assets', assets }` or `{ by: 'areas', areas }`,
+    `src/lib/api.ts`) replaced the old flat `assets: string[]` field; `parseMilestoneCriteria` still
+    reads the old shape from any criterion saved before this change.
 - **Combining criteria**: a milestone's overall pct is the plain average of each criterion's own
   pct (not weighted by how many items each one covers) — by request, so a milestone rests on
   several conditions clearing roughly together rather than needing every last one done before

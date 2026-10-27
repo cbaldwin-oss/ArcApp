@@ -1468,8 +1468,14 @@ export function useDeleteSubmittalRecord() {
 // upsert-by-id/delete shape as Submittals above.
 // ---------------------------------------------------------------------------
 
-export type ChecklistOrIssueCriterion = { module: 'checklists' | 'issues'; assets: string[]; targetStatuses: string[] }
-export type SubmittalCriterion = { module: 'submittals'; assets: string[]; targetStatuses: string[] }
+// A Checklists/Issues/Submittals criterion scopes to either an explicit asset list, or every
+// asset whose Place (STY4dropdownoptions' Asset<->Place pairing — same source Tamper Seal/RTFT
+// already use to auto-fill Place from Asset) is one of the selected areas, so a criterion can
+// track "everything in Electrical Room 3" without enumerating each asset in it by hand, and picks
+// up assets added to that area later automatically.
+export type CriterionScope = { by: 'assets'; assets: string[] } | { by: 'areas'; areas: string[] }
+export type ChecklistOrIssueCriterion = { module: 'checklists' | 'issues'; scope: CriterionScope; targetStatuses: string[] }
+export type SubmittalCriterion = { module: 'submittals'; scope: CriterionScope; targetStatuses: string[] }
 export type NetaFlag = 'clericalReview' | 'submittedToGoogle' | 'technicalReview' | 'stampPresent' | 'netaCompleted' | 'uploadedToAcc'
 export type NetaCriterion = { module: 'neta'; tab: NetaTab; zones: string[]; flag: NetaFlag }
 export type MilestoneCriterion = ChecklistOrIssueCriterion | SubmittalCriterion | NetaCriterion
@@ -1486,7 +1492,16 @@ export type MilestoneRecord = {
 
 function parseMilestoneCriteria(raw: unknown): MilestoneCriterion[] {
   if (!Array.isArray(raw)) return []
-  return raw.filter((c): c is MilestoneCriterion => !!c && typeof c === 'object' && typeof (c as { module?: unknown }).module === 'string')
+  return raw
+    .filter((c): c is Record<string, unknown> => !!c && typeof c === 'object' && typeof (c as { module?: unknown }).module === 'string')
+    .map((c) => {
+      // Pre-area-scoping criteria stored `assets: string[]` directly instead of `scope` — wrap
+      // those into the current shape so milestones saved before this change still evaluate.
+      if (c.module !== 'neta' && !c.scope && Array.isArray(c.assets)) {
+        return { ...c, scope: { by: 'assets', assets: c.assets } }
+      }
+      return c
+    }) as MilestoneCriterion[]
 }
 
 async function getMilestoneRecords(): Promise<MilestoneRecord[]> {

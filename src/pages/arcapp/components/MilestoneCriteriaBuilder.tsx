@@ -12,11 +12,12 @@ const MODULE_LABEL: Record<MilestoneCriterion['module'], string> = {
 
 function defaultCriterion(module: MilestoneCriterion['module']): MilestoneCriterion {
   if (module === 'neta') return { module: 'neta', tab: 'Submissions', zones: [], flag: 'submittedToGoogle' }
-  return { module, assets: [], targetStatuses: [] }
+  return { module, scope: { by: 'assets', assets: [] }, targetStatuses: [] }
 }
 
 type Options = {
   assets: string[]
+  areas: string[]
   checklistStatuses: string[]
   issueStatuses: string[]
   submittalStatuses: readonly string[]
@@ -126,14 +127,44 @@ export default function MilestoneCriteriaBuilder({
               </div>
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                <MultiSelectPicker
-                  label={`Assets (${c.assets.length} selected)`}
-                  options={options.assets}
-                  selected={c.assets}
-                  onChange={(assets) => updateAt(i, { ...c, assets })}
-                  placeholder="Search assets…"
-                  disabled={disabled}
-                />
+                <div className="ts-filter-group">
+                  <span className="ts-filter-label">Scope by:</span>
+                  <button
+                    type="button"
+                    className={`ts-filter-btn${c.scope.by === 'assets' ? ' active' : ''}`}
+                    disabled={disabled}
+                    onClick={() => updateAt(i, { ...c, scope: { by: 'assets', assets: [] } })}
+                  >
+                    Asset
+                  </button>
+                  <button
+                    type="button"
+                    className={`ts-filter-btn${c.scope.by === 'areas' ? ' active' : ''}`}
+                    disabled={disabled}
+                    onClick={() => updateAt(i, { ...c, scope: { by: 'areas', areas: [] } })}
+                  >
+                    Area
+                  </button>
+                </div>
+                {c.scope.by === 'assets' ? (
+                  <MultiSelectPicker
+                    label={`Assets (${c.scope.assets.length} selected)`}
+                    options={options.assets}
+                    selected={c.scope.assets}
+                    onChange={(assets) => updateAt(i, { ...c, scope: { by: 'assets', assets } })}
+                    placeholder="Search assets…"
+                    disabled={disabled}
+                  />
+                ) : (
+                  <MultiSelectPicker
+                    label={`Areas (${c.scope.areas.length} selected)`}
+                    options={options.areas}
+                    selected={c.scope.areas}
+                    onChange={(areas) => updateAt(i, { ...c, scope: { by: 'areas', areas } })}
+                    placeholder="Search areas… (every asset placed there counts)"
+                    disabled={disabled}
+                  />
+                )}
                 <MultiSelectPicker
                   label={`Target status (${c.targetStatuses.length} selected)`}
                   options={statusOptionsFor(c.module)}
