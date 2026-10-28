@@ -236,15 +236,19 @@ different spreadsheet from CxAlloy's. `useGetJointPackData`/`useLogJointPackPhot
     folder's sharing setting in Drive before suspecting the code.
 - **Photo Gallery view** (added 2026-10-28) — a **View: Asset List / Photo Gallery** toggle above
   the asset search switches away from the original one-asset-at-a-time drill-down to a single
-  filterable grid of every saved photo across every asset and Joint Pack # at once
-  (`JointPackGallery` in `JointPackPhotosPanel.tsx`), each tile showing the same Drive thumbnail the
-  per-row dropdown does, labeled with its asset/Joint Pack #/side and linking to the full photo.
-  Filterable by a **Side** toggle (All/Top/Side/Bottom — reusing `FilterButtonGroup`, pulled out of
-  `TamperSealLogPanel.tsx` into its own file so both can share the same multi-select toggle-button
-  look) and a free-text search across asset name + Joint Pack #. Only sides that actually have a
-  saved photo appear — there's nothing to show for an outstanding one. Plain page state, not a
-  persisted setting, same as the search box next to it: it's a personal view preference that
-  resets when you leave the page, not project configuration.
+  filterable list of every saved photo across every asset and Joint Pack # at once
+  (`JointPackGallery` in `JointPackPhotosPanel.tsx`): one row per asset+Joint Pack #, its asset name
+  and Joint Pack # stacked on their own lines to the left, and that pack's saved photos (same Drive
+  thumbnail the per-row dropdown shows, each linking to the full photo) laid out to the right —
+  rather than repeating the asset/pack label once per photo, which is how this first shipped before
+  being reworked the same day into the current grouped-row layout. Filterable by a **Side** toggle
+  (All/Top/Side/Bottom — reusing `FilterButtonGroup`, pulled out of `TamperSealLogPanel.tsx` into
+  its own file so both can share the same multi-select toggle-button look) and a free-text search
+  across asset name + Joint Pack #; a pack with no saved photos left after filtering drops its whole
+  row rather than showing one with nothing in it. Only sides that actually have a saved photo appear
+  at all — there's nothing to show for an outstanding one. Plain page state, not a persisted
+  setting, same as the search box next to it: it's a personal view preference that resets when you
+  leave the page, not project configuration.
 - **Logging a photo** compresses it client-side (`compressImageFile` in `utils.ts` — downscaled to
   1600px, JPEG ~0.82 quality, to keep uploads fast on-site) then POSTs it to the Apps Script, which
   uploads it to Drive (via `DriveApp`, running as the script's own account — no per-user Google

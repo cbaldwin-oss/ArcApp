@@ -268,22 +268,25 @@ export default function JointPackPhotosPanel() {
   )
 }
 
-type GalleryTile = { asset: string; jointPackNumber: string; side: JointPackSide; url: string }
+type GalleryPhoto = { side: JointPackSide; url: string }
+type GalleryGroup = { asset: string; jointPackNumber: string; photos: GalleryPhoto[] }
 
-/** Every saved photo across every asset/Joint Pack #, flattened into one filterable grid — the
- * "Photo Gallery" view alongside the original per-asset drill-down ("Asset List"). Only sides that
- * actually have a saved photo show up here; there's nothing useful to show for an outstanding one. */
+/** Every saved photo across every asset/Joint Pack #, grouped one row per asset+pack — the "Photo
+ * Gallery" view alongside the original per-asset drill-down ("Asset List"). The asset name and
+ * Joint Pack # stack on their own lines to the left of that pack's photos, rather than repeating
+ * the label once per photo. Only sides that actually have a saved photo show up; there's nothing
+ * useful to show for an outstanding one, and a group with none left after filtering drops out
+ * entirely rather than showing an empty row. */
 function JointPackGallery({ rows }: { rows: JointPackRow[] }) {
   const [search, setSearch] = useState('')
   const [sideFilter, setSideFilter] = useState<Set<string>>(new Set([ALL]))
 
-  const tiles = useMemo(() => {
-    const out: GalleryTile[] = []
+  const groups = useMemo(() => {
+    const out: GalleryGroup[] = []
     for (const r of rows) {
       const urls = sideUrls(r)
-      for (const side of SIDES) {
-        if (urls[side]) out.push({ asset: r.asset, jointPackNumber: r.jointPackNumber, side, url: urls[side] })
-      }
+      const photos = SIDES.filter((side) => urls[side]).map((side) => ({ side, url: urls[side] }))
+      if (photos.length > 0) out.push({ asset: r.asset, jointPackNumber: r.jointPackNumber, photos })
     }
     return out
   }, [rows])
@@ -291,13 +294,13 @@ function JointPackGallery({ rows }: { rows: JointPackRow[] }) {
   const q = search.trim().toLowerCase()
   const filtered = useMemo(
     () =>
-      tiles.filter((t) => {
-        if (!sideFilter.has(ALL) && !sideFilter.has(t.side)) return false
-        if (q && !`${t.asset} ${t.jointPackNumber}`.toLowerCase().includes(q)) return false
-        return true
-      }),
-    [tiles, sideFilter, q],
+      groups
+        .map((g) => ({ ...g, photos: sideFilter.has(ALL) ? g.photos : g.photos.filter((p) => sideFilter.has(p.side)) }))
+        .filter((g) => g.photos.length > 0 && (!q || `${g.asset} ${g.jointPackNumber}`.toLowerCase().includes(q))),
+    [groups, sideFilter, q],
   )
+  const totalPhotos = useMemo(() => groups.reduce((n, g) => n + g.photos.length, 0), [groups])
+  const filteredPhotos = filtered.reduce((n, g) => n + g.photos.length, 0)
 
   return (
     <div>
@@ -312,24 +315,28 @@ function JointPackGallery({ rows }: { rows: JointPackRow[] }) {
         />
       </div>
       <div className="q-hint" style={{ margin: '10px 0' }}>
-        {filtered.length} photo{filtered.length === 1 ? '' : 's'}
-        {tiles.length !== filtered.length ? ` of ${tiles.length}` : ''}
+        {filteredPhotos} photo{filteredPhotos === 1 ? '' : 's'}
+        {totalPhotos !== filteredPhotos ? ` of ${totalPhotos}` : ''}
       </div>
       {filtered.length === 0 ? (
         <div className="table-empty">No saved photos match.</div>
       ) : (
-        <div className="jp-gallery-grid">
-          {filtered.map((t) => (
-            <a key={`${t.asset}::${t.jointPackNumber}::${t.side}`} href={t.url} target="_blank" rel="noopener noreferrer" className="jp-gallery-card">
-              <img src={driveThumbnailUrl(t.url)} alt={`${t.asset} ${t.jointPackNumber} ${t.side}`} className="jp-gallery-thumb" />
-              <div className="jp-gallery-meta">
-                <span className="jp-gallery-asset">{t.asset}</span>
-                <span className="jp-gallery-pack">{t.jointPackNumber}</span>
-                <span className="status-chip complete" style={{ alignSelf: 'flex-start' }}>
-                  {t.side}
-                </span>
+        <div className="jp-gallery-list">
+          {filtered.map((g) => (
+            <div key={`${g.asset}::${g.jointPackNumber}`} className="jp-gallery-row">
+              <div className="jp-gallery-label">
+                <span className="jp-gallery-asset">{g.asset}</span>
+                <span className="jp-gallery-pack">{g.jointPackNumber}</span>
               </div>
-            </a>
+              <div className="jp-gallery-photos">
+                {g.photos.map((p) => (
+                  <a key={p.side} href={p.url} target="_blank" rel="noopener noreferrer" className="jp-gallery-photo">
+                    <img src={driveThumbnailUrl(p.url)} alt={`${g.asset} ${g.jointPackNumber} ${p.side}`} className="jp-gallery-thumb" />
+                    <span className="jp-gallery-side">{p.side}</span>
+                  </a>
+                ))}
+              </div>
+            </div>
           ))}
         </div>
       )}
