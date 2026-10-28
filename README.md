@@ -220,6 +220,11 @@ different spreadsheet from CxAlloy's. `useGetJointPackData`/`useLogJointPackPhot
   `Settings` tab's asset list to show, per asset, whether it hasn't been started at all, still has
   outstanding sides, or is fully photographed — then drills into a specific asset to show each
   Joint Pack #'s Top/Side/Bottom status individually.
+- **Saved photo previews** (added 2026-10-28): expanding a Joint Pack #'s **Log Photos** dropdown
+  shows an actual thumbnail (`.jp-saved-thumb`, linking to the full photo on Drive) above each
+  side's file picker when a photo's already saved for it, instead of just the collapsed row's small
+  "✓" text link — so opening it to check what's already on file (or decide whether it needs
+  replacing) doesn't require clicking through to Drive first.
 - **Logging a photo** compresses it client-side (`compressImageFile` in `utils.ts` — downscaled to
   1600px, JPEG ~0.82 quality, to keep uploads fast on-site) then POSTs it to the Apps Script, which
   uploads it to Drive (via `DriveApp`, running as the script's own account — no per-user Google

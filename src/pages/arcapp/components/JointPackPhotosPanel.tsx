@@ -447,8 +447,13 @@ function JointPackRowItem({
               <div className="form-field" key={side} style={{ marginBottom: 0 }}>
                 <label>
                   {side}
-                  {urls[side] ? ' (replace)' : ''}
+                  {urls[side] ? ' (saved — pick a file to replace)' : ''}
                 </label>
+                {urls[side] && (
+                  <a href={urls[side]} target="_blank" rel="noopener noreferrer">
+                    <img src={urls[side]} alt={`${side} — saved photo`} className="jp-saved-thumb" />
+                  </a>
+                )}
                 <input type="file" accept="image/*" onChange={(e) => void pickFile(side, e.target.files?.[0] ?? null)} />
               </div>
             ))}
