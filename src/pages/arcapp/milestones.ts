@@ -97,16 +97,30 @@ export type MilestoneProgress = {
   configured: boolean
 }
 
+export type StatusThresholds = { complete: number; go: number; caution: number }
+export const DEFAULT_STATUS_THRESHOLDS: StatusThresholds = { complete: 100, go: 70, caution: 40 }
+
+/** pct >= thresholds.complete → Complete, else >= thresholds.go → Go, else >= thresholds.caution
+ * → Caution, else Hold — checked in that order, so if thresholds are set out of order (e.g.
+ * caution higher than go) the higher one just never gets reached from below. Configurable from the
+ * Milestones page's own Settings drawer (Settings → milestone_*_threshold). */
+function statusForPct(pct: number, thresholds: StatusThresholds): Milestone['status'] {
+  if (pct >= thresholds.complete) return 'complete'
+  if (pct >= thresholds.go) return 'go'
+  if (pct >= thresholds.caution) return 'caution'
+  return 'hold'
+}
+
 /** Weighted-average-of-criteria-pct, each criterion weighted equally (not by item count) — picked
  * over all-or-nothing so a milestone resting on, say, 3 criteria shows real partial progress
  * instead of staying at 0% until the very last one clears. Criteria with no matching items (see
  * evaluateCriterion) are left out of the average rather than counted as 0 or 100. */
-export function computeMilestoneProgress(criteria: MilestoneCriterion[], data: ModuleData): MilestoneProgress {
+export function computeMilestoneProgress(criteria: MilestoneCriterion[], data: ModuleData, thresholds: StatusThresholds): MilestoneProgress {
   if (criteria.length === 0) return { pct: 0, status: 'hold', label: 'NO CRITERIA', results: [], configured: false }
   const results = criteria.map((c) => evaluateCriterion(c, data))
   const valid = results.filter((r): r is CriterionResult & { pct: number } => r.pct !== null)
   const pct = valid.length === 0 ? 0 : Math.round(valid.reduce((sum, r) => sum + r.pct, 0) / valid.length)
-  const status: Milestone['status'] = pct >= 100 ? 'complete' : pct >= 70 ? 'go' : pct >= 40 ? 'caution' : 'hold'
+  const status = statusForPct(pct, thresholds)
   const label = status === 'complete' ? 'COMPLETE' : status.toUpperCase()
   return { pct, status, label, results, configured: true }
 }
@@ -162,7 +176,7 @@ export type ComputedMilestone = MilestoneRecord & { progress: MilestoneProgress 
  * into a live computed pct/status. `netaEnabled` gates the NETA fetch since getNetaTrackerData()
  * throws outright when the project hasn't configured it (see getNetaScriptUrl in api.ts).
  */
-export function useMilestonesWithProgress(netaEnabled: boolean) {
+export function useMilestonesWithProgress(netaEnabled: boolean, thresholds: StatusThresholds = DEFAULT_STATUS_THRESHOLDS) {
   const milestonesFn = useGetMilestoneRecords()
   const checklistsFn = useGetChecklists()
   const openChecklistsFn = useGetOpenChecklists()
@@ -196,7 +210,7 @@ export function useMilestonesWithProgress(netaEnabled: boolean) {
     assetPlaces: assetPlacesFn.data ?? [],
   }
 
-  const computed: ComputedMilestone[] = (milestonesFn.data ?? []).map((m) => ({ ...m, progress: computeMilestoneProgress(m.criteria, data) }))
+  const computed: ComputedMilestone[] = (milestonesFn.data ?? []).map((m) => ({ ...m, progress: computeMilestoneProgress(m.criteria, data, thresholds) }))
 
   return {
     computed,

@@ -19,8 +19,13 @@ export default function DashboardPage() {
 
   // Milestones used to be hardcoded sample data here — now the same live, criteria-driven
   // progress the Milestones page itself computes (see useMilestonesWithProgress), so the two never
-  // disagree about what's actually complete.
-  const { computed: milestoneRows } = useMilestonesWithProgress(ctx.netaTrackerEnabled)
+  // disagree about what's actually complete. Same configured status thresholds too, not the
+  // function's hardcoded fallback, so a status shown here always matches the Milestones page.
+  const { computed: milestoneRows } = useMilestonesWithProgress(ctx.netaTrackerEnabled, {
+    complete: ctx.milestoneCompleteThreshold,
+    go: ctx.milestoneGoThreshold,
+    caution: ctx.milestoneCautionThreshold,
+  })
   const dashboardMilestones = milestoneRows.map((m) => ({
     name: m.name,
     pct: m.progress.pct,

@@ -148,6 +148,9 @@ export default function AppShell() {
         netaSubmissionsDefaultAssignee?: DefaultAssignee
         netaReturnedDefaultAssignee?: DefaultAssignee
         cxalloyLinkBaseOverride?: string
+        milestoneCompleteThreshold?: number
+        milestoneGoThreshold?: number
+        milestoneCautionThreshold?: number
       }
     | undefined
   const jointPackFolder = settingsData?.jointPackPhotosFolder ?? ''
@@ -169,6 +172,9 @@ export default function AppShell() {
   const netaSubmissionsDefaultAssignee = settingsData?.netaSubmissionsDefaultAssignee ?? { teamId: null, email: null, name: null }
   const netaReturnedDefaultAssignee = settingsData?.netaReturnedDefaultAssignee ?? { teamId: null, email: null, name: null }
   const cxalloyLinkBaseOverride = settingsData?.cxalloyLinkBaseOverride ?? ''
+  const milestoneCompleteThreshold = settingsData?.milestoneCompleteThreshold ?? 100
+  const milestoneGoThreshold = settingsData?.milestoneGoThreshold ?? 70
+  const milestoneCautionThreshold = settingsData?.milestoneCautionThreshold ?? 40
   const cxAlloyLinkBaseDetected = (cxAlloyLinkBaseFn.data as { domain: string; projectId: string } | null | undefined) ?? null
   // A manual Settings override always wins over auto-detection — see getCxAlloyLinkBase in
   // api.ts for why auto-detection alone can come back null (no Equipment Tracker data synced yet
@@ -384,6 +390,9 @@ export default function AppShell() {
     cxAlloyLinkBase,
     cxAlloyLinkBaseDetected,
     cxalloyLinkBaseOverride,
+    milestoneCompleteThreshold,
+    milestoneGoThreshold,
+    milestoneCautionThreshold,
     settingsLoading: settingsFn.loading,
     onSaveSetting: saveSetting,
     onSaveDefaultAssignee: saveDefaultAssignee,

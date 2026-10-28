@@ -544,10 +544,19 @@ instead of being set by hand.
 - **Combining criteria**: a milestone's overall pct is the plain average of each criterion's own
   pct (not weighted by how many items each one covers) — by request, so a milestone rests on
   several conditions clearing roughly together rather than needing every last one done before
-  showing any progress. Status is then derived from that pct: 100% → Complete, ≥70% → Go, ≥40% →
-  Caution, else Hold. A criterion with zero matching items (nothing picked yet, or the picked
+  showing any progress. A criterion with zero matching items (nothing picked yet, or the picked
   assets/zone have no rows in that module) is left out of the average entirely rather than counted
   as 0% or 100% — a misconfigured criterion shouldn't silently look either done or stuck.
+- **Status thresholds are configurable** (added 2026-10-28), not fixed — the Milestones page has its
+  own **Status Thresholds** button/Settings drawer (`MilestoneStatusThresholdsManager.tsx`, admin-
+  only like every other per-module Settings control) with three pct inputs: Complete, Go, and
+  Caution (anything below Caution is Hold). Checked in that order — `statusForPct` in
+  `src/pages/arcapp/milestones.ts` — so pct ≥ Complete wins first, then ≥ Go, then ≥ Caution, else
+  Hold; keeping them in descending order (Complete ≥ Go ≥ Caution) is on the admin, same as the
+  in-app hint says. Stored as three more `arcapp_settings` rows (`milestone_complete_threshold`/
+  `milestone_go_threshold`/`milestone_caution_threshold`), defaulting to 100/70/40 — the fixed
+  values this app shipped with before they were editable — so nothing changes for a project that
+  never touches this setting.
 - **Checklists/Issues criteria see every status, not just "Ready"/"for review"**: `useGetChecklists`/
   `useGetOpenChecklists` (and the Issues equivalents) are fetched and merged together to get the
   complete current set of rows regardless of status, since a criterion might target any status, not

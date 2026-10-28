@@ -1,10 +1,12 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useOutletContext } from 'react-router-dom'
-import { Plus, Pencil, Trash2, RefreshCw } from 'lucide-react'
+import { Plus, Pencil, Trash2, RefreshCw, Settings as SettingsIcon } from 'lucide-react'
 import { useGetCxAlloySettingsSheet, useSaveMilestone, useDeleteMilestone, SUBMITTAL_STATUSES, type MilestoneCriterion } from '../../../lib/api'
-import { useMilestonesWithProgress, describeCriterion, distinctAreas, type ComputedMilestone } from '../milestones'
+import { useMilestonesWithProgress, describeCriterion, distinctAreas, type ComputedMilestone, type StatusThresholds } from '../milestones'
 import { MilestoneArc } from '../components/MilestonesPanel'
 import MilestoneCriteriaBuilder from '../components/MilestoneCriteriaBuilder'
+import MilestoneStatusThresholdsManager from '../components/MilestoneStatusThresholdsManager'
+import ModuleSettingsSection from '../components/ModuleSettingsSection'
 import { fmtDate } from '../utils'
 import type { ShellContext } from '../ShellContext'
 
@@ -19,7 +21,12 @@ function distinctZones(...lists: Array<Array<{ zone: string }>>): string[] {
 
 export default function MilestonesPage() {
   const ctx = useOutletContext<ShellContext>()
-  const { computed, data, loading, error, reload } = useMilestonesWithProgress(ctx.netaTrackerEnabled)
+  const thresholds: StatusThresholds = {
+    complete: ctx.milestoneCompleteThreshold,
+    go: ctx.milestoneGoThreshold,
+    caution: ctx.milestoneCautionThreshold,
+  }
+  const { computed, data, loading, error, reload } = useMilestonesWithProgress(ctx.netaTrackerEnabled, thresholds)
   const cxSettingsFn = useGetCxAlloySettingsSheet()
   const saveFn = useSaveMilestone()
   const deleteFn = useDeleteMilestone()
@@ -35,6 +42,15 @@ export default function MilestonesPage() {
   const [formError, setFormError] = useState('')
   const [saving, setSaving] = useState(false)
   const [deleteId, setDeleteId] = useState<string | null>(null)
+  const [settingsOpen, setSettingsOpen] = useState(false)
+
+  async function saveThresholds(next: StatusThresholds) {
+    await Promise.all([
+      ctx.onSaveSetting('milestone_complete_threshold', String(next.complete)),
+      ctx.onSaveSetting('milestone_go_threshold', String(next.go)),
+      ctx.onSaveSetting('milestone_caution_threshold', String(next.caution)),
+    ])
+  }
 
   const criteriaOptions = useMemo(
     () => ({
@@ -114,6 +130,15 @@ export default function MilestonesPage() {
               New Milestone
             </button>
           )}
+          <button
+            type="button"
+            className="wf-btn"
+            style={{ display: 'flex', alignItems: 'center', gap: 6 }}
+            onClick={() => setSettingsOpen((v) => !v)}
+          >
+            <SettingsIcon style={{ width: 13, height: 13 }} />
+            Status Thresholds
+          </button>
           <button className={loading ? 'icon-btn spin' : 'icon-btn'} title="Refresh" onClick={reload} aria-label="Refresh milestones">
             <RefreshCw />
           </button>
@@ -123,6 +148,11 @@ export default function MilestonesPage() {
         A milestone's % is computed automatically from its completion criteria — pulled live from
         Checklists, Issues, Submittals, and NETA Tracker — not set by hand.
         {!canEdit ? ' · sign in as an authorized editor to add or edit' : ''}
+      </div>
+      <div style={{ padding: '0 20px 12px' }}>
+        <ModuleSettingsSection open={settingsOpen} onOpenChange={setSettingsOpen}>
+          <MilestoneStatusThresholdsManager value={thresholds} canEdit={ctx.isAdmin} loading={ctx.settingsLoading} onSave={saveThresholds} />
+        </ModuleSettingsSection>
       </div>
 
       <div className="panel-body">

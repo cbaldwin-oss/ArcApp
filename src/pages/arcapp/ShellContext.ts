@@ -93,6 +93,12 @@ export type ShellContext = {
    * Settings next to the override field so it's visible without opening dev tools. */
   cxAlloyLinkBaseDetected: CxAlloyLinkBase | null
   cxalloyLinkBaseOverride: string
+  /** Milestone pct → status thresholds, editable from the Milestones page's own Settings drawer —
+   * see computeMilestoneProgress in src/pages/arcapp/milestones.ts, the only thing that reads
+   * these. Defaults (100/70/40) match what shipped before they were configurable. */
+  milestoneCompleteThreshold: number
+  milestoneGoThreshold: number
+  milestoneCautionThreshold: number
   settingsLoading: boolean
   onSaveSetting: (key: string, value: string) => Promise<void>
   onSaveDefaultAssignee: (prefix: string, result: DefaultAssignee) => Promise<void>

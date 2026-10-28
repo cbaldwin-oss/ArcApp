@@ -1210,11 +1210,27 @@ export type AppSettings = {
    * finds the wrong one. AppShell.tsx logs/resolves the effective value here so it's visible
    * without opening dev tools. */
   cxalloyLinkBaseOverride: string
+  /** Milestone pct → status thresholds (Milestones page's own Settings drawer, added 2026-10-28)
+   * — a milestone's status is Complete at/above `milestoneCompleteThreshold`, else Go at/above
+   * `milestoneGoThreshold`, else Caution at/above `milestoneCautionThreshold`, else Hold. See
+   * computeMilestoneProgress in src/pages/arcapp/milestones.ts, which is the only thing that reads
+   * these. Defaults (100/70/40) match the thresholds this app shipped with before they were
+   * configurable. */
+  milestoneCompleteThreshold: number
+  milestoneGoThreshold: number
+  milestoneCautionThreshold: number
 }
 const SETTINGS_DEFAULTS = {
   checklistReadyStatuses: ['Finished'],
   issueReviewStatuses: ['Pending Verification'],
   submittalExemptAssets: [] as string[],
+  milestoneCompleteThreshold: 100,
+  milestoneGoThreshold: 70,
+  milestoneCautionThreshold: 40,
+}
+function parseThreshold(v: string | undefined, fallback: number): number {
+  const n = Number(v)
+  return v && Number.isFinite(n) ? n : fallback
 }
 function splitCsv(v: string | undefined, fallback: string[]): string[] {
   if (v === undefined || v === null) return fallback
@@ -1252,6 +1268,9 @@ async function getSettings(): Promise<AppSettings> {
     netaSubmissionsDefaultAssignee: parseDefaultAssignee(map, 'neta_submissions_default_assignee'),
     netaReturnedDefaultAssignee: parseDefaultAssignee(map, 'neta_returned_default_assignee'),
     cxalloyLinkBaseOverride: map.get('cxalloy_link_base_override') ?? '',
+    milestoneCompleteThreshold: parseThreshold(map.get('milestone_complete_threshold'), SETTINGS_DEFAULTS.milestoneCompleteThreshold),
+    milestoneGoThreshold: parseThreshold(map.get('milestone_go_threshold'), SETTINGS_DEFAULTS.milestoneGoThreshold),
+    milestoneCautionThreshold: parseThreshold(map.get('milestone_caution_threshold'), SETTINGS_DEFAULTS.milestoneCautionThreshold),
   }
 }
 export function useGetSettings() {
@@ -1286,6 +1305,9 @@ const ALLOWED_SETTING_KEYS = new Set([
   'neta_returned_default_assignee_email',
   'neta_returned_default_assignee_name',
   'cxalloy_link_base_override',
+  'milestone_complete_threshold',
+  'milestone_go_threshold',
+  'milestone_caution_threshold',
 ])
 async function saveSetting(params: { key: string; value: string }): Promise<{ key: string; value: string }> {
   if (!ALLOWED_SETTING_KEYS.has(params.key)) throw new Error(`Unknown setting key: ${params.key}`)
