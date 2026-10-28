@@ -21,17 +21,18 @@ export default function DashboardPage() {
   // progress the Milestones page itself computes (see useMilestonesWithProgress), so the two never
   // disagree about what's actually complete. Same configured status thresholds too, not the
   // function's hardcoded fallback, so a status shown here always matches the Milestones page.
-  const { computed: milestoneRows } = useMilestonesWithProgress(ctx.netaTrackerEnabled, {
-    complete: ctx.milestoneCompleteThreshold,
-    go: ctx.milestoneGoThreshold,
-    caution: ctx.milestoneCautionThreshold,
-  })
+  const { computed: milestoneRows } = useMilestonesWithProgress(
+    ctx.netaTrackerEnabled,
+    { complete: ctx.milestoneCompleteThreshold, go: ctx.milestoneGoThreshold, caution: ctx.milestoneCautionThreshold },
+    ctx.milestoneStatusStyles,
+  )
   const dashboardMilestones = milestoneRows.map((m) => ({
     name: m.name,
     pct: m.progress.pct,
     due: m.dueDate ? fmtDate(m.dueDate) : 'No due date',
     status: m.progress.status,
     label: m.progress.label,
+    color: m.progress.color,
   }))
 
   // "Your To-Dos" personalizes once someone's signed in (mine + my teams'); falls back to every

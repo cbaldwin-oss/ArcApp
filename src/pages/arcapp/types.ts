@@ -49,6 +49,9 @@ export type Milestone = {
   due: string
   status: 'go' | 'caution' | 'hold' | 'complete'
   label: string
+  /** Hex color for this milestone's current status — configurable per status bucket (Milestones
+   * page's own Settings drawer), not fixed by `status` alone. */
+  color: string
 }
 
 export type ActivityAnswer = {

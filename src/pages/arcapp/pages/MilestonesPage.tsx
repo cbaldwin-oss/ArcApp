@@ -1,11 +1,12 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useOutletContext } from 'react-router-dom'
 import { Plus, Pencil, Trash2, RefreshCw, Settings as SettingsIcon } from 'lucide-react'
-import { useGetCxAlloySettingsSheet, useSaveMilestone, useDeleteMilestone, SUBMITTAL_STATUSES, type MilestoneCriterion } from '../../../lib/api'
+import { useGetCxAlloySettingsSheet, useSaveMilestone, useDeleteMilestone, SUBMITTAL_STATUSES, type MilestoneCriterion, type MilestoneStatusStyles } from '../../../lib/api'
 import { useMilestonesWithProgress, describeCriterion, distinctAreas, type ComputedMilestone, type StatusThresholds } from '../milestones'
 import { MilestoneArc } from '../components/MilestonesPanel'
 import MilestoneCriteriaBuilder from '../components/MilestoneCriteriaBuilder'
 import MilestoneStatusThresholdsManager from '../components/MilestoneStatusThresholdsManager'
+import MilestoneStatusStylesManager from '../components/MilestoneStatusStylesManager'
 import ModuleSettingsSection from '../components/ModuleSettingsSection'
 import { fmtDate } from '../utils'
 import type { ShellContext } from '../ShellContext'
@@ -26,7 +27,8 @@ export default function MilestonesPage() {
     go: ctx.milestoneGoThreshold,
     caution: ctx.milestoneCautionThreshold,
   }
-  const { computed, data, loading, error, reload } = useMilestonesWithProgress(ctx.netaTrackerEnabled, thresholds)
+  const styles = ctx.milestoneStatusStyles
+  const { computed, data, loading, error, reload } = useMilestonesWithProgress(ctx.netaTrackerEnabled, thresholds, styles)
   const cxSettingsFn = useGetCxAlloySettingsSheet()
   const saveFn = useSaveMilestone()
   const deleteFn = useDeleteMilestone()
@@ -50,6 +52,10 @@ export default function MilestonesPage() {
       ctx.onSaveSetting('milestone_go_threshold', String(next.go)),
       ctx.onSaveSetting('milestone_caution_threshold', String(next.caution)),
     ])
+  }
+
+  async function saveStyles(next: MilestoneStatusStyles) {
+    await ctx.onSaveSetting('milestone_status_styles', JSON.stringify(next))
   }
 
   const criteriaOptions = useMemo(
@@ -137,7 +143,7 @@ export default function MilestonesPage() {
             onClick={() => setSettingsOpen((v) => !v)}
           >
             <SettingsIcon style={{ width: 13, height: 13 }} />
-            Status Thresholds
+            Milestone Statuses
           </button>
           <button className={loading ? 'icon-btn spin' : 'icon-btn'} title="Refresh" onClick={reload} aria-label="Refresh milestones">
             <RefreshCw />
@@ -152,6 +158,7 @@ export default function MilestonesPage() {
       <div style={{ padding: '0 20px 12px' }}>
         <ModuleSettingsSection open={settingsOpen} onOpenChange={setSettingsOpen}>
           <MilestoneStatusThresholdsManager value={thresholds} canEdit={ctx.isAdmin} loading={ctx.settingsLoading} onSave={saveThresholds} />
+          <MilestoneStatusStylesManager value={styles} canEdit={ctx.isAdmin} loading={ctx.settingsLoading} onSave={saveStyles} />
         </ModuleSettingsSection>
       </div>
 
@@ -216,11 +223,13 @@ export default function MilestonesPage() {
             <div className="milestone-list">
               {computed.map((m) => (
                 <div key={m.id} className="milestone-item" style={{ alignItems: 'flex-start' }}>
-                  <MilestoneArc pct={m.progress.pct} status={m.progress.status} />
+                  <MilestoneArc pct={m.progress.pct} status={m.progress.status} color={m.progress.color} />
                   <div className="milestone-main">
                     <p className="milestone-name">{m.name}</p>
                     <div className="milestone-meta">
-                      <span className={`status-chip ${m.progress.status}`}>{m.progress.label}</span>
+                      <span className="status-chip" style={{ color: m.progress.color, background: `${m.progress.color}24` }}>
+                        {m.progress.label}
+                      </span>
                       <span className="milestone-date">{m.dueDate ? fmtDate(m.dueDate) : 'No due date'}</span>
                     </div>
                     {m.criteria.length > 0 ? (

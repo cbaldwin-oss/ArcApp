@@ -548,15 +548,26 @@ instead of being set by hand.
   assets/zone have no rows in that module) is left out of the average entirely rather than counted
   as 0% or 100% — a misconfigured criterion shouldn't silently look either done or stuck.
 - **Status thresholds are configurable** (added 2026-10-28), not fixed — the Milestones page has its
-  own **Status Thresholds** button/Settings drawer (`MilestoneStatusThresholdsManager.tsx`, admin-
-  only like every other per-module Settings control) with three pct inputs: Complete, Go, and
-  Caution (anything below Caution is Hold). Checked in that order — `statusForPct` in
-  `src/pages/arcapp/milestones.ts` — so pct ≥ Complete wins first, then ≥ Go, then ≥ Caution, else
-  Hold; keeping them in descending order (Complete ≥ Go ≥ Caution) is on the admin, same as the
-  in-app hint says. Stored as three more `arcapp_settings` rows (`milestone_complete_threshold`/
-  `milestone_go_threshold`/`milestone_caution_threshold`), defaulting to 100/70/40 — the fixed
-  values this app shipped with before they were editable — so nothing changes for a project that
-  never touches this setting.
+  own **Milestone Statuses** button/Settings drawer (admin-only like every other per-module
+  Settings control), split into two pieces:
+  - `MilestoneStatusThresholdsManager.tsx` — three pct inputs: Complete, Go, and Caution (anything
+    below Caution is Hold). Checked in that order — `statusForPct` in
+    `src/pages/arcapp/milestones.ts` — so pct ≥ Complete wins first, then ≥ Go, then ≥ Caution, else
+    Hold; keeping them in descending order (Complete ≥ Go ≥ Caution) is on the admin, same as the
+    in-app hint says. Stored as three `arcapp_settings` rows (`milestone_complete_threshold`/
+    `milestone_go_threshold`/`milestone_caution_threshold`), defaulting to 100/70/40 — the fixed
+    values this app shipped with before they were editable.
+  - `MilestoneStatusStylesManager.tsx` (added 2026-10-28) — what each of the four buckets is
+    actually called and colored (a text label + a native color picker per bucket, e.g. relabel
+    "Hold" to "Blocked" or pick project-specific colors), separate from which bucket a milestone
+    falls into — that's still decided by the thresholds above. Stored as one JSON-encoded
+    `arcapp_settings` row (`milestone_status_styles`, parsed/validated by
+    `parseMilestoneStatusStyles` in `src/lib/api.ts`, falling back to the default label/color per
+    bucket on anything malformed) rather than eight separate keys. `computeMilestoneProgress` now
+    returns a `color` alongside `label`, and both the Milestones page and the Dashboard widget
+    render the status chip/progress ring from that color via inline style instead of the old fixed
+    CSS modifier classes (`status-chip.go`/`.caution`/etc.), which only ever supported the built-in
+    palette.
 - **Checklists/Issues criteria see every status, not just "Ready"/"for review"**: `useGetChecklists`/
   `useGetOpenChecklists` (and the Issues equivalents) are fetched and merged together to get the
   complete current set of rows regardless of status, since a criterion might target any status, not

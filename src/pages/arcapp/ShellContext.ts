@@ -1,5 +1,5 @@
 import type { ScheduleRow, ScheduleState, Team, TeamMember, Todo } from './types'
-import type { CxAlloyLinkBase, DefaultAssignee, TaskInput } from '../../lib/api'
+import type { CxAlloyLinkBase, DefaultAssignee, TaskInput, MilestoneStatusStyles } from '../../lib/api'
 import type { OpenItemsData } from './components/OpenItemsTodoPanel'
 
 /**
@@ -99,6 +99,9 @@ export type ShellContext = {
   milestoneCompleteThreshold: number
   milestoneGoThreshold: number
   milestoneCautionThreshold: number
+  /** Per-status label text + color (Milestones page's own Settings drawer) — see
+   * computeMilestoneProgress in src/pages/arcapp/milestones.ts, the only thing that reads these. */
+  milestoneStatusStyles: MilestoneStatusStyles
   settingsLoading: boolean
   onSaveSetting: (key: string, value: string) => Promise<void>
   onSaveDefaultAssignee: (prefix: string, result: DefaultAssignee) => Promise<void>

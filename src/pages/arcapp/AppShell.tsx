@@ -7,7 +7,8 @@ import {
   useGetSettings, useSaveSetting, useSaveDefaultAssignee, useGetWorkflows, useGetWorkflowItems, useGetCxAlloyLinkBase, parseCxAlloyLinkBase,
   useGetTasks, useSaveTask, useSetTaskDone, useDeleteTask, useGetTeams, useSaveTeam, useDeleteTeam,
 } from '../../lib/api'
-import type { TaskInput, DefaultAssignee } from '../../lib/api'
+import type { TaskInput, DefaultAssignee, MilestoneStatusStyles } from '../../lib/api'
+import { DEFAULT_MILESTONE_STATUS_STYLES } from '../../lib/api'
 import type { WorkflowItem } from './workflowItems'
 import type { ShellContext } from './ShellContext'
 import type { ScheduleRow, ScheduleState, ActivityAnswer, Todo, Team, TeamMember } from './types'
@@ -151,6 +152,7 @@ export default function AppShell() {
         milestoneCompleteThreshold?: number
         milestoneGoThreshold?: number
         milestoneCautionThreshold?: number
+        milestoneStatusStyles?: MilestoneStatusStyles
       }
     | undefined
   const jointPackFolder = settingsData?.jointPackPhotosFolder ?? ''
@@ -175,6 +177,7 @@ export default function AppShell() {
   const milestoneCompleteThreshold = settingsData?.milestoneCompleteThreshold ?? 100
   const milestoneGoThreshold = settingsData?.milestoneGoThreshold ?? 70
   const milestoneCautionThreshold = settingsData?.milestoneCautionThreshold ?? 40
+  const milestoneStatusStyles = settingsData?.milestoneStatusStyles ?? DEFAULT_MILESTONE_STATUS_STYLES
   const cxAlloyLinkBaseDetected = (cxAlloyLinkBaseFn.data as { domain: string; projectId: string } | null | undefined) ?? null
   // A manual Settings override always wins over auto-detection — see getCxAlloyLinkBase in
   // api.ts for why auto-detection alone can come back null (no Equipment Tracker data synced yet
@@ -393,6 +396,7 @@ export default function AppShell() {
     milestoneCompleteThreshold,
     milestoneGoThreshold,
     milestoneCautionThreshold,
+    milestoneStatusStyles,
     settingsLoading: settingsFn.loading,
     onSaveSetting: saveSetting,
     onSaveDefaultAssignee: saveDefaultAssignee,

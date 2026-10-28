@@ -16,6 +16,8 @@ import {
   type MilestoneRecord,
   type CriterionScope,
   type NetaFlag,
+  type MilestoneStatusStyles,
+  DEFAULT_MILESTONE_STATUS_STYLES,
 } from '../../lib/api'
 import type { Milestone } from './types'
 
@@ -92,6 +94,7 @@ export type MilestoneProgress = {
   pct: number
   status: Milestone['status']
   label: string
+  color: string
   results: CriterionResult[]
   /** false for a milestone with zero criteria yet — distinct from a configured one that's just at 0%. */
   configured: boolean
@@ -115,14 +118,19 @@ function statusForPct(pct: number, thresholds: StatusThresholds): Milestone['sta
  * over all-or-nothing so a milestone resting on, say, 3 criteria shows real partial progress
  * instead of staying at 0% until the very last one clears. Criteria with no matching items (see
  * evaluateCriterion) are left out of the average rather than counted as 0 or 100. */
-export function computeMilestoneProgress(criteria: MilestoneCriterion[], data: ModuleData, thresholds: StatusThresholds): MilestoneProgress {
-  if (criteria.length === 0) return { pct: 0, status: 'hold', label: 'NO CRITERIA', results: [], configured: false }
+export function computeMilestoneProgress(
+  criteria: MilestoneCriterion[],
+  data: ModuleData,
+  thresholds: StatusThresholds,
+  styles: MilestoneStatusStyles = DEFAULT_MILESTONE_STATUS_STYLES,
+): MilestoneProgress {
+  if (criteria.length === 0) return { pct: 0, status: 'hold', label: 'NO CRITERIA', color: styles.hold.color, results: [], configured: false }
   const results = criteria.map((c) => evaluateCriterion(c, data))
   const valid = results.filter((r): r is CriterionResult & { pct: number } => r.pct !== null)
   const pct = valid.length === 0 ? 0 : Math.round(valid.reduce((sum, r) => sum + r.pct, 0) / valid.length)
   const status = statusForPct(pct, thresholds)
-  const label = status === 'complete' ? 'COMPLETE' : status.toUpperCase()
-  return { pct, status, label, results, configured: true }
+  const style = styles[status]
+  return { pct, status, label: style.label, color: style.color, results, configured: true }
 }
 
 export const NETA_FLAG_LABELS: Record<NetaFlag, string> = {
@@ -176,7 +184,11 @@ export type ComputedMilestone = MilestoneRecord & { progress: MilestoneProgress 
  * into a live computed pct/status. `netaEnabled` gates the NETA fetch since getNetaTrackerData()
  * throws outright when the project hasn't configured it (see getNetaScriptUrl in api.ts).
  */
-export function useMilestonesWithProgress(netaEnabled: boolean, thresholds: StatusThresholds = DEFAULT_STATUS_THRESHOLDS) {
+export function useMilestonesWithProgress(
+  netaEnabled: boolean,
+  thresholds: StatusThresholds = DEFAULT_STATUS_THRESHOLDS,
+  styles: MilestoneStatusStyles = DEFAULT_MILESTONE_STATUS_STYLES,
+) {
   const milestonesFn = useGetMilestoneRecords()
   const checklistsFn = useGetChecklists()
   const openChecklistsFn = useGetOpenChecklists()
@@ -210,7 +222,7 @@ export function useMilestonesWithProgress(netaEnabled: boolean, thresholds: Stat
     assetPlaces: assetPlacesFn.data ?? [],
   }
 
-  const computed: ComputedMilestone[] = (milestonesFn.data ?? []).map((m) => ({ ...m, progress: computeMilestoneProgress(m.criteria, data, thresholds) }))
+  const computed: ComputedMilestone[] = (milestonesFn.data ?? []).map((m) => ({ ...m, progress: computeMilestoneProgress(m.criteria, data, thresholds, styles) }))
 
   return {
     computed,

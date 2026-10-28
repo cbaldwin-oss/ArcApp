@@ -21,7 +21,7 @@ import { useApiFn } from './useApiFn'
 import { supabase } from './supabaseClient'
 import { CURRENT_PROJECT, hasCapability } from './project'
 import { FALLBACK_WORKFLOW_ITEMS, type WorkflowItem } from '../pages/arcapp/workflowItems'
-import type { Team, TeamMember, Todo, TaskTag } from '../pages/arcapp/types'
+import type { Team, TeamMember, Todo, TaskTag, Milestone } from '../pages/arcapp/types'
 
 // The active LaunchPad project (site) — see src/lib/project.ts. Every table-name template below
 // (STY4dropdownoptions, STY4BackEndData, STY4authorized_editors, etc.) reads this instead of a
@@ -1219,6 +1219,20 @@ export type AppSettings = {
   milestoneCompleteThreshold: number
   milestoneGoThreshold: number
   milestoneCautionThreshold: number
+  /** The label text and color shown for each milestone status bucket (Milestones page's Settings
+   * drawer, added 2026-10-28) — e.g. relabel "Hold" to "Blocked" or pick a project-specific color,
+   * instead of the fixed GO/CAUTION/HOLD/COMPLETE text and green/amber/red colors this shipped
+   * with. Read by computeMilestoneProgress (src/pages/arcapp/milestones.ts), which is the only
+   * thing that looks these up. */
+  milestoneStatusStyles: MilestoneStatusStyles
+}
+export type MilestoneStatusStyle = { label: string; color: string }
+export type MilestoneStatusStyles = Record<Milestone['status'], MilestoneStatusStyle>
+export const DEFAULT_MILESTONE_STATUS_STYLES: MilestoneStatusStyles = {
+  complete: { label: 'COMPLETE', color: '#3fe382' },
+  go: { label: 'GO', color: '#3fe382' },
+  caution: { label: 'CAUTION', color: '#f0a840' },
+  hold: { label: 'HOLD', color: '#ff5c56' },
 }
 const SETTINGS_DEFAULTS = {
   checklistReadyStatuses: ['Finished'],
@@ -1227,10 +1241,28 @@ const SETTINGS_DEFAULTS = {
   milestoneCompleteThreshold: 100,
   milestoneGoThreshold: 70,
   milestoneCautionThreshold: 40,
+  milestoneStatusStyles: DEFAULT_MILESTONE_STATUS_STYLES,
 }
 function parseThreshold(v: string | undefined, fallback: number): number {
   const n = Number(v)
   return v && Number.isFinite(n) ? n : fallback
+}
+const HEX_COLOR_RE = /^#[0-9a-fA-F]{6}$/
+function parseMilestoneStatusStyles(v: string | undefined): MilestoneStatusStyles {
+  if (!v) return DEFAULT_MILESTONE_STATUS_STYLES
+  try {
+    const parsed = JSON.parse(v) as Partial<Record<Milestone['status'], Partial<MilestoneStatusStyle>>>
+    const out = { ...DEFAULT_MILESTONE_STATUS_STYLES }
+    for (const key of Object.keys(out) as Array<Milestone['status']>) {
+      const entry = parsed[key]
+      const label = typeof entry?.label === 'string' && entry.label.trim() ? entry.label.trim() : out[key].label
+      const color = typeof entry?.color === 'string' && HEX_COLOR_RE.test(entry.color) ? entry.color : out[key].color
+      out[key] = { label, color }
+    }
+    return out
+  } catch {
+    return DEFAULT_MILESTONE_STATUS_STYLES
+  }
 }
 function splitCsv(v: string | undefined, fallback: string[]): string[] {
   if (v === undefined || v === null) return fallback
@@ -1271,6 +1303,7 @@ async function getSettings(): Promise<AppSettings> {
     milestoneCompleteThreshold: parseThreshold(map.get('milestone_complete_threshold'), SETTINGS_DEFAULTS.milestoneCompleteThreshold),
     milestoneGoThreshold: parseThreshold(map.get('milestone_go_threshold'), SETTINGS_DEFAULTS.milestoneGoThreshold),
     milestoneCautionThreshold: parseThreshold(map.get('milestone_caution_threshold'), SETTINGS_DEFAULTS.milestoneCautionThreshold),
+    milestoneStatusStyles: parseMilestoneStatusStyles(map.get('milestone_status_styles')),
   }
 }
 export function useGetSettings() {
@@ -1308,6 +1341,7 @@ const ALLOWED_SETTING_KEYS = new Set([
   'milestone_complete_threshold',
   'milestone_go_threshold',
   'milestone_caution_threshold',
+  'milestone_status_styles',
 ])
 async function saveSetting(params: { key: string; value: string }): Promise<{ key: string; value: string }> {
   if (!ALLOWED_SETTING_KEYS.has(params.key)) throw new Error(`Unknown setting key: ${params.key}`)
