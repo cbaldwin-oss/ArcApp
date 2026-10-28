@@ -79,6 +79,23 @@ export function parseSealNumberParts(value: string): { prefix: string; num: stri
 }
 
 /**
+ * Google Drive "view" URLs — `https://drive.google.com/file/d/<id>/view...`, what
+ * `DriveApp.getUrl()` returns in the Joint Pack Photos Apps Script — serve an HTML viewer page,
+ * not raw image bytes, so using one directly as an `<img src>` just shows a broken-image icon
+ * (it still works fine as a link's `href`, opened in a new tab, which is why that was never
+ * noticed before an actual inline thumbnail was added). This pulls the file ID out of whichever
+ * Drive URL shape it's given and builds the `thumbnail` endpoint instead, which does serve real
+ * image bytes. Falls back to the original URL untouched if no file ID can be found, so a link that
+ * isn't a Drive URL at all just renders as before (broken img, working href) instead of breaking
+ * further.
+ */
+export function driveThumbnailUrl(url: string): string {
+  const match = url.match(/\/d\/([a-zA-Z0-9_-]+)/) ?? url.match(/[?&]id=([a-zA-Z0-9_-]+)/)
+  const id = match?.[1]
+  return id ? `https://drive.google.com/thumbnail?id=${id}&sz=w1000` : url
+}
+
+/**
  * Downscales + JPEG-compresses a photo before it's base64'd into a Joint Pack Photo upload —
  * on-site cell signal is often poor and a raw phone/iPad photo can be 5-15MB, most of which is
  * far more resolution than a torque-inspection reference photo needs.

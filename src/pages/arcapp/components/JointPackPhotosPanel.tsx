@@ -5,7 +5,7 @@ import { useGetJointPackData, useLogJointPackPhotos } from '../../../lib/api'
 import type { JointPackRow, JointPackSide } from '../../../lib/api'
 import { CURRENT_PROJECT, projectLabel } from '../../../lib/project'
 import type { ShellContext } from '../ShellContext'
-import { compressImageFile } from '../utils'
+import { compressImageFile, driveThumbnailUrl } from '../utils'
 import FullscreenOverlay from './FullscreenOverlay'
 import ModuleSettingsSection from './ModuleSettingsSection'
 import { Field } from './SettingsControls'
@@ -451,7 +451,7 @@ function JointPackRowItem({
                 </label>
                 {urls[side] && (
                   <a href={urls[side]} target="_blank" rel="noopener noreferrer">
-                    <img src={urls[side]} alt={`${side} — saved photo`} className="jp-saved-thumb" />
+                    <img src={driveThumbnailUrl(urls[side])} alt={`${side} — saved photo`} className="jp-saved-thumb" />
                   </a>
                 )}
                 <input type="file" accept="image/*" onChange={(e) => void pickFile(side, e.target.files?.[0] ?? null)} />

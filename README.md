@@ -225,6 +225,15 @@ different spreadsheet from CxAlloy's. `useGetJointPackData`/`useLogJointPackPhot
   side's file picker when a photo's already saved for it, instead of just the collapsed row's small
   "✓" text link — so opening it to check what's already on file (or decide whether it needs
   replacing) doesn't require clicking through to Drive first.
+  - The URL stored in the sheet (`DriveApp.getUrl()`'s output, `https://drive.google.com/file/d/
+    <id>/view...`) is a viewer *page*, not raw image bytes — it works as a link's `href` (which is
+    all this app used it for before the thumbnail existed) but renders as a broken image if used
+    directly as an `<img src>`. `driveThumbnailUrl()` in `utils.ts` pulls the file ID out of that
+    URL and points the `<img>` at Drive's `thumbnail?id=...` endpoint instead, which does serve
+    actual image bytes, while the link itself still goes to the original viewer URL. That endpoint
+    still needs the file/folder shared as **Anyone with the link can view** to load without a
+    Google sign-in prompt — if thumbnails still show broken after this, check the destination
+    folder's sharing setting in Drive before suspecting the code.
 - **Logging a photo** compresses it client-side (`compressImageFile` in `utils.ts` — downscaled to
   1600px, JPEG ~0.82 quality, to keep uploads fast on-site) then POSTs it to the Apps Script, which
   uploads it to Drive (via `DriveApp`, running as the script's own account — no per-user Google
