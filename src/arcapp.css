@@ -896,6 +896,17 @@ html, body, #root{ margin:0; padding:0; min-height:100%; background:#05070d; }
 .arcapp .ts-seal-btn.active-approve{ color:var(--green-soft); background:var(--green-tint); border-color:var(--green-dim); }
 .arcapp .ts-seal-btn.active-deny{ color:var(--red); background:var(--red-tint); border-color:var(--red); }
 
+.arcapp .jp-gallery-grid{ display:grid; grid-template-columns:repeat(auto-fill, minmax(150px, 1fr)); gap:14px; }
+.arcapp .jp-gallery-card{
+  display:flex; flex-direction:column; gap:6px; text-decoration:none; background:var(--bg-elev-2);
+  border:1px solid var(--border-strong); border-radius:var(--radius-sm); padding:8px; transition:border-color .15s ease;
+}
+.arcapp .jp-gallery-card:hover{ border-color:var(--green-dim); }
+.arcapp .jp-gallery-thumb{ width:100%; height:120px; border-radius:6px; object-fit:cover; display:block; }
+.arcapp .jp-gallery-meta{ display:flex; flex-direction:column; gap:4px; }
+.arcapp .jp-gallery-asset{ font-size:12.5px; color:var(--text); font-weight:500; line-height:1.25; }
+.arcapp .jp-gallery-pack{ font-family:var(--font-mono); font-size:11px; color:var(--text-muted); }
+
 .arcapp .oi-popover{
   position:fixed; background:var(--bg-elev); border:1px solid var(--border-strong); box-shadow:var(--shadow-md);
   padding:14px; z-index:400; border-radius:var(--radius-sm); color:var(--text); font-size:13px; width:260px;

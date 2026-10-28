@@ -9,6 +9,7 @@ import { compressImageFile, driveThumbnailUrl } from '../utils'
 import FullscreenOverlay from './FullscreenOverlay'
 import ModuleSettingsSection from './ModuleSettingsSection'
 import { Field } from './SettingsControls'
+import FilterButtonGroup, { ALL, toggleFilterValue } from './FilterButtonGroup'
 
 const MAX_CAPTURE_DIM = 1600
 const CAPTURE_QUALITY = 0.82
@@ -68,6 +69,11 @@ export default function JointPackPhotosPanel() {
   const [search, setSearch] = useState('')
   const [selectedAsset, setSelectedAsset] = useState<string | null>(null)
   const [cameraOpen, setCameraOpen] = useState(false)
+  // "Asset List" drills into one asset at a time (the original flow); "Photo Gallery" (added
+  // 2026-10-28) shows every saved photo across every asset/pack at once, filterable, for scanning
+  // what's already on file without clicking into each asset individually. Plain page state, not a
+  // persisted setting — it's a personal view preference, same as the search box next to it.
+  const [viewMode, setViewMode] = useState<'assets' | 'gallery'>('assets')
 
   const filteredAssets = useMemo(() => {
     const f = search.trim().toLowerCase()
@@ -175,59 +181,75 @@ export default function JointPackPhotosPanel() {
 
         {state === 'ready' && (
           <>
-            <div className="form-field" style={{ maxWidth: 420, marginTop: 18 }}>
-              <label>Find an asset ({assets.length} tracked)</label>
-              <input
-                type="text"
-                placeholder="e.g. MDA-ROW-1, PNM-ROW-12..."
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-              />
+            <div className="ts-filter-group" style={{ marginTop: 18, marginBottom: 16 }}>
+              <span className="ts-filter-label">View:</span>
+              <button type="button" className={`ts-filter-btn${viewMode === 'assets' ? ' active' : ''}`} onClick={() => setViewMode('assets')}>
+                Asset List
+              </button>
+              <button type="button" className={`ts-filter-btn${viewMode === 'gallery' ? ' active' : ''}`} onClick={() => setViewMode('gallery')}>
+                Photo Gallery
+              </button>
             </div>
 
-            <div className="wf-order-list" style={{ maxHeight: 280, overflowY: 'auto', marginBottom: 20 }}>
-              {filteredAssets.length === 0 && <div className="wf-order-empty">No assets match.</div>}
-              {filteredAssets.map((a) => {
-                const assetRowsForA = rowsByAsset.get(a) ?? []
-                const started = assetRowsForA.length > 0
-                const outstanding = assetRowsForA.reduce((sum, r) => sum + outstandingCount(r), 0)
-                return (
-                  <button
-                    key={a}
-                    type="button"
-                    className="wf-order-item"
-                    style={{
-                      width: '100%',
-                      textAlign: 'left',
-                      cursor: 'pointer',
-                      border: 'none',
-                      background: selectedAsset === a ? 'var(--green-tint)' : 'transparent',
-                    }}
-                    onClick={() => setSelectedAsset(a)}
-                  >
-                    <span className="wf-order-label">{a}</span>
-                    {!started ? (
-                      <span className="wf-tag-disabled">not started</span>
-                    ) : outstanding > 0 ? (
-                      <span className="status-chip caution">
-                        {outstanding} side{outstanding === 1 ? '' : 's'} needed
-                      </span>
-                    ) : (
-                      <span className="status-chip complete">complete</span>
-                    )}
-                  </button>
-                )
-              })}
-            </div>
+            {viewMode === 'gallery' ? (
+              <JointPackGallery rows={rows} />
+            ) : (
+              <>
+                <div className="form-field" style={{ maxWidth: 420 }}>
+                  <label>Find an asset ({assets.length} tracked)</label>
+                  <input
+                    type="text"
+                    placeholder="e.g. MDA-ROW-1, PNM-ROW-12..."
+                    value={search}
+                    onChange={(e) => setSearch(e.target.value)}
+                  />
+                </div>
 
-            {selectedAsset && (
-              <JointPackAssetDetail
-                asset={selectedAsset}
-                building={building}
-                rows={assetRows}
-                folderId={folder}
-                onLogged={() => void fn.trigger()}
-              />
+                <div className="wf-order-list" style={{ maxHeight: 280, overflowY: 'auto', marginBottom: 20 }}>
+                  {filteredAssets.length === 0 && <div className="wf-order-empty">No assets match.</div>}
+                  {filteredAssets.map((a) => {
+                    const assetRowsForA = rowsByAsset.get(a) ?? []
+                    const started = assetRowsForA.length > 0
+                    const outstanding = assetRowsForA.reduce((sum, r) => sum + outstandingCount(r), 0)
+                    return (
+                      <button
+                        key={a}
+                        type="button"
+                        className="wf-order-item"
+                        style={{
+                          width: '100%',
+                          textAlign: 'left',
+                          cursor: 'pointer',
+                          border: 'none',
+                          background: selectedAsset === a ? 'var(--green-tint)' : 'transparent',
+                        }}
+                        onClick={() => setSelectedAsset(a)}
+                      >
+                        <span className="wf-order-label">{a}</span>
+                        {!started ? (
+                          <span className="wf-tag-disabled">not started</span>
+                        ) : outstanding > 0 ? (
+                          <span className="status-chip caution">
+                            {outstanding} side{outstanding === 1 ? '' : 's'} needed
+                          </span>
+                        ) : (
+                          <span className="status-chip complete">complete</span>
+                        )}
+                      </button>
+                    )
+                  })}
+                </div>
+
+                {selectedAsset && (
+                  <JointPackAssetDetail
+                    asset={selectedAsset}
+                    building={building}
+                    rows={assetRows}
+                    folderId={folder}
+                    onLogged={() => void fn.trigger()}
+                  />
+                )}
+              </>
             )}
           </>
         )}
@@ -243,6 +265,75 @@ export default function JointPackPhotosPanel() {
         />
       )}
     </section>
+  )
+}
+
+type GalleryTile = { asset: string; jointPackNumber: string; side: JointPackSide; url: string }
+
+/** Every saved photo across every asset/Joint Pack #, flattened into one filterable grid — the
+ * "Photo Gallery" view alongside the original per-asset drill-down ("Asset List"). Only sides that
+ * actually have a saved photo show up here; there's nothing useful to show for an outstanding one. */
+function JointPackGallery({ rows }: { rows: JointPackRow[] }) {
+  const [search, setSearch] = useState('')
+  const [sideFilter, setSideFilter] = useState<Set<string>>(new Set([ALL]))
+
+  const tiles = useMemo(() => {
+    const out: GalleryTile[] = []
+    for (const r of rows) {
+      const urls = sideUrls(r)
+      for (const side of SIDES) {
+        if (urls[side]) out.push({ asset: r.asset, jointPackNumber: r.jointPackNumber, side, url: urls[side] })
+      }
+    }
+    return out
+  }, [rows])
+
+  const q = search.trim().toLowerCase()
+  const filtered = useMemo(
+    () =>
+      tiles.filter((t) => {
+        if (!sideFilter.has(ALL) && !sideFilter.has(t.side)) return false
+        if (q && !`${t.asset} ${t.jointPackNumber}`.toLowerCase().includes(q)) return false
+        return true
+      }),
+    [tiles, sideFilter, q],
+  )
+
+  return (
+    <div>
+      <div className="ts-filters">
+        <FilterButtonGroup label="Side" options={[ALL, ...SIDES]} selected={sideFilter} onToggle={(v) => setSideFilter((cur) => toggleFilterValue(cur, v))} />
+        <input
+          type="text"
+          className="ts-search"
+          placeholder="Search asset or Joint Pack #…"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+        />
+      </div>
+      <div className="q-hint" style={{ margin: '10px 0' }}>
+        {filtered.length} photo{filtered.length === 1 ? '' : 's'}
+        {tiles.length !== filtered.length ? ` of ${tiles.length}` : ''}
+      </div>
+      {filtered.length === 0 ? (
+        <div className="table-empty">No saved photos match.</div>
+      ) : (
+        <div className="jp-gallery-grid">
+          {filtered.map((t) => (
+            <a key={`${t.asset}::${t.jointPackNumber}::${t.side}`} href={t.url} target="_blank" rel="noopener noreferrer" className="jp-gallery-card">
+              <img src={driveThumbnailUrl(t.url)} alt={`${t.asset} ${t.jointPackNumber} ${t.side}`} className="jp-gallery-thumb" />
+              <div className="jp-gallery-meta">
+                <span className="jp-gallery-asset">{t.asset}</span>
+                <span className="jp-gallery-pack">{t.jointPackNumber}</span>
+                <span className="status-chip complete" style={{ alignSelf: 'flex-start' }}>
+                  {t.side}
+                </span>
+              </div>
+            </a>
+          ))}
+        </div>
+      )}
+    </div>
   )
 }
 

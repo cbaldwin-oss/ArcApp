@@ -234,6 +234,17 @@ different spreadsheet from CxAlloy's. `useGetJointPackData`/`useLogJointPackPhot
     still needs the file/folder shared as **Anyone with the link can view** to load without a
     Google sign-in prompt — if thumbnails still show broken after this, check the destination
     folder's sharing setting in Drive before suspecting the code.
+- **Photo Gallery view** (added 2026-10-28) — a **View: Asset List / Photo Gallery** toggle above
+  the asset search switches away from the original one-asset-at-a-time drill-down to a single
+  filterable grid of every saved photo across every asset and Joint Pack # at once
+  (`JointPackGallery` in `JointPackPhotosPanel.tsx`), each tile showing the same Drive thumbnail the
+  per-row dropdown does, labeled with its asset/Joint Pack #/side and linking to the full photo.
+  Filterable by a **Side** toggle (All/Top/Side/Bottom — reusing `FilterButtonGroup`, pulled out of
+  `TamperSealLogPanel.tsx` into its own file so both can share the same multi-select toggle-button
+  look) and a free-text search across asset name + Joint Pack #. Only sides that actually have a
+  saved photo appear — there's nothing to show for an outstanding one. Plain page state, not a
+  persisted setting, same as the search box next to it: it's a personal view preference that
+  resets when you leave the page, not project configuration.
 - **Logging a photo** compresses it client-side (`compressImageFile` in `utils.ts` — downscaled to
   1600px, JPEG ~0.82 quality, to keep uploads fast on-site) then POSTs it to the Apps Script, which
   uploads it to Drive (via `DriveApp`, running as the script's own account — no per-user Google
@@ -418,7 +429,8 @@ editable grid → "Confirm & Save" flow as always, writing to the same `STY4Asse
   above the table: multi-select **Location** and **Status** toggle-button groups (both default to
   "All"; clicking a specific value drops "All" and toggles that value, clicking "All" clears back
   to just "All", emptying the set falls back to "All" rather than matching nothing —
-  `toggleFilterValue` in `TamperSealLogPanel.tsx`) plus a free-text **search** across asset/
+  `toggleFilterValue`, now in its own `FilterButtonGroup.tsx` — moved out of this file 2026-10-28
+  so Joint Pack Photos' gallery filters could reuse it too) plus a free-text **search** across asset/
   location/seal #/sub area/notes/signoff. Deliberately multi-select toggle buttons rather than the
   single-select dropdowns Checklists/Issues/Submittals use elsewhere in this app — that's
   LaunchPad's own UX for this specific page, matched as asked rather than homogenized to ArcApp's

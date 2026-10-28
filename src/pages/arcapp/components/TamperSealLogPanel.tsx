@@ -8,6 +8,7 @@ import { hasCapability } from '../../../lib/project'
 import TamperSealSection from './TamperSealSection'
 import AssetPicker from './AssetPicker'
 import CapabilityNotice from './CapabilityNotice'
+import FilterButtonGroup, { ALL, toggleFilterValue } from './FilterButtonGroup'
 import type { ShellContext } from '../ShellContext'
 
 type SealRow = {
@@ -27,39 +28,6 @@ function sealStatusClass(status: string): string {
   if (t.includes('broke') || t.includes('missing') || t.includes('tamper')) return 'hold'
   if (t.includes('intact')) return 'go'
   return 'muted'
-}
-
-const ALL = 'All'
-
-/** Toggles a value in/out of a multi-select filter set, same semantics as LaunchPad's Tamper Seal
- * log filter bar: clicking "All" clears back to just {All}; clicking a specific value drops "All"
- * and toggles that value; emptying the set falls back to {All} rather than matching nothing. */
-function toggleFilterValue(current: Set<string>, value: string): Set<string> {
-  const next = new Set(current)
-  if (value === ALL) return new Set([ALL])
-  next.delete(ALL)
-  if (next.has(value)) next.delete(value)
-  else next.add(value)
-  if (next.size === 0) next.add(ALL)
-  return next
-}
-
-function FilterButtonGroup({ label, options, selected, onToggle }: { label: string; options: string[]; selected: Set<string>; onToggle: (value: string) => void }) {
-  return (
-    <div className="ts-filter-group">
-      <span className="ts-filter-label">{label}:</span>
-      {options.map((opt) => (
-        <button
-          key={opt}
-          type="button"
-          className={`ts-filter-btn${selected.has(opt) ? ' active' : ''}`}
-          onClick={() => onToggle(opt)}
-        >
-          {opt}
-        </button>
-      ))}
-    </div>
-  )
 }
 
 /** One batch submission's card — shows the request-level info once (requestor/reason/date, or
