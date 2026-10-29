@@ -102,6 +102,9 @@ export type ShellContext = {
   /** Per-status label text + color (Milestones page's own Settings drawer) — see
    * computeMilestoneProgress in src/pages/arcapp/milestones.ts, the only thing that reads these. */
   milestoneStatusStyles: MilestoneStatusStyles
+  /** This project's own dedicated Equipment Tracker Apps Script URL — see saveEquipmentTrackerSettings
+   * in api.ts for why Phase Rules specifically need it (Supabase alone isn't enough for them). */
+  equipmentTrackerScriptUrl: string
   settingsLoading: boolean
   onSaveSetting: (key: string, value: string) => Promise<void>
   onSaveDefaultAssignee: (prefix: string, result: DefaultAssignee) => Promise<void>

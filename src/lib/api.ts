@@ -589,19 +589,28 @@ export async function ocrAssetImage(params: {
 }
 
 // ---------------------------------------------------------------------------
-// Equipment Status Tracker — read-only view of LaunchPad's own L2/L3/L4 phase-tracking grid.
-// Unlike everything above, this doesn't go through Apps Script at all: LaunchPad periodically
-// syncs the underlying Google Sheet into `launchpad_equipment_tracker_data` (a GitHub Action, not
-// this app) and keeps its own editable config in `launchpad_equipment_tracker_config` — both
-// already anon-readable, shared with LaunchPad, keyed by project_key (same value as
-// CXALLOY_TABLE_PREFIX for this deployment). ArcApp only reads them; the Settings/config editor,
-// Phase Rules Engine, and status-color admin UI stay LaunchPad's to own and are not ported here.
+// Equipment Status Tracker — ArcApp's view of LaunchPad's own L2/L3/L4 phase-tracking grid.
+// The grid itself still doesn't go through Apps Script: LaunchPad periodically syncs the
+// underlying Google Sheet into `launchpad_equipment_tracker_data` (a GitHub Action, not this app),
+// and both apps just read that snapshot. System Config (phase toggles/headers, status-color lists)
+// lives purely in Supabase (`launchpad_equipment_tracker_config`) and is a plain read/write from
+// here now (added 2026-10-29, mirroring LaunchPad's own Settings modal). Phase Rules are different:
+// the actual rule EVALUATION that derives each asset's status happens entirely server-side (Apps
+// Script/Sheet-side, not in either app's own JS) keyed off the Sheet's own copy of this table, so
+// saving a rule change here also POSTs the full settings payload to that project's own dedicated
+// Equipment Tracker Apps Script (`equipmentTrackerScriptUrl` below) exactly like LaunchPad does —
+// writing `phase_rules` to Supabase alone would be inert (nothing evaluates it there) and would
+// get silently overwritten by the next scheduled Sheet sync regardless.
 // ---------------------------------------------------------------------------
 
 export type EquipmentTrackerRow = Record<string, string>
 
 export type EqPhaseRule = {
-  active?: string
+  // `active`/includeOpenCHKs`/`includeOpenGatingIssues` read as either a real boolean (what the
+  // editor now saves, matching LaunchPad's own Settings modal) or a leftover string/'TRUE'/'FALSE'
+  // from however older rows were written straight from a Sheet cell — never assume one or the
+  // other when reading these.
+  active?: string | boolean
   phase?: string
   prevStatus?: string
   maxGate?: string
@@ -610,8 +619,8 @@ export type EqPhaseRule = {
   maxGatingIssues?: string
   maxNonGatingIssues?: string
   resultingStatus?: string
-  includeOpenCHKs?: string
-  includeOpenGatingIssues?: string
+  includeOpenCHKs?: string | boolean
+  includeOpenGatingIssues?: string | boolean
   color?: string
 }
 
@@ -720,6 +729,49 @@ async function getEquipmentTrackerData(): Promise<EquipmentTrackerData> {
 }
 export function useGetEquipmentTrackerData() {
   return useApiFn(getEquipmentTrackerData)
+}
+
+export type EquipmentTrackerSettingsInput = { config: EquipmentTrackerConfig; phaseRules: EqPhaseRule[] }
+
+/**
+ * Mirrors LaunchPad's own `saveSettings()` exactly: the Supabase config upsert and the Sheet POST
+ * both carry the same combined payload (config fields + `phaseRules`) and run together, since
+ * LaunchPad's Settings modal only has the one "Save & Sync to Sheet" action, not separate buttons
+ * for config vs. rules. Supabase getting `phaseRules` too is harmless — `getEquipmentTrackerData`
+ * never reads rules from the config row, only from `launchpad_equipment_tracker_data.phase_rules`
+ * (the Sheet-synced copy), same as LaunchPad's own `fetchTrackerConfig`.
+ *
+ * If `equipmentTrackerScriptUrl` isn't set yet, the config half still saves (toggles/headers/
+ * status colors take effect immediately, since those are pure Supabase reads) but Phase Rule edits
+ * don't go anywhere real — the caller gets `syncedToSheet: false` back to surface that clearly
+ * rather than letting it look like a silent success that reverts on the next Sheet sync.
+ */
+async function saveEquipmentTrackerSettings(params: EquipmentTrackerSettingsInput): Promise<{ syncedToSheet: boolean }> {
+  const updatedBy = (await getCurrentUserEmail()) || 'admin'
+  const payload = { ...params.config, phaseRules: params.phaseRules }
+  const { equipmentTrackerScriptUrl } = await getSettings()
+
+  const [configRes, sheetRes] = await Promise.all([
+    supabase
+      .from('launchpad_equipment_tracker_config')
+      .upsert({ project_key: CXALLOY_TABLE_PREFIX, config: payload, updated_by: updatedBy }, { onConflict: 'project_key' }),
+    equipmentTrackerScriptUrl ? fetch(equipmentTrackerScriptUrl, { method: 'POST', body: JSON.stringify(payload) }) : Promise.resolve(null),
+  ])
+  if (configRes.error) throw new Error(configRes.error.message)
+  if (!sheetRes) return { syncedToSheet: false }
+
+  let sheetJson: { success?: boolean; error?: string } | null = null
+  try {
+    sheetJson = await sheetRes.json()
+  } catch {
+    // Apps Script web apps commonly return an opaque/non-JSON response on success — only a real
+    // JSON { success: false } below counts as a failure, matching LaunchPad's own handling.
+  }
+  if (sheetJson && sheetJson.success === false) throw new Error(sheetJson.error || 'Phase Rules sync to the Sheet failed.')
+  return { syncedToSheet: true }
+}
+export function useSaveEquipmentTrackerSettings() {
+  return useApiFn(saveEquipmentTrackerSettings)
 }
 
 // ---------------------------------------------------------------------------
@@ -1225,6 +1277,13 @@ export type AppSettings = {
    * with. Read by computeMilestoneProgress (src/pages/arcapp/milestones.ts), which is the only
    * thing that looks these up. */
   milestoneStatusStyles: MilestoneStatusStyles
+  /** This project's own dedicated Equipment Tracker Apps Script `/exec` URL (added 2026-10-29) —
+   * a separate, per-project deployment bound to the Equipment Tracker's own spreadsheet, NOT the
+   * shared CxAlloy script `getCxAlloyScriptUrl()` resolves. Only used by `saveEquipmentTrackerSettings`
+   * to sync Phase Rules back to the Sheet; blank by default (Phase Rules just don't sync until an
+   * admin sets this, same "wire up a new project's deployment yourself" pattern as Joint Pack
+   * Photos'/NETA Tracker's own script URL settings). */
+  equipmentTrackerScriptUrl: string
 }
 export type MilestoneStatusStyle = { label: string; color: string }
 export type MilestoneStatusStyles = Record<Milestone['status'], MilestoneStatusStyle>
@@ -1304,6 +1363,7 @@ async function getSettings(): Promise<AppSettings> {
     milestoneGoThreshold: parseThreshold(map.get('milestone_go_threshold'), SETTINGS_DEFAULTS.milestoneGoThreshold),
     milestoneCautionThreshold: parseThreshold(map.get('milestone_caution_threshold'), SETTINGS_DEFAULTS.milestoneCautionThreshold),
     milestoneStatusStyles: parseMilestoneStatusStyles(map.get('milestone_status_styles')),
+    equipmentTrackerScriptUrl: map.get('equipment_tracker_script_url') ?? '',
   }
 }
 export function useGetSettings() {
@@ -1342,6 +1402,7 @@ const ALLOWED_SETTING_KEYS = new Set([
   'milestone_go_threshold',
   'milestone_caution_threshold',
   'milestone_status_styles',
+  'equipment_tracker_script_url',
 ])
 async function saveSetting(params: { key: string; value: string }): Promise<{ key: string; value: string }> {
   if (!ALLOWED_SETTING_KEYS.has(params.key)) throw new Error(`Unknown setting key: ${params.key}`)

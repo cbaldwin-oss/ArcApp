@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { ChevronDown, ChevronUp, Eraser, FileDown, RefreshCw, Search as SearchIcon } from 'lucide-react'
+import { useOutletContext } from 'react-router-dom'
+import { ChevronDown, ChevronUp, Eraser, FileDown, RefreshCw, Search as SearchIcon, Settings as SettingsIcon } from 'lucide-react'
 import { useGetEquipmentTrackerData } from '../../../lib/api'
 import type { EqPhaseRule, EquipmentTrackerConfig, EquipmentTrackerRow } from '../../../lib/api'
 import { CURRENT_PROJECT } from '../../../lib/project'
@@ -15,6 +16,10 @@ import {
   type MaxCols,
 } from '../lib/equipmentTracker'
 import EquipmentTrackerPdfModal from './EquipmentTrackerPdfModal'
+import EquipmentTrackerSettingsModal from './EquipmentTrackerSettingsModal'
+import ModuleSettingsSection from './ModuleSettingsSection'
+import { Field } from './SettingsControls'
+import type { ShellContext } from '../ShellContext'
 
 const GATE_W = 100
 const CELL_W = 100
@@ -32,12 +37,15 @@ type RowMeta = {
 const COLUMN_LABELS = ['Asset', 'Area', 'L2 Gate', 'L2 Status', 'L3 Gate', 'L3 Status', 'L4 Gate', 'L4 Status', 'Open Issues']
 
 /**
- * Read-only Equipment Status Tracker grid — ported from LaunchPad's equipment-tracker-view.js
- * (see that file's header comment for the full backstory). Reads the same periodically-synced
- * Supabase tables LaunchPad's own tracker reads; no new backend, and no write path — the Settings
- * modal (phase toggles, status-color lists, Phase Rules Engine) stays LaunchPad's to edit.
+ * Equipment Status Tracker grid — ported from LaunchPad's equipment-tracker-view.js (see that
+ * file's header comment for the full backstory). Reads the same periodically-synced Supabase
+ * tables LaunchPad's own tracker reads. System Config + Phase Rules Engine (EquipmentTrackerSettingsModal)
+ * mirror LaunchPad's own Settings modal in full as of 2026-10-29 — see the Equipment Status
+ * Tracker section in api.ts for why Phase Rules specifically need an Apps Script round trip to
+ * actually take effect, not just a Supabase write.
  */
 export default function EquipmentTrackerPanel() {
+  const ctx = useOutletContext<ShellContext>()
   const fn = useGetEquipmentTrackerData()
   useEffect(() => {
     void fn.trigger()
@@ -58,6 +66,8 @@ export default function EquipmentTrackerPanel() {
   const [debouncedSearch, setDebouncedSearch] = useState('')
   const [searchIndex, setSearchIndex] = useState(0)
   const [pdfOpen, setPdfOpen] = useState(false)
+  const [settingsOpen, setSettingsOpen] = useState(false)
+  const [configModalOpen, setConfigModalOpen] = useState(false)
   const rowRefs = useRef(new Map<RowMeta, HTMLDivElement>())
 
   useEffect(() => {
@@ -301,14 +311,33 @@ export default function EquipmentTrackerPanel() {
             <FileDown style={{ width: 14, height: 14 }} />
             Export PDF
           </button>
+          {ctx.isAdmin && config && (
+            <button type="button" className="wf-btn" style={{ display: 'flex', alignItems: 'center', gap: 6 }} onClick={() => setConfigModalOpen(true)}>
+              <SettingsIcon style={{ width: 13, height: 13 }} />
+              System Config
+            </button>
+          )}
           <button className={fn.loading ? 'icon-btn spin' : 'icon-btn'} title="Refresh" onClick={() => void fn.trigger()} aria-label="Refresh">
             <RefreshCw />
           </button>
         </div>
       </div>
       <div className="sync-note">
-        Read-only view of LaunchPad&apos;s own Equipment Status Tracker (L2/L3/L4 phase tracking, synced from the project sheet). Settings
-        and the Phase Rules Engine stay LaunchPad&apos;s to edit.
+        Mirrors LaunchPad&apos;s own Equipment Status Tracker (L2/L3/L4 phase tracking, synced from
+        the project sheet) — grid, filtering, search, PDF export, and (for admins) System Config +
+        the Phase Rules Engine.
+      </div>
+      <div style={{ padding: '0 20px 12px' }}>
+        <ModuleSettingsSection open={settingsOpen} onOpenChange={setSettingsOpen}>
+          <Field
+            label="Equipment Tracker — Apps Script Web App URL"
+            hint="This project's own dedicated Equipment Tracker deployment's /exec URL (separate from the shared CxAlloy script) — needed so Phase Rules saved from System Config actually sync to the Sheet instead of just sitting in Supabase."
+            initial={ctx.equipmentTrackerScriptUrl}
+            canEdit={ctx.isAdmin}
+            loading={ctx.settingsLoading}
+            onSave={(v) => ctx.onSaveSetting('equipment_tracker_script_url', v)}
+          />
+        </ModuleSettingsSection>
       </div>
 
       <div className="panel-body no-pad">
@@ -534,6 +563,16 @@ export default function EquipmentTrackerPanel() {
           config={config}
           siteLabel={CURRENT_PROJECT}
           onClose={() => setPdfOpen(false)}
+        />
+      )}
+
+      {configModalOpen && config && (
+        <EquipmentTrackerSettingsModal
+          config={config}
+          phaseRules={phaseRules}
+          scriptUrlSet={!!ctx.equipmentTrackerScriptUrl}
+          onClose={() => setConfigModalOpen(false)}
+          onSaved={() => void fn.trigger()}
         />
       )}
     </section>

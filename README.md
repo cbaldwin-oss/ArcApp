@@ -701,26 +701,27 @@ just gives ArcApp its own window into data LaunchPad's version already reads and
   processed or saved against production** during verification, to avoid writing test data/photos
   under a real asset's name.
 
-## Equipment Status Tracker (read-only, LaunchPad's own data)
+## Equipment Status Tracker (mirrors LaunchPad's own module)
 
-A read-only ArcApp view of LaunchPad's Equipment Status Tracker grid — the L2 Verification /
-L3 Functional / L4 Integrated phase-tracking board, ported from LaunchPad's
-`equipment-tracker-view.js` shadow-DOM component (`EquipmentTrackerPanel.tsx`,
-`EquipmentTrackerPdfModal.tsx`, `lib/equipmentTracker.ts`) and restyled to fit ArcApp's dark theme
-instead of copying LaunchPad's light-green one.
+ArcApp's view of LaunchPad's Equipment Status Tracker grid — the L2 Verification / L3 Functional /
+L4 Integrated phase-tracking board, ported from LaunchPad's `equipment-tracker-view.js` shadow-DOM
+component (`EquipmentTrackerPanel.tsx`, `EquipmentTrackerPdfModal.tsx`,
+`EquipmentTrackerSettingsModal.tsx`, `lib/equipmentTracker.ts`) and restyled to fit ArcApp's dark
+theme instead of copying LaunchPad's light-green one. Originally shipped read-only; as of
+2026-10-29 the System Config + Phase Rules Engine editors are ported too, so this page is now a
+full mirror rather than a read-only view.
 
-- **No new backend.** Unlike the CxAlloy/Joint Pack/Asset Attributes features above, this doesn't
-  call Apps Script at all — it reads `launchpad_equipment_tracker_data` and
-  `launchpad_equipment_tracker_config` directly from Supabase, the same tables LaunchPad's own
-  tracker reads. LaunchPad periodically syncs the underlying Google Sheet into the `data` table
-  itself (a GitHub Action, not this app); both tables were already anon-readable and shared, so
-  this page needed zero schema/RLS changes.
+- **Grid data has no new backend.** This still doesn't call Apps Script to *read* the grid — it
+  reads `launchpad_equipment_tracker_data` and `launchpad_equipment_tracker_config` directly from
+  Supabase, the same tables LaunchPad's own tracker reads. LaunchPad periodically syncs the
+  underlying Google Sheet into the `data` table itself (a GitHub Action, not this app); both tables
+  were already anon-readable and shared, so the read side needed zero schema/RLS changes.
 - **Grid**: sticky-header, horizontally + vertically scrolling table — frozen Asset/Area columns,
   then L2/L3/L4 phase groups (Gate CL column(s) + a colored Overall Status summary, each
   expandable to show every individual Support CL), then an Asset Issues group (colored open-issue
   summary, expandable to every individual issue). Cell colors come from the synced Phase Rules
   (matched against the status text) first, then the configured open/closed/cx-complete status
-  lists — both read from Supabase, neither editable here.
+  lists.
 - **Filtering**: click the ▼ on any of the 9 filterable columns (Asset, Area, each phase's Gate CL
   1 / Overall Status, Open Issues) for a searchable checkbox dropdown — cascading, so one column's
   available values narrow based on every other active filter, same as the reference.
@@ -731,15 +732,34 @@ instead of copying LaunchPad's light-green one.
 - **Export PDF**: a column-picker modal opens a plain print window built straight from the
   currently-filtered row data (not by scraping the rendered grid's DOM, unlike the reference) and
   calls the browser's print dialog.
-- **Not ported** — stays LaunchPad's to own/edit, per the scoping call made before building this:
-  the System Config modal (phase name/toggle setup, status-color list editor) and the Phase Rules
-  Engine table editor. This page only reads whatever LaunchPad has configured; there's no write
-  path here at all.
+- **System Config + Phase Rules Engine** (added 2026-10-29) — an admin-only **System Config**
+  button opens `EquipmentTrackerSettingsModal.tsx`, a field-for-field port of LaunchPad's own
+  Settings modal: phase names/headers + Gate/Support toggles per L2/L3/L4, the Global Issues
+  header, nine status-color lists (Checklists Open/Closed/Cx Complete, Tests Open/Closed, Global
+  Issues Open/Closed, Gating/Non-Gating severities), a fallback color, and the Phase Rules Engine
+  table (Active/Phase/threshold expressions/Result Status/Color, add/remove rows).
+  - **System Config saves as a plain Supabase upsert** to `launchpad_equipment_tracker_config` —
+    those fields are pure display config this page already reads straight from there, so toggles/
+    headers/status colors take effect immediately on save.
+  - **Phase Rules are different, and need real care**: the actual rule *evaluation* that derives
+    each asset's L2/L3/L4 status happens entirely server-side (Apps Script/Sheet-side — neither
+    LaunchPad's nor ArcApp's own JS ever evaluates `maxGate`/`maxSupport`/etc.), keyed off the
+    Sheet's own copy of this table, which is what the periodic GitHub Action sync then copies into
+    Supabase's `phase_rules` column. Writing `phase_rules` to Supabase directly would be inert (the
+    Sheet never actually changes) and would get silently reverted by the next sync regardless, so
+    saving Phase Rules here **also POSTs the full settings payload to this project's own dedicated
+    Equipment Tracker Apps Script** (a separate, per-project deployment bound to the Equipment
+    Tracker spreadsheet — not the shared CxAlloy script) exactly like LaunchPad's own "Save & Sync
+    to Sheet" button does. That URL is a new admin-editable Settings field on this page
+    (`equipment_tracker_script_url` in `arcapp_settings` / `equipmentTrackerScriptUrl` in
+    `AppSettings`/`ShellContext`), blank by default — until it's set, System Config still saves
+    fine, but the modal shows an explicit notice that Phase Rule edits aren't syncing anywhere real
+    yet, rather than looking like a silent success that reverts later.
 - Verified live against real production data — 1,297 real assets loaded, phase-rule coloring
   correct, expand/collapse, cascading column filters (1,297 → 114 rows on an Area filter, cleared
   back to 1,297), global search (found and navigated 34 real matches, correct row highlighted),
   and a full PDF export exercised end-to-end (114-row filtered popup with correct headers/grouped
-  CHK and issue ids). Being read-only, no data could be modified during verification either way.
+  CHK and issue ids) — from before this page gained a write path at all.
 
 ## To-Do — Teams & task assignment
 

@@ -153,6 +153,7 @@ export default function AppShell() {
         milestoneGoThreshold?: number
         milestoneCautionThreshold?: number
         milestoneStatusStyles?: MilestoneStatusStyles
+        equipmentTrackerScriptUrl?: string
       }
     | undefined
   const jointPackFolder = settingsData?.jointPackPhotosFolder ?? ''
@@ -178,6 +179,7 @@ export default function AppShell() {
   const milestoneGoThreshold = settingsData?.milestoneGoThreshold ?? 70
   const milestoneCautionThreshold = settingsData?.milestoneCautionThreshold ?? 40
   const milestoneStatusStyles = settingsData?.milestoneStatusStyles ?? DEFAULT_MILESTONE_STATUS_STYLES
+  const equipmentTrackerScriptUrl = settingsData?.equipmentTrackerScriptUrl ?? ''
   const cxAlloyLinkBaseDetected = (cxAlloyLinkBaseFn.data as { domain: string; projectId: string } | null | undefined) ?? null
   // A manual Settings override always wins over auto-detection — see getCxAlloyLinkBase in
   // api.ts for why auto-detection alone can come back null (no Equipment Tracker data synced yet
@@ -397,6 +399,7 @@ export default function AppShell() {
     milestoneGoThreshold,
     milestoneCautionThreshold,
     milestoneStatusStyles,
+    equipmentTrackerScriptUrl,
     settingsLoading: settingsFn.loading,
     onSaveSetting: saveSetting,
     onSaveDefaultAssignee: saveDefaultAssignee,
