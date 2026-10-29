@@ -65,7 +65,7 @@ export default function DashboardPage() {
         <p>Your checklist, milestones, and live activity feed for {projectLabel(CURRENT_PROJECT)}.</p>
       </div>
 
-      <KpiRow />
+      <KpiRow milestones={milestoneRows} todos={myTodos} extraOpenCount={myItems.length + mySummaries.length} scheduleRows={ctx.rows} />
 
       <div className="dash-grid">
         <TodoPanel

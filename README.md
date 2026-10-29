@@ -538,6 +538,30 @@ same `getSettings()`. The fix is a one-line policy swap (`settings_select_authen
 but changing a live RLS policy needs your explicit go-ahead rather than being applied
 automatically — ask for it to be applied when you're ready.
 
+## Dashboard KPI row — real data, not sample numbers
+
+`KpiRow.tsx` was still the original Retool-era mock — all four tiles (Milestones GO, Open to-dos,
+Systems in commissioning, Next milestone) were hardcoded literals, never wired up even after the
+features they describe became real. Fixed 2026-10-29, same inputs `DashboardPage.tsx` already had
+on hand for its other widgets — no new fetches:
+
+- **Milestones GO**: `{count with progress.status === 'go'} / {total milestones}`, from the same
+  `useMilestonesWithProgress` call `MilestonesPanel`'s widget uses — never disagrees with the
+  Milestones page. Sub-line counts Caution/Hold milestones as "need attention" (red dot if any are
+  Hold, amber if only Caution, green "All on track"/"All complete" otherwise).
+- **Open to-dos**: `todos.filter(t => !t.done).length + extraOpenCount` — the exact same formula
+  `TodoPanel.tsx`'s own header count uses, given the exact same `myTodos`/`extraOpenCount` props, so
+  this tile can't drift from what "Your To-Dos" shows. Sub-line counts how many are due today (or
+  overdue — `todoDueDisplay().today` covers both) via the existing `todoDueDisplay` helper.
+- **Scheduled Activities** (renamed from "Systems in commissioning", which never meant anything
+  concrete here) — a plain count of `ctx.rows`, the same Schedule rows `SchedulePanel` below it is
+  already showing for whichever day is selected. Sub-line counts distinct `trade` values among them
+  ("3 disciplines active" / "Nothing scheduled").
+- **Next milestone**: the soonest `dueDate` among milestones not yet at `complete` status, sourced
+  from that same `useMilestonesWithProgress` list — "T−NND" countdown, "Today", or "NND late" once
+  past due, with the milestone's name underneath. Red sub-line once due or overdue, amber inside 3
+  days, otherwise neutral; "No upcoming milestones" when none have a due date or all are complete.
+
 ## Milestones — criteria-driven progress, not hand-set
 
 Used to be entirely fake: `sampleData.ts` hardcoded six milestones with a hand-picked pct/status,
