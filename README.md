@@ -632,11 +632,21 @@ instead of being set by hand.
   just whatever Settings currently calls "ready." This reuses the existing ready+open split instead
   of adding a new unfiltered fetch (CxAlloy's Apps Script needs an explicit status filter either
   way — see the comment on `getOpenChecklists` in `src/lib/api.ts`).
-- **Dashboard's Milestones widget** now reads this same live computed data (`useMilestonesWithProgress`
-  in `src/pages/arcapp/milestones.ts`) instead of the old hardcoded sample list, so it can never show
-  something different from the Milestones page itself. The tradeoff: visiting the Dashboard now also
-  fires the Checklists/Issues/Submittals (and, if enabled, NETA) fetches that used to only happen on
-  their own pages — say if that extra load time on the landing page becomes a problem.
+- **Dashboard's Milestones widget and KPI row** read this same live computed data
+  (`useMilestonesWithProgress` in `src/pages/arcapp/milestones.ts`) instead of the old hardcoded
+  sample numbers, so neither can ever disagree with the Milestones page itself.
+  - **Demand-driven fetching** (added 2026-10-30, after visiting the Dashboard got noticeably
+    slower) — `useMilestonesWithProgress` used to always fetch Checklists/Issues/Submittals/NETA/
+    Joint Pack Photos for every milestone's criteria, every time, on every page that shows
+    milestone progress. Checklists/Issues in particular go through CxAlloy's Apps Script (cold-
+    start + Sheets-read latency, the same cost that pushed the Equipment Tracker off live Apps
+    Script calls entirely — see that section above), so a Dashboard visit was paying for up to five
+    module fetches regardless of whether any milestone's criteria actually used them. Now it reads
+    the (cheap, single-table) milestone records first, looks at which modules their criteria
+    actually reference, and only fetches those — a project whose milestones only use Submittals no
+    longer waits on Checklists/Issues/NETA/Joint Pack round trips on the Dashboard. The Milestones
+    page itself passes `{ fetchAll: true }` instead, since its criteria *builder* needs every
+    module's picker options available even before a criterion using that module exists.
 - Any signed-in authorized user (`canEdit`, editor or admin — not admin-only, same as Submittals)
   can add, edit, or delete milestones and their criteria.
 

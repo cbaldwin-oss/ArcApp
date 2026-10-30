@@ -196,12 +196,25 @@ export type ComputedMilestone = MilestoneRecord & { progress: MilestoneProgress 
  * turns every milestone into a live computed pct/status. `enabled.neta`/`enabled.jointPack` gate
  * those two fetches since both throw outright when the project hasn't configured them (see
  * getNetaScriptUrl/getJointPackScriptUrl in api.ts).
+ *
+ * Checklists/Issues in particular go through CxAlloy's Apps Script (cold-start + Sheets-read
+ * latency — the same cost that made the Equipment Tracker move off live Apps Script calls
+ * entirely), so firing all five module fetches on every page that shows milestone progress — the
+ * Dashboard included, which never lets you edit criteria — used to make visiting the Dashboard pay
+ * for Checklists/Issues/Submittals/NETA/Joint Pack data even when no milestone's criteria touch
+ * them at all. `fetchAll: false` (the default) waits for the cheap milestones-table read, looks at
+ * what modules its criteria actually reference, and only fetches those — a Dashboard with
+ * Submittals-only milestones no longer waits on Checklists/Issues/NETA/Joint Pack round trips it
+ * has no use for. MilestonesPage passes `fetchAll: true` instead, since its criteria *builder* UI
+ * needs every module's picker options available even before a criterion using that module exists.
  */
 export function useMilestonesWithProgress(
   enabled: { neta: boolean; jointPack: boolean },
   thresholds: StatusThresholds = DEFAULT_STATUS_THRESHOLDS,
   styles: MilestoneStatusStyles = DEFAULT_MILESTONE_STATUS_STYLES,
+  opts: { fetchAll?: boolean } = {},
 ) {
+  const fetchAll = opts.fetchAll ?? false
   const milestonesFn = useGetMilestoneRecords()
   const checklistsFn = useGetChecklists()
   const openChecklistsFn = useGetOpenChecklists()
@@ -212,22 +225,32 @@ export function useMilestonesWithProgress(
   const jointPackFn = useGetJointPackData()
   const assetPlacesFn = useGetAssetPlaceOptions()
 
-  function reload() {
-    void milestonesFn.trigger()
-    void checklistsFn.trigger()
-    void openChecklistsFn.trigger()
-    void issuesFn.trigger()
-    void openIssuesFn.trigger()
-    void submittalsFn.trigger()
+  async function reload() {
     void assetPlacesFn.trigger()
-    if (enabled.neta) void netaFn.trigger()
-    if (enabled.jointPack) void jointPackFn.trigger()
+    let milestones: MilestoneRecord[]
+    try {
+      milestones = await milestonesFn.trigger().result
+    } catch {
+      return // milestonesFn.error is already set by useApiFn; nothing else to fetch without knowing criteria
+    }
+    const used = new Set(milestones.flatMap((m) => m.criteria.map((c) => c.module)))
+    if (fetchAll || used.has('checklists')) {
+      void checklistsFn.trigger()
+      void openChecklistsFn.trigger()
+    }
+    if (fetchAll || used.has('issues')) {
+      void issuesFn.trigger()
+      void openIssuesFn.trigger()
+    }
+    if (fetchAll || used.has('submittals')) void submittalsFn.trigger()
+    if (enabled.neta && (fetchAll || used.has('neta'))) void netaFn.trigger()
+    if (enabled.jointPack && (fetchAll || used.has('jointpack'))) void jointPackFn.trigger()
   }
 
   useEffect(() => {
-    reload()
+    void reload()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [enabled.neta, enabled.jointPack])
+  }, [enabled.neta, enabled.jointPack, fetchAll])
 
   const data: ModuleData = {
     checklists: [...(checklistsFn.data?.rows ?? []), ...(openChecklistsFn.data?.rows ?? [])],

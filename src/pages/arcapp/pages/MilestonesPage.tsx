@@ -32,6 +32,7 @@ export default function MilestonesPage() {
     { neta: ctx.netaTrackerEnabled, jointPack: ctx.jointPackEnabled },
     thresholds,
     styles,
+    { fetchAll: true }, // this page's criteria builder needs every module's picker options on hand
   )
   const cxSettingsFn = useGetCxAlloySettingsSheet()
   const saveFn = useSaveMilestone()
