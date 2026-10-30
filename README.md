@@ -815,10 +815,11 @@ Workflows — see `supabase/schema.sql`/`policies.sql`.
   that personalized view — creating/editing/assigning/completing tasks and teams needs no sign-in.
 - The old sample-data To-Dos were carried over as real seed rows in `schema.sql` so the list isn't
   empty on first load.
-- **Board view** (added 2026-10-30) — a **View: List / Board** toggle next to My Tasks/All Tasks
-  switches to a fixed **To Do / In Progress / Done** Kanban board (`TodoBoard.tsx`), alongside the
-  original flat list rather than replacing it (same List/view-toggle pattern Joint Pack Photos'
-  Asset List/Photo Gallery uses). A new `status` column on `arcapp_tasks` (`'todo' | 'in_progress'
+- **Board view** (added 2026-10-30, made the default later the same day) — a **View: Board / List**
+  toggle next to My Tasks/All Tasks switches between a fixed **To Do / In Progress / Done** Kanban
+  board (`TodoBoard.tsx`, the default) and the original flat list, kept rather than replaced (same
+  List/view-toggle pattern Joint Pack Photos' Asset List/Photo Gallery uses). A new `status` column
+  on `arcapp_tasks` (`'todo' | 'in_progress'
   | 'done'`, backfilled from the existing `done` boolean — nothing could already be "in progress")
   is the real field now; `done`/`completed_at` stay in sync with it on every write
   (`setTaskStatus`/`setTaskDone` in `src/lib/api.ts`) so every pre-existing done/not-done consumer

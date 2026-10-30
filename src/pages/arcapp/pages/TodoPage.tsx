@@ -47,7 +47,7 @@ export default function TodoPage() {
   const navigate = useNavigate()
 
   const [tab, setTab] = useState<Tab>(currentUserEmail ? 'mine' : 'all')
-  const [viewMode, setViewMode] = useState<ViewMode>('list')
+  const [viewMode, setViewMode] = useState<ViewMode>('board')
   const [formOpen, setFormOpen] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [form, setForm] = useState<FormState>(emptyForm())
@@ -158,11 +158,11 @@ export default function TodoPage() {
           </div>
           <div className="ts-filter-group">
             <span className="ts-filter-label">View:</span>
-            <button type="button" className={`ts-filter-btn${viewMode === 'list' ? ' active' : ''}`} onClick={() => setViewMode('list')}>
-              List
-            </button>
             <button type="button" className={`ts-filter-btn${viewMode === 'board' ? ' active' : ''}`} onClick={() => setViewMode('board')}>
               Board
+            </button>
+            <button type="button" className={`ts-filter-btn${viewMode === 'list' ? ' active' : ''}`} onClick={() => setViewMode('list')}>
+              List
             </button>
           </div>
         </div>
