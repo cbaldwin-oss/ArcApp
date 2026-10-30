@@ -815,6 +815,18 @@ Workflows — see `supabase/schema.sql`/`policies.sql`.
   that personalized view — creating/editing/assigning/completing tasks and teams needs no sign-in.
 - The old sample-data To-Dos were carried over as real seed rows in `schema.sql` so the list isn't
   empty on first load.
+- **Board view** (added 2026-10-30) — a **View: List / Board** toggle next to My Tasks/All Tasks
+  switches to a fixed **To Do / In Progress / Done** Kanban board (`TodoBoard.tsx`), alongside the
+  original flat list rather than replacing it (same List/view-toggle pattern Joint Pack Photos'
+  Asset List/Photo Gallery uses). A new `status` column on `arcapp_tasks` (`'todo' | 'in_progress'
+  | 'done'`, backfilled from the existing `done` boolean — nothing could already be "in progress")
+  is the real field now; `done`/`completed_at` stay in sync with it on every write
+  (`setTaskStatus`/`setTaskDone` in `src/lib/api.ts`) so every pre-existing done/not-done consumer
+  (the List view's checkbox, `KpiRow`, `TodoPanel`'s open count, `todoDueDisplay`) keeps working
+  unchanged. Cards move between columns via **‹ / ›** buttons, not drag-and-drop — native HTML5
+  drag-and-drop doesn't work reliably from touch on iOS Safari, and this app runs on iPad, so a
+  button that always works everywhere beat a drag interaction that wouldn't (would need a
+  touch-aware DnD library to do properly, which wasn't worth the new dependency for this).
 
 ### Checklist/Issue/NETA markers in "Your To-Dos" — summary cards + individually-assigned items
 

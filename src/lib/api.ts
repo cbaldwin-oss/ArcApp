@@ -21,7 +21,7 @@ import { useApiFn } from './useApiFn'
 import { supabase } from './supabaseClient'
 import { CURRENT_PROJECT, hasCapability } from './project'
 import { FALLBACK_WORKFLOW_ITEMS, type WorkflowItem } from '../pages/arcapp/workflowItems'
-import type { Team, TeamMember, Todo, TaskTag, Milestone } from '../pages/arcapp/types'
+import type { Team, TeamMember, Todo, TaskTag, TaskStatus, Milestone } from '../pages/arcapp/types'
 
 // The active LaunchPad project (site) — see src/lib/project.ts. Every table-name template below
 // (STY4dropdownoptions, STY4BackEndData, STY4authorized_editors, etc.) reads this instead of a
@@ -2222,12 +2222,17 @@ export function useDeleteTeam() {
 
 function toTodo(r: Record<string, unknown>): Todo {
   const tag = r.tag as string
+  const status = r.status as string
   return {
     id: String(r.id),
     text: (r.text as string) ?? '',
     tag: tag === 'crit' || tag === 'high' ? (tag as TaskTag) : 'norm',
     sys: (r.sys as string) ?? '',
     dueDate: (r.due_date as string | null) ?? null,
+    // Falls back from `done` for any row written before the `status` column existed, rather than
+    // trusting a NULL/unexpected value — the column is NOT NULL with a default going forward, so
+    // this only matters for the brief window right after that migration ran.
+    status: status === 'todo' || status === 'in_progress' || status === 'done' ? (status as TaskStatus) : r.done ? 'done' : 'todo',
     done: !!r.done,
     completedAt: (r.completed_at as string | null) ?? null,
     assignedTeamId: (r.assigned_team_id as string | null) ?? null,
@@ -2238,7 +2243,7 @@ function toTodo(r: Record<string, unknown>): Todo {
 async function getTasks(): Promise<Todo[]> {
   const res = await supabase
     .from('arcapp_tasks')
-    .select('id, text, tag, sys, due_date, done, completed_at, assigned_team_id, assigned_email, assigned_name')
+    .select('id, text, tag, sys, due_date, status, done, completed_at, assigned_team_id, assigned_email, assigned_name')
     .eq('project_key', CURRENT_PROJECT)
     .order('done', { ascending: true })
     .order('due_date', { ascending: true, nullsFirst: false })
@@ -2294,6 +2299,10 @@ async function setTaskDone(params: { id: string; done: boolean }): Promise<{ id:
     .from('arcapp_tasks')
     .update({
       done: params.done,
+      // The checkbox stays a plain 2-state toggle (its pre-Kanban behavior) — checking it always
+      // lands on Done, unchecking always lands back on To Do, regardless of whatever status (e.g.
+      // In Progress) it was at before. Use setTaskStatus directly for 3-way moves on the board.
+      status: params.done ? 'done' : 'todo',
       completed_at: params.done ? new Date().toISOString() : null,
       updated_at: new Date().toISOString(),
     })
@@ -2303,6 +2312,23 @@ async function setTaskDone(params: { id: string; done: boolean }): Promise<{ id:
 }
 export function useSetTaskDone() {
   return useApiFn(setTaskDone)
+}
+
+async function setTaskStatus(params: { id: string; status: TaskStatus }): Promise<{ id: string; status: TaskStatus }> {
+  const res = await supabase
+    .from('arcapp_tasks')
+    .update({
+      status: params.status,
+      done: params.status === 'done',
+      completed_at: params.status === 'done' ? new Date().toISOString() : null,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', params.id)
+  if (res.error) throw new Error(res.error.message)
+  return { id: params.id, status: params.status }
+}
+export function useSetTaskStatus() {
+  return useApiFn(setTaskStatus)
 }
 
 async function deleteTask(params: { id: string }): Promise<{ id: string }> {

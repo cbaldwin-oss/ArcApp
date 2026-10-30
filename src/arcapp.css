@@ -334,6 +334,26 @@ html, body, #root{ margin:0; padding:0; min-height:100%; background:#05070d; }
 }
 .arcapp .todo-actions{ flex:0 0 auto; display:flex; gap:4px; align-self:flex-start; }
 
+/* ---------- To-Do Kanban board ---------- */
+.arcapp .kanban-board{ display:grid; grid-template-columns:repeat(3, 1fr); gap:16px; align-items:start; }
+@media (max-width:860px){ .arcapp .kanban-board{ grid-template-columns:1fr; } }
+.arcapp .kanban-col{ background:var(--bg-elev-2); border:1px solid var(--border-strong); border-radius:var(--radius); padding:12px; min-height:80px; }
+.arcapp .kanban-col-header{ display:flex; align-items:center; justify-content:space-between; margin-bottom:10px; padding-bottom:9px; border-bottom:1px solid var(--border); }
+.arcapp .kanban-col-title{ font-family:var(--font-display); font-size:12px; font-weight:700; letter-spacing:0.5px; text-transform:uppercase; color:var(--text); }
+.arcapp .kanban-col-count{ font-family:var(--font-mono); font-size:11px; color:var(--text-faint); }
+.arcapp .kanban-cards{ display:flex; flex-direction:column; gap:10px; }
+.arcapp .kanban-empty{ font-size:12.5px; color:var(--text-faint); padding:8px 2px; }
+.arcapp .kanban-card{ background:var(--bg-elev); border:1px solid var(--border-strong); border-radius:var(--radius-sm); padding:11px 12px; }
+.arcapp .kanban-card-text{ font-size:13.5px; color:var(--text); margin:0 0 8px; line-height:1.4; }
+.arcapp .kanban-card-footer{ display:flex; align-items:center; justify-content:space-between; gap:8px; margin-top:10px; }
+.arcapp .kanban-move-group{ display:flex; gap:4px; }
+.arcapp .kanban-move-btn{
+  background:var(--bg-elev-2); border:1px solid var(--border-strong); border-radius:6px; color:var(--text-muted);
+  width:26px; height:26px; display:flex; align-items:center; justify-content:center; cursor:pointer; transition:border-color .15s ease, color .15s ease;
+}
+.arcapp .kanban-move-btn:hover{ border-color:var(--green); color:var(--green); }
+.arcapp .kanban-move-btn:disabled{ opacity:0.3; cursor:not-allowed; }
+
 /* ---------- milestones (orbit rings) ---------- */
 .arcapp .milestone-item{ display:flex; align-items:center; gap:16px; padding:15px 0; border-bottom:1px solid var(--border); }
 .arcapp .milestone-item:last-child{ border-bottom:none; }

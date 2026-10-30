@@ -5,13 +5,13 @@ import { CURRENT_PROJECT, projectLabel } from '../../lib/project'
 import {
   useGetSchedule, useGetResultOptions, useSaveResult, useLogTamperSeals, useSubmitRtft,
   useGetSettings, useSaveSetting, useSaveDefaultAssignee, useGetWorkflows, useGetWorkflowItems, useGetCxAlloyLinkBase, parseCxAlloyLinkBase,
-  useGetTasks, useSaveTask, useSetTaskDone, useDeleteTask, useGetTeams, useSaveTeam, useDeleteTeam,
+  useGetTasks, useSaveTask, useSetTaskDone, useSetTaskStatus, useDeleteTask, useGetTeams, useSaveTeam, useDeleteTeam,
 } from '../../lib/api'
 import type { TaskInput, DefaultAssignee, MilestoneStatusStyles } from '../../lib/api'
 import { DEFAULT_MILESTONE_STATUS_STYLES } from '../../lib/api'
 import type { WorkflowItem } from './workflowItems'
 import type { ShellContext } from './ShellContext'
-import type { ScheduleRow, ScheduleState, ActivityAnswer, Todo, Team, TeamMember } from './types'
+import type { ScheduleRow, ScheduleState, ActivityAnswer, Todo, Team, TeamMember, TaskStatus } from './types'
 import { localIsoDate, addDaysIso } from './utils'
 import Topbar from './components/Topbar'
 import Sidebar from './components/Sidebar'
@@ -53,6 +53,7 @@ export default function AppShell() {
   const tasksFn = useGetTasks()
   const saveTaskFn = useSaveTask()
   const setTaskDoneFn = useSetTaskDone()
+  const setTaskStatusFn = useSetTaskStatus()
   const deleteTaskFn = useDeleteTask()
   const teamsFn = useGetTeams()
   const saveTeamFn = useSaveTeam()
@@ -240,7 +241,14 @@ export default function AppShell() {
     const done = !current.done
     await setTaskDoneFn.trigger({ id, done }).result
     setTodos((prev) =>
-      prev.map((t) => (t.id === id ? { ...t, done, completedAt: done ? new Date().toISOString() : null } : t)),
+      prev.map((t) => (t.id === id ? { ...t, done, status: done ? 'done' : 'todo', completedAt: done ? new Date().toISOString() : null } : t)),
+    )
+  }
+
+  async function moveTaskStatus(id: string, status: TaskStatus) {
+    await setTaskStatusFn.trigger({ id, status }).result
+    setTodos((prev) =>
+      prev.map((t) => (t.id === id ? { ...t, status, done: status === 'done', completedAt: status === 'done' ? new Date().toISOString() : null } : t)),
     )
   }
 
@@ -340,6 +348,7 @@ export default function AppShell() {
   const outletContext: ShellContext = {
     todos,
     onToggleTodo: toggleTodo,
+    onMoveTaskStatus: moveTaskStatus,
     tasksLoading: tasksFn.loading || !tasksFn.data,
     tasksError: tasksFn.error ?? '',
     onSaveTask: saveTaskRecord,

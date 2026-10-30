@@ -24,6 +24,12 @@ export type Team = {
 
 export type TaskTag = 'crit' | 'high' | 'norm'
 
+/** The Kanban board's three columns (added 2026-10-30) — `done` stays in sync with this
+ * (`done === (status === 'done')`) so every pre-existing done/not-done consumer (the list
+ * checkbox, KpiRow, TodoPanel's open count, todoDueDisplay) keeps working unchanged; `status` is
+ * the richer field the board reads/writes. See setTaskStatus/setTaskDone in src/lib/api.ts. */
+export type TaskStatus = 'todo' | 'in_progress' | 'done'
+
 /**
  * A real, persisted task (arcapp_tasks) — replaces the old hardcoded sample To-Do list.
  * `tagLabel`/`due`/`today` used to be stored directly; they're now derived for display via
@@ -35,6 +41,7 @@ export type Todo = {
   tag: TaskTag
   sys: string
   dueDate: string | null // ISO yyyy-mm-dd
+  status: TaskStatus
   done: boolean
   completedAt: string | null
   /** A task is assigned to at most one of: a team, or a specific person (assignedEmail/Name). */

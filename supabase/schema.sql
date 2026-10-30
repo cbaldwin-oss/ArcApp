@@ -264,3 +264,18 @@ CREATE TABLE IF NOT EXISTS arcapp_milestones (
   updated_at timestamptz NOT NULL DEFAULT now(),
   created_at timestamptz NOT NULL DEFAULT now()
 );
+
+-- ---------------------------------------------------------------------------
+-- APPLIED — arcapp_tasks.status (Kanban board, requested 2026-10-30).
+--
+-- The To-Do page's new Board view needs a real third state between "not started" and "done" —
+-- `done` alone can't represent "in progress". `status` is the richer field going forward;
+-- `done`/`completed_at` stay in sync with it on every write (see setTaskStatus/setTaskDone in
+-- src/lib/api.ts) so every pre-existing done/not-done consumer (the List view's checkbox, KpiRow,
+-- TodoPanel's open count, todoDueDisplay) keeps working unchanged. Existing rows backfilled to
+-- 'done' where `done = true`, 'todo' otherwise (nothing could already be "in progress").
+-- ---------------------------------------------------------------------------
+
+ALTER TABLE arcapp_tasks ADD COLUMN IF NOT EXISTS status text NOT NULL DEFAULT 'todo';
+ALTER TABLE arcapp_tasks ADD CONSTRAINT arcapp_tasks_status_check CHECK (status IN ('todo','in_progress','done'));
+UPDATE arcapp_tasks SET status = 'done' WHERE done = true AND status <> 'done';

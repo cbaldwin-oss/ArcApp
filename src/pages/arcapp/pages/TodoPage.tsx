@@ -6,6 +6,7 @@ import type { TaskInput } from '../../../lib/api'
 import type { Todo, TaskTag } from '../types'
 import { isTodoMine } from '../utils'
 import { TodoList } from '../components/TodoPanel'
+import TodoBoard from '../components/TodoBoard'
 import TeamsManager from '../components/TeamsManager'
 import { MyItemRow, MySummaryCard, todoSummaryRoute } from '../components/OpenItemsTodoPanel'
 import PersonSelect, { useAuthorizedUsersOptions } from '../components/PersonSelect'
@@ -38,6 +39,7 @@ function formFromTodo(t: Todo): FormState {
 }
 
 type Tab = 'mine' | 'all'
+type ViewMode = 'list' | 'board'
 
 export default function TodoPage() {
   const ctx = useOutletContext<ShellContext>()
@@ -45,6 +47,7 @@ export default function TodoPage() {
   const navigate = useNavigate()
 
   const [tab, setTab] = useState<Tab>(currentUserEmail ? 'mine' : 'all')
+  const [viewMode, setViewMode] = useState<ViewMode>('list')
   const [formOpen, setFormOpen] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [form, setForm] = useState<FormState>(emptyForm())
@@ -144,13 +147,24 @@ export default function TodoPage() {
           </div>
         </div>
 
-        <div style={{ display: 'flex', gap: 8, padding: '0 20px 12px' }}>
-          <button className={tab === 'mine' ? 'wf-btn' : 'wf-btn'} style={tab === 'mine' ? { borderColor: 'var(--green)', color: 'var(--green)' } : undefined} onClick={() => setTab('mine')}>
-            My Tasks {currentUserEmail ? `(${mineCount})` : ''}
-          </button>
-          <button className="wf-btn" style={tab === 'all' ? { borderColor: 'var(--green)', color: 'var(--green)' } : undefined} onClick={() => setTab('all')}>
-            All Tasks ({todos.length})
-          </button>
+        <div style={{ display: 'flex', gap: 8, padding: '0 20px 12px', flexWrap: 'wrap', justifyContent: 'space-between' }}>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button className={tab === 'mine' ? 'wf-btn' : 'wf-btn'} style={tab === 'mine' ? { borderColor: 'var(--green)', color: 'var(--green)' } : undefined} onClick={() => setTab('mine')}>
+              My Tasks {currentUserEmail ? `(${mineCount})` : ''}
+            </button>
+            <button className="wf-btn" style={tab === 'all' ? { borderColor: 'var(--green)', color: 'var(--green)' } : undefined} onClick={() => setTab('all')}>
+              All Tasks ({todos.length})
+            </button>
+          </div>
+          <div className="ts-filter-group">
+            <span className="ts-filter-label">View:</span>
+            <button type="button" className={`ts-filter-btn${viewMode === 'list' ? ' active' : ''}`} onClick={() => setViewMode('list')}>
+              List
+            </button>
+            <button type="button" className={`ts-filter-btn${viewMode === 'board' ? ' active' : ''}`} onClick={() => setViewMode('board')}>
+              Board
+            </button>
+          </div>
         </div>
         {tab === 'mine' && !currentUserEmail && (
           <div className="q-hint" style={{ padding: '0 20px 12px' }}>
@@ -271,9 +285,14 @@ export default function TodoPage() {
           {!ctx.tasksLoading && !ctx.tasksError && visible.length === 0 && shownMyItems.length === 0 && shownMySummaries.length === 0 && (
             <div className="q-hint">{tab === 'mine' ? 'Nothing assigned to you right now.' : 'No tasks yet.'}</div>
           )}
-          {!ctx.tasksLoading && !ctx.tasksError && visible.length > 0 && (
-            <TodoList todos={visible} teams={teams} onToggle={ctx.onToggleTodo} onEdit={openEdit} onDelete={handleDelete} />
-          )}
+          {!ctx.tasksLoading &&
+            !ctx.tasksError &&
+            visible.length > 0 &&
+            (viewMode === 'board' ? (
+              <TodoBoard todos={visible} teams={teams} onMoveStatus={(id, status) => void ctx.onMoveTaskStatus(id, status)} onEdit={openEdit} onDelete={handleDelete} />
+            ) : (
+              <TodoList todos={visible} teams={teams} onToggle={ctx.onToggleTodo} onEdit={openEdit} onDelete={handleDelete} />
+            ))}
         </div>
       </section>
     </>

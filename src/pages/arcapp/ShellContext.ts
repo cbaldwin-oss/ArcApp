@@ -1,4 +1,4 @@
-import type { ScheduleRow, ScheduleState, Team, TeamMember, Todo } from './types'
+import type { ScheduleRow, ScheduleState, Team, TeamMember, Todo, TaskStatus } from './types'
 import type { CxAlloyLinkBase, DefaultAssignee, TaskInput, MilestoneStatusStyles } from '../../lib/api'
 import type { OpenItemsData } from './components/OpenItemsTodoPanel'
 
@@ -11,6 +11,9 @@ import type { OpenItemsData } from './components/OpenItemsTodoPanel'
 export type ShellContext = {
   todos: Todo[]
   onToggleTodo: (id: string) => void
+  /** Kanban board's per-card move buttons (added 2026-10-30) — a 3-way version of onToggleTodo,
+   * see setTaskStatus in src/lib/api.ts. */
+  onMoveTaskStatus: (id: string, status: TaskStatus) => Promise<void>
   tasksLoading: boolean
   tasksError: string
   onSaveTask: (input: TaskInput) => Promise<void>
