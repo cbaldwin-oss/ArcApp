@@ -8,10 +8,12 @@ const MODULE_LABEL: Record<MilestoneCriterion['module'], string> = {
   issues: 'Issues',
   submittals: 'Submittals',
   neta: 'NETA Tracker',
+  jointpack: 'Joint Pack Photos',
 }
 
 function defaultCriterion(module: MilestoneCriterion['module']): MilestoneCriterion {
   if (module === 'neta') return { module: 'neta', tab: 'Submissions', zones: [], flag: 'submittedToGoogle' }
+  if (module === 'jointpack') return { module, scope: { by: 'assets', assets: [] } }
   if (module === 'issues') return { module, scope: { by: 'assets', assets: [] }, targetStatuses: [], priorities: [] }
   return { module, scope: { by: 'assets', assets: [] }, targetStatuses: [] }
 }
@@ -25,12 +27,13 @@ type Options = {
   submittalStatuses: readonly string[]
   netaZones: string[]
   netaEnabled: boolean
+  jointPackEnabled: boolean
 }
 
 /**
  * The editable list of a milestone's completion criteria — each row picks a module (Checklists/
- * Issues/Submittals/NETA Tracker), then the fields that module needs to decide which of its rows
- * count. Shared between the add and edit forms in MilestonesPage.tsx.
+ * Issues/Submittals/NETA Tracker/Joint Pack Photos), then the fields that module needs to decide
+ * which of its rows count. Shared between the add and edit forms in MilestonesPage.tsx.
  */
 export default function MilestoneCriteriaBuilder({
   criteria,
@@ -43,7 +46,9 @@ export default function MilestoneCriteriaBuilder({
   disabled?: boolean
   options: Options
 }) {
-  const moduleOptions = (Object.keys(MODULE_LABEL) as MilestoneCriterion['module'][]).filter((m) => m !== 'neta' || options.netaEnabled)
+  const moduleOptions = (Object.keys(MODULE_LABEL) as MilestoneCriterion['module'][]).filter(
+    (m) => (m !== 'neta' || options.netaEnabled) && (m !== 'jointpack' || options.jointPackEnabled),
+  )
 
   function updateAt(i: number, next: MilestoneCriterion) {
     onChange(criteria.map((c, idx) => (idx === i ? next : c)))
@@ -177,14 +182,21 @@ export default function MilestoneCriteriaBuilder({
                     disabled={disabled}
                   />
                 )}
-                <MultiSelectPicker
-                  label={`Target status (${c.targetStatuses.length} selected)`}
-                  options={statusOptionsFor(c.module)}
-                  selected={c.targetStatuses}
-                  onChange={(targetStatuses) => updateAt(i, { ...c, targetStatuses })}
-                  placeholder="Search statuses…"
-                  disabled={disabled}
-                />
+                {c.module === 'jointpack' ? (
+                  <div className="q-hint" style={{ margin: 0 }}>
+                    Counts as done when a Joint Pack # has all three sides (Top/Side/Bottom)
+                    photographed — Joint Pack Photos has no status list to pick a target from.
+                  </div>
+                ) : (
+                  <MultiSelectPicker
+                    label={`Target status (${c.targetStatuses.length} selected)`}
+                    options={statusOptionsFor(c.module)}
+                    selected={c.targetStatuses}
+                    onChange={(targetStatuses) => updateAt(i, { ...c, targetStatuses })}
+                    placeholder="Search statuses…"
+                    disabled={disabled}
+                  />
+                )}
               </div>
             )}
           </div>

@@ -28,7 +28,11 @@ export default function MilestonesPage() {
     caution: ctx.milestoneCautionThreshold,
   }
   const styles = ctx.milestoneStatusStyles
-  const { computed, data, loading, error, reload } = useMilestonesWithProgress(ctx.netaTrackerEnabled, thresholds, styles)
+  const { computed, data, loading, error, reload } = useMilestonesWithProgress(
+    { neta: ctx.netaTrackerEnabled, jointPack: ctx.jointPackEnabled },
+    thresholds,
+    styles,
+  )
   const cxSettingsFn = useGetCxAlloySettingsSheet()
   const saveFn = useSaveMilestone()
   const deleteFn = useDeleteMilestone()
@@ -68,8 +72,9 @@ export default function MilestonesPage() {
       submittalStatuses: SUBMITTAL_STATUSES,
       netaZones: distinctZones(data.neta.submissions, data.neta.returnedFiles),
       netaEnabled: ctx.netaTrackerEnabled,
+      jointPackEnabled: ctx.jointPackEnabled,
     }),
-    [data.assetPlaces, cxSettingsFn.data, data.neta, ctx.netaTrackerEnabled],
+    [data.assetPlaces, cxSettingsFn.data, data.neta, ctx.netaTrackerEnabled, ctx.jointPackEnabled],
   )
 
   function openNew() {

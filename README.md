@@ -573,8 +573,12 @@ instead of being set by hand.
 
 - **A criterion** scopes into one other module — Checklists, Issues, or Submittals by either an
   explicit asset list **or by area** (added 2026-10-27), + which status(es) on that module count as
-  "done"; or NETA Tracker by a tab (Submissions/Returned Files) + zone(s) + which boolean field
-  (Clerical Review, Technical Review, NETA Completed, etc.) counts as done.
+  "done"; NETA Tracker by a tab (Submissions/Returned Files) + zone(s) + which boolean field
+  (Clerical Review, Technical Review, NETA Completed, etc.) counts as done; or Joint Pack Photos
+  (added 2026-10-30) by asset/area only — it has no status vocabulary, so a Joint Pack # row just
+  counts as done once all three sides (Top/Side/Bottom) are photographed. Gated by that project's
+  `jointPackEnabled` toggle the same way NETA criteria are gated by `netaTrackerEnabled` — the
+  module option doesn't even show up in the picker if Joint Pack Photos isn't turned on.
   `MilestoneCriteriaBuilder.tsx` is the editable list of these inside the Add/Edit Milestone form;
   `evaluateCriterion`/`computeMilestoneProgress` (`src/pages/arcapp/milestones.ts`) are the pure
   functions that turn `criteria` + each module's current data into a result — **nothing is stored

@@ -6,12 +6,14 @@ import {
   useGetOpenIssues,
   useGetSubmittalsList,
   useGetNetaTrackerData,
+  useGetJointPackData,
   useGetAssetPlaceOptions,
   useGetMilestoneRecords,
   type ChecklistRow,
   type IssueRow,
   type Submittal,
   type NetaTrackerData,
+  type JointPackRow,
   type MilestoneCriterion,
   type MilestoneRecord,
   type CriterionScope,
@@ -28,6 +30,7 @@ export type ModuleData = {
   issues: IssueRow[]
   submittals: Submittal[]
   neta: NetaTrackerData
+  jointPacks: JointPackRow[]
   /** Asset<->Place pairing (STY4dropdownoptions) — lets a criterion scope by area instead of
    * listing assets one by one; see resolveScopeAssets. */
   assetPlaces: Array<{ asset: string; place: string }>
@@ -49,11 +52,12 @@ function resolveScopeAssets(scope: CriterionScope, assetPlaces: Array<{ asset: s
 }
 
 /**
- * Checklists/Issues/Submittals criteria all reduce to the same shape: how many of the rows
- * scoped to this criterion (by asset list or by area) already sit in one of its target statuses.
- * `total` is 0 (and `pct` null, excluded from the milestone's average) whenever nothing's picked
- * yet, or the scope currently matches no rows in that module — a misconfigured/empty criterion
- * shouldn't silently count as either 0% or 100% done.
+ * Checklists/Issues/Submittals/Joint Pack Photos criteria all reduce to the same shape: how many
+ * of the rows scoped to this criterion (by asset list or by area) already count as done — in a
+ * target status for the first three, or "all three sides photographed" for Joint Pack Photos,
+ * which has no status vocabulary of its own. `total` is 0 (and `pct` null, excluded from the
+ * milestone's average) whenever nothing's picked yet, or the scope currently matches no rows in
+ * that module — a misconfigured/empty criterion shouldn't silently count as either 0% or 100% done.
  */
 export function evaluateCriterion(c: MilestoneCriterion, data: ModuleData): CriterionResult {
   switch (c.module) {
@@ -85,6 +89,12 @@ export function evaluateCriterion(c: MilestoneCriterion, data: ModuleData): Crit
         const v = (r as unknown as Record<string, unknown>)[c.flag]
         return v === true || v === 'N/A' // N/A means the check doesn't apply here, not that it's outstanding
       }).length
+      return { satisfied, total: scoped.length, pct: scoped.length === 0 ? null : (satisfied / scoped.length) * 100 }
+    }
+    case 'jointpack': {
+      const assetSet = resolveScopeAssets(c.scope, data.assetPlaces)
+      const scoped = assetSet.size === 0 ? [] : data.jointPacks.filter((r) => assetSet.has(norm(r.asset)))
+      const satisfied = scoped.filter((r) => r.topUrl && r.sideUrl && r.bottomUrl).length
       return { satisfied, total: scoped.length, pct: scoped.length === 0 ? null : (satisfied / scoped.length) * 100 }
     }
   }
@@ -160,10 +170,12 @@ const MODULE_LABEL: Record<MilestoneCriterion['module'], string> = {
   issues: 'Issues',
   submittals: 'Submittals',
   neta: 'NETA Tracker',
+  jointpack: 'Joint Pack Photos',
 }
 
 export function describeCriterion(c: MilestoneCriterion): string {
   if (c.module === 'neta') return `${MODULE_LABEL.neta} (${c.tab}) for ${zonePart(c.zones)} — ${NETA_FLAG_LABELS[c.flag]}`
+  if (c.module === 'jointpack') return `${MODULE_LABEL.jointpack} for ${scopePart(c.scope)} fully photographed (Top/Side/Bottom)`
   const statusPart = c.targetStatuses.length === 0 ? 'no target status picked yet' : c.targetStatuses.join(' or ')
   const priorityPart = c.module === 'issues' && c.priorities.length > 0 ? ` (${c.priorities.join('/')} only)` : ''
   return `${MODULE_LABEL[c.module]} for ${scopePart(c.scope)}${priorityPart} reach ${statusPart}`
@@ -180,12 +192,13 @@ export type ComputedMilestone = MilestoneRecord & { progress: MilestoneProgress 
 /**
  * Fetches a milestone's criteria inputs — Checklists/Issues (ready + open, merged, so a criterion
  * can target any status regardless of which bucket it's normally filtered into elsewhere),
- * Submittals, and (when this project has it enabled) NETA Tracker data — and turns every milestone
- * into a live computed pct/status. `netaEnabled` gates the NETA fetch since getNetaTrackerData()
- * throws outright when the project hasn't configured it (see getNetaScriptUrl in api.ts).
+ * Submittals, and (when this project has them enabled) NETA Tracker + Joint Pack Photos data — and
+ * turns every milestone into a live computed pct/status. `enabled.neta`/`enabled.jointPack` gate
+ * those two fetches since both throw outright when the project hasn't configured them (see
+ * getNetaScriptUrl/getJointPackScriptUrl in api.ts).
  */
 export function useMilestonesWithProgress(
-  netaEnabled: boolean,
+  enabled: { neta: boolean; jointPack: boolean },
   thresholds: StatusThresholds = DEFAULT_STATUS_THRESHOLDS,
   styles: MilestoneStatusStyles = DEFAULT_MILESTONE_STATUS_STYLES,
 ) {
@@ -196,6 +209,7 @@ export function useMilestonesWithProgress(
   const openIssuesFn = useGetOpenIssues()
   const submittalsFn = useGetSubmittalsList()
   const netaFn = useGetNetaTrackerData()
+  const jointPackFn = useGetJointPackData()
   const assetPlacesFn = useGetAssetPlaceOptions()
 
   function reload() {
@@ -206,19 +220,21 @@ export function useMilestonesWithProgress(
     void openIssuesFn.trigger()
     void submittalsFn.trigger()
     void assetPlacesFn.trigger()
-    if (netaEnabled) void netaFn.trigger()
+    if (enabled.neta) void netaFn.trigger()
+    if (enabled.jointPack) void jointPackFn.trigger()
   }
 
   useEffect(() => {
     reload()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [netaEnabled])
+  }, [enabled.neta, enabled.jointPack])
 
   const data: ModuleData = {
     checklists: [...(checklistsFn.data?.rows ?? []), ...(openChecklistsFn.data?.rows ?? [])],
     issues: [...(issuesFn.data?.rows ?? []), ...(openIssuesFn.data?.rows ?? [])],
     submittals: submittalsFn.data ?? [],
     neta: netaFn.data ?? { submissions: [], returnedFiles: [], syncedAt: null },
+    jointPacks: jointPackFn.data?.rows ?? [],
     assetPlaces: assetPlacesFn.data ?? [],
   }
 

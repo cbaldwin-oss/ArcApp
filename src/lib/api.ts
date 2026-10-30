@@ -1598,7 +1598,10 @@ export type IssueCriterion = { module: 'issues'; scope: CriterionScope; targetSt
 export type SubmittalCriterion = { module: 'submittals'; scope: CriterionScope; targetStatuses: string[] }
 export type NetaFlag = 'clericalReview' | 'submittedToGoogle' | 'technicalReview' | 'stampPresent' | 'netaCompleted' | 'uploadedToAcc'
 export type NetaCriterion = { module: 'neta'; tab: NetaTab; zones: string[]; flag: NetaFlag }
-export type MilestoneCriterion = ChecklistCriterion | IssueCriterion | SubmittalCriterion | NetaCriterion
+// Joint Pack Photos has no status vocabulary to target — a Joint Pack # row is just "fully
+// photographed" (Top + Side + Bottom all saved) or not, so this criterion only needs a scope.
+export type JointPackCriterion = { module: 'jointpack'; scope: CriterionScope }
+export type MilestoneCriterion = ChecklistCriterion | IssueCriterion | SubmittalCriterion | NetaCriterion | JointPackCriterion
 
 export type MilestoneRecord = {
   id: string

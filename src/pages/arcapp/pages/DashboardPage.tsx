@@ -22,7 +22,7 @@ export default function DashboardPage() {
   // disagree about what's actually complete. Same configured status thresholds too, not the
   // function's hardcoded fallback, so a status shown here always matches the Milestones page.
   const { computed: milestoneRows } = useMilestonesWithProgress(
-    ctx.netaTrackerEnabled,
+    { neta: ctx.netaTrackerEnabled, jointPack: ctx.jointPackEnabled },
     { complete: ctx.milestoneCompleteThreshold, go: ctx.milestoneGoThreshold, caution: ctx.milestoneCautionThreshold },
     ctx.milestoneStatusStyles,
   )
